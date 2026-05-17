@@ -1,16 +1,10 @@
-# Wiki Template
+# <Organization> Wiki
 
-A self-maintaining, LLM-readable knowledge base for your company, team, or project. Downstream AI agents (sales, product, support, ops) read from this wiki instead of re-deriving context from raw documents every time. Built on the [Karpathy LLM-wiki pattern](https://karpathy.ai/zero-to-one/).
+A clonable, agent-readable wiki template. The company context layer for AI agents at the organization defined in [`wiki/domain.md`](wiki/domain.md).
 
-Drop your documents into `raw/`, run `/ingest`, and the wiki starts compounding.
+A self-maintaining, LLM-readable knowledge base. Downstream agents (sales, product, customer success) read from it instead of re-deriving context from raw documents. Built on the [Karpathy LLM-wiki pattern](https://karpathy.ai/zero-to-one/).
 
-## Quick start
-
-1. **Copy this repo** (fork, clone, or "Use this template" on GitHub) into your own workspace.
-2. **Drop source documents** into the appropriate `raw/<category>/` subfolder. Existing subfolders are example categories — rename, add, or remove to fit your domain.
-3. **Open the project in Claude Code** (or another AI coding agent that respects `CLAUDE.md`).
-4. **Run `/ingest`** to turn raw documents into structured wiki pages.
-5. **Ask questions.** The agent reads from `wiki/` and cites its sources.
+> **Just cloned this?** See [`SETUP.md`](SETUP.md) — your AI agent will read it on first session and offer to interview you to configure the wiki for your organization.
 
 ## How to use it
 
@@ -18,11 +12,16 @@ The wiki is designed as a **reference guide for AI agents**. There are three mod
 
 ### 1. Ask a question (default)
 
-Just ask. Any AI agent with access to this directory picks up [`CLAUDE.md`](CLAUDE.md), follows it to [`CONTEXT.md`](CONTEXT.md), and routes through the [research workspace](.claude/workspaces/research/CONTEXT.md) — which tells the agent how to find the right pages, cite sources, and respect confidence ratings. No command needed.
+Just ask. Claude Code auto-loads [`CLAUDE.md`](CLAUDE.md); OpenAI Codex (and other agents that follow the `AGENTS.md` convention) auto-load [`AGENTS.md`](AGENTS.md), which forwards to the same instructions. From there the agent follows [`CONTEXT.md`](CONTEXT.md) into the [research workspace](.claude/workspaces/research/CONTEXT.md), which tells it how to find the right pages, cite sources, and respect confidence ratings. No command needed.
 
-The agent answers with citations like `(source: [[sources/some-page]])` so you can trace any claim back to its source.
+Example question shapes (fill in your own domain):
+- "How does `<our product>` compare to `<competitor>`?"
+- "What's our positioning on `<market shift or theme>`?"
+- "What's our GTM strategy for `<segment>`?"
 
-**Meaningful answers are auto-filed.** When an answer synthesizes 3+ wiki pages and runs >300 words, the agent saves it to [`wiki/analyses/`](wiki/analyses/) automatically and tells you in one line (*"Filed as `analyses/<slug>.md` — delete if not useful."*). This is how the wiki compounds — good answers don't disappear into chat history. Deletion is cheaper than re-asking the same question next month.
+The agent answers with citations like `(source: [[sources/<source-slug>]])` so you can trace any claim back to its source.
+
+**Meaningful answers are auto-filed.** When the answer synthesizes 3+ wiki pages and runs >300 words, the agent saves it to [`wiki/analyses/`](wiki/analyses/) automatically and tells you in one line (*"Filed as `analyses/<slug>.md` — delete if not useful."*). This is how the wiki compounds — good answers don't disappear into chat history. Deletion is cheaper than re-asking the same question next month.
 
 ### 2. Add a new source
 
@@ -34,6 +33,8 @@ Drop the file into the appropriate `raw/` subfolder, then run:
 
 This runs the 3-stage ingest pipeline (triage → extract → link), creates or updates the relevant entity pages, rebuilds backlinks, and appends a log entry.
 
+> **No slash commands?** `/ingest` and `/lint` are Claude Code shortcuts. On Codex or any other agent, point it at [`.claude/workspaces/ingest/CONTEXT.md`](.claude/workspaces/ingest/CONTEXT.md) and ask it to follow the pipeline — the prose workflow is the same.
+
 ### 3. Maintain the wiki
 
 ```
@@ -42,7 +43,7 @@ This runs the 3-stage ingest pipeline (triage → extract → link), creates or 
 
 Checks for contradictions, stale claims, orphan pages, missing cross-references, terminology drift, and confidence miscalibration. Reports findings, asks which to apply, then applies approved fixes.
 
-For decisions, contradictions, or sourcing-queue updates, just describe the task — the agent routes through the [maintenance workspace](.claude/workspaces/maintenance/CONTEXT.md).
+For decisions, contradictions, or sourcing-queue updates, just describe the task — the agent will route through the [maintenance workspace](.claude/workspaces/maintenance/CONTEXT.md).
 
 ### Browsing manually
 
@@ -51,46 +52,47 @@ Start at [`wiki/index.md`](wiki/index.md) — the master catalog of every page, 
 ## Repo structure
 
 ```
-your-wiki/
+<wiki-root>/
 ├── CLAUDE.md       Map of the repo. Always loaded by agents.
 ├── CONTEXT.md      Task router.
+├── SETUP.md        First-session config (when wiki/domain.md is unconfigured).
 ├── README.md       This file.
 │
 ├── raw/            Source documents. Immutable — never edited.
 ├── wiki/           Knowledge layer. All entity pages live here.
-├── deliverables/   Generated outputs (briefs, decks, drafts).
 └── .claude/        Workspace machinery and slash commands.
 ```
 
-## Entity types
+## What's in the wiki
 
-13 entity types ship out of the box. Each lives in its own folder under `wiki/`. Add, remove, or rename to fit your domain.
+13 entity types out of the box. Drop the ones that don't fit your domain during setup; add custom types as needed.
 
-| Type | Folder | Purpose |
-|---|---|---|
-| Source | `wiki/sources/` | Summary of a raw document — facts, quotes, metadata |
-| Product | `wiki/products/` | A product: positioning, users, core jobs |
-| Feature | `wiki/features/` | A specific feature: what it does, who uses it |
-| Persona | `wiki/personas/` | A user/buyer type: role, goals, pain, objections |
-| Customer | `wiki/customers/` | A named customer or segment |
-| Competitor | `wiki/competitors/` | A competing vendor: positioning, where they win/lose |
-| Concept | `wiki/concepts/` | A domain idea or canonical definition |
-| Initiative | `wiki/initiatives/` | A strategic bet, launch, or program |
-| Decision | `wiki/decisions/` | A decision, reasoning, alternatives, revisit date |
-| Metric | `wiki/metrics/` | A KPI or North Star: definition, formula, target |
-| Person/Team | `wiki/people/` | A role, team, or stakeholder |
-| Analysis | `wiki/analyses/` | Synthesized output: comparison, brief, gap analysis |
-| Style Rule | `wiki/style/` | Writing/naming convention for agent-generated content |
+| Type | Purpose |
+|---|---|
+| Sources | Summaries of raw documents — what they contain, what they're trustworthy for |
+| Products | What the organization offers |
+| Features | Specific capabilities within a product |
+| Personas | User and buyer types |
+| Customers | Named customers or segments |
+| Competitors | Competing vendors and how they position |
+| Concepts | Domain ideas, terminology, and frameworks |
+| Initiatives | Strategic bets, launches, programs |
+| Decisions | Choices made, alternatives rejected, when to revisit |
+| Metrics | KPIs and North Stars |
+| People | Roles, teams, stakeholders |
+| Analyses | Synthesized outputs — comparisons, briefs, gap analyses |
+| Style Rules | Writing and naming conventions for agent-generated content |
 
-Full schema in [`.claude/workspaces/ingest/docs/schema.md`](.claude/workspaces/ingest/docs/schema.md).
+Full catalog: [`wiki/index.md`](wiki/index.md). See [`wiki/domain.md`](wiki/domain.md) for which types this wiki has activated.
 
 ## How agents consume it
 
-Three files cover most queries:
+Four files cover most queries:
 
-1. [`wiki/index.md`](wiki/index.md) — master catalog
-2. [`wiki/overview.md`](wiki/overview.md) — company synthesis
-3. [`wiki/glossary.md`](wiki/glossary.md) — canonical terminology
+1. [`wiki/domain.md`](wiki/domain.md) — org name, scope, active entity types
+2. [`wiki/index.md`](wiki/index.md) — master catalog
+3. [`wiki/overview.md`](wiki/overview.md) — synthesis of the organization
+4. [`wiki/glossary.md`](wiki/glossary.md) — canonical terminology
 
 Each page carries a `confidence:` rating in its frontmatter:
 
@@ -105,10 +107,12 @@ Every factual claim cites its source as `(source: [[source-slug]])`. Inferences 
 
 ## Conventions
 
-- **Filenames:** kebab-case, no prefix (`acme-battlecard.md`)
+- **Filenames:** kebab-case, no prefix (e.g. `<competitor>-battlecard.md`)
 - **Internal links:** `[[page-name]]` (no folder, no extension)
 - **`raw/` is immutable** — source files are never edited; new sources are appended
 - **Cite the wiki page**, not the raw source, in agent-to-human output
+
+For the full schema, see [`.claude/workspaces/ingest/docs/schema.md`](.claude/workspaces/ingest/docs/schema.md).
 
 ## Workspaces
 
@@ -127,22 +131,17 @@ RAG does one thing: at query time, embed the question, retrieve chunks from sour
 The wiki front-loads the hard work at ingest time and makes every session cheaper and more reliable:
 
 1. **Distillation, not retrieval.** The wiki reads each source once and distills it into structured entity pages. The query agent starts from signal, not raw chunks.
+
 2. **Explicit contradiction handling.** When sources disagree, the wiki flags it and marks pages `confidence: contested`. RAG retrieves both and lets the LLM guess.
-3. **Typed, navigable relationships.** Entity types, frontmatter, and `[[wikilinks]]` route agents directly to the right pages. No chunk-hunting.
+
+3. **Typed, navigable relationships.** 13 entity types, frontmatter, and `[[wikilinks]]` route agents directly to the right pages. No chunk-hunting.
+
 4. **Compounding knowledge.** Good answers get filed back into `wiki/analyses/` as citable pages. RAG accumulates source documents; the wiki accumulates understanding.
+
 5. **Scoped agent context.** Ingest, research, and maintenance agents each load only what they need. Smaller context, lower hallucination risk.
-6. **Domain-locked terminology.** The glossary prevents paraphrase drift on precise terms.
+
+6. **Domain-locked terminology.** The glossary prevents paraphrase drift on precise domain terms — definitions live in one place and downstream agents use them verbatim.
 
 ## Activity
 
 See [`wiki/log.md`](wiki/log.md) for the append-only history of every ingest, lint, and decision capture.
-
-## Customizing for your domain
-
-1. **Edit `CLAUDE.md`** — change the "Purpose" section to describe *your* company or domain.
-2. **Rename `raw/` subfolders** to match your document categories.
-3. **Edit `wiki/overview.md`** — write a paragraph or two about your company. The agent updates this as it ingests sources.
-4. **Edit `wiki/glossary.md`** — seed it with terms your domain cares about.
-5. **Add or remove entity types.** If you don't sell software, you may not need `products/` or `features/`. If you're a research team, you may want `papers/` or `experiments/`.
-
-The harness in `.claude/` is domain-agnostic — it works on any corpus.

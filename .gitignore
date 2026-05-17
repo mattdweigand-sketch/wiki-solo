@@ -1,3 +1,11 @@
+# macOS
 .DS_Store
+
+# Source documents are user-specific and may be sensitive.
+# Override per-project if you want to version your raw corpus.
+raw/*
+!raw/.gitkeep
+!raw/README.md
+
+# Local Claude Code settings
 .claude/settings.local.json
-~$*

@@ -16,8 +16,8 @@ sources: [list of wiki/sources/ pages this synthesis draws from]
 tags: [relevant tags — e.g., competitive, customer-segment, pricing]
 confidence: high | medium | low | contested
 agent_use_cases:
-  - <e.g., "answering 'how does Acme compete with Foo on pricing?'">
-  - <e.g., "exec briefing on next-FY pricing question">
+  - <e.g., "answering 'how does our product compete with <competitor> on <feature>?'">
+  - <e.g., "exec briefing on a pricing question">
 ---
 ```
 

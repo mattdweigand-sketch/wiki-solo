@@ -44,7 +44,7 @@ A research session flows like a conversation, not a pipeline:
 1. **Orient.** Read [`../../../wiki/index.md`](../../../wiki/index.md). If the question is fuzzy, also read [`../../../wiki/primer.md`](../../../wiki/primer.md) — it routes by question type.
 2. **Pull pages.** Identify and read the 3–8 wiki pages most relevant. Don't load the whole wiki.
 3. **Synthesize.** Answer with citations. Use `[[page-name]]` for internal references. Mark inferences with `Inference:` and speculation with `Hypothesis:`. (See [`../ingest/docs/citation-rules.md`](../ingest/docs/citation-rules.md) — the same rules apply.)
-4. **Auto-file if meaningful.** If the answer synthesized **3+ wiki pages** and is **>300 words**, file it to `../../../wiki/analyses/<slug>.md` using [`docs/analysis-template.md`](docs/analysis-template.md). **Don't ask first.** Notify in one line: *"Filed as `analyses/<slug>.md` — delete if not useful."* Pick a slug that names the *question* (e.g., `acme-vs-foo-pricing-positioning.md`, not `acme-wins-on-pricing.md`). If the answer doesn't meet both criteria, skip filing.
+4. **Auto-file if meaningful.** If the answer synthesized **3+ wiki pages** and is **>300 words**, file it to `../../../wiki/analyses/<slug>.md` using [`docs/analysis-template.md`](docs/analysis-template.md). **Don't ask first.** Notify in one line: *"Filed as `analyses/<slug>.md` — delete if not useful."* Pick a slug that names the *question* (e.g., `<product>-vs-<competitor>-<topic>-positioning.md`, not `<product>-wins-on-<topic>.md`). If the answer doesn't meet both criteria, skip filing.
 5. **Log.** Append to [`../../../wiki/log.md`](../../../wiki/log.md):
    ```
    ## [YYYY-MM-DD] query | <question summary>

@@ -9,12 +9,12 @@ Reference spec for entity types, page format, and source-type summary templates.
 | Type | Location | Purpose |
 |---|---|---|
 | **Source** | `wiki/sources/` | Summary of a raw document — key facts, quotes, metadata, what it informs |
-| **Product** | `wiki/products/` | A product: positioning, users, core jobs, related features |
+| **Product** | `wiki/products/` | A product offered by the organization (see [[domain]]): positioning, users, core jobs, related features |
 | **Feature** | `wiki/features/` | A specific product feature: what it does, who uses it, how it's differentiated |
 | **Persona** | `wiki/personas/` | A user or buyer type: role, goals, pain points, objections, buying authority |
 | **Customer** | `wiki/customers/` | A named customer or segment: profile, use cases, expansion story, risks |
 | **Competitor** | `wiki/competitors/` | A competing vendor: positioning, strengths, weaknesses, where they win/lose |
-| **Concept** | `wiki/concepts/` | A domain idea: definition, why it matters, common confusions |
+| **Concept** | `wiki/concepts/` | A domain concept relevant to this wiki's scope (see [[domain]]): definition, why it matters to the organization, common confusions |
 | **Initiative** | `wiki/initiatives/` | A strategic bet, launch, or program: goal, owner, status, dependencies |
 | **Decision** | `wiki/decisions/` | A decision made, the reasoning, the alternatives rejected, when it should be revisited |
 | **Metric** | `wiki/metrics/` | A KPI or North Star: definition, formula, current value, target, owner |
@@ -40,7 +40,7 @@ tags: [relevant tags]
 confidence: high | medium | low | contested   # how well-sourced this page is; "contested" means active disagreement across sources
 agent_use_cases:                  # which downstream-agent questions this page is meant to answer
   - <e.g., "answering buyer-side product questions">
-  - <e.g., "comparing Acme's payments feature to a competitor's">
+  - <e.g., "comparing our product to a competitor's">
 ---
 ```
 
@@ -73,9 +73,9 @@ When ingesting a source, the summary in `wiki/sources/` should be shaped by what
 | `strategy-doc` | initiatives, north stars, multi-year goals | tactical detail | goals, owners, dependencies |
 | `release-note` | shipped capabilities, dates | strategy | dated feature list, what changed |
 | `press` | external positioning | internal accuracy | quotes, dates, reach |
-| `analyst-report` | market view, peer set | internal claims about own product | market size, peer comparisons, vendor ratings |
+| `analyst-report` | market view, peer set | internal claims about the organization | market size, peer comparisons, the organization's rating |
 | `competitor-collateral` | competitor's stated positioning | objectivity | their claims verbatim, gaps to attack |
-| `sales-battlecard` | what your sales team tells sellers about a competitor | factual claims about the competitor (own-POV, not neutral) | "Why we win / lose," objection handling, competitor tells |
+| `sales-battlecard` | what we tell sellers about a competitor | factual claims about the competitor (our POV, not neutral) | "Why we win / lose," objection handling, competitor tells |
 | `product-spec` | engineering ground truth | GTM framing | requirements, constraints, edge cases |
 | `board-doc` | strategic priorities, metric targets | day-to-day truth | priorities, targets, board asks |
 | `synthesis` | LLM-synthesized analysis integrating multiple sources | source integration methodology not transparent; may embed interpreter bias | main findings, high-level synthesis, caveats on sources |

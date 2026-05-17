@@ -67,7 +67,7 @@ The answer should stand alone. Someone reading it without the wiki should still 
 
 > Filed as `analyses/<slug>.md` — delete if not useful.
 
-Pick a slug that names the *question*, not the answer (e.g., `acme-vs-foo-pricing-positioning.md`, not `acme-wins-on-pricing.md`).
+Pick a slug that names the *question*, not the answer (e.g., `<product>-vs-<competitor>-<topic>-positioning.md`, not `<product>-wins-on-<topic>.md`).
 
 When filing:
 - Use [`analysis-template.md`](analysis-template.md) for structure.

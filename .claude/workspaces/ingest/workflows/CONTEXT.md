@@ -25,16 +25,15 @@ Skills accumulate as you move forward: triage uses file readers to peek; extract
 When the user says "ingest" (with or without arguments):
 
 1. Scan `../../../../raw/` for files that don't yet sit in an organized subfolder. Check the root and any unfamiliar subfolders.
-2. For each new file, decide the right destination subfolder by content type. Reuse existing subfolders when possible:
-   - `raw/competitive-intel/` — battlecards, analyst reports, win/loss notes
-   - `raw/customer-research/` — interview notes, account briefs
-   - `raw/internal-memos/`, `raw/internal-meetings/` — exec/team comms
-   - `raw/board-and-strategy/` — board decks, strategy docs
-   - `raw/release-notes/`, `raw/product-resources/`, `raw/product-marketing/`
-   - `raw/payments/`, `raw/transactions/`, `raw/contracts/`, `raw/legal-compliance/`, `raw/security-compliance/`, `raw/investor-reporting/`
-   - `raw/ai-resources/`, `raw/people/`, `raw/pricing/`
-   - …and any other established subfolder. Create a new one only if no existing one fits.
-3. Rename to kebab-case, preserve the extension. Example: `Gen II — Sales Battlecard (Battlecard).pdf` → `gen-ii-battlecard.pdf`.
+2. For each new file, decide the right destination subfolder by content type. The expected taxonomy lives in [`../../../../wiki/domain.md`](../../../../wiki/domain.md) under `raw_taxonomy`, mirrored by the actual subfolders currently in `raw/`. Common categories you'll see across most domains:
+   - `competitive-intel/` — battlecards, analyst reports, win/loss notes
+   - `customer-research/` — interview notes, account briefs
+   - `internal-memos/`, `internal-meetings/` — exec and team comms
+   - `board-and-strategy/` — board decks, strategy docs
+   - `release-notes/`, `product-resources/`, `product-marketing/`
+   - `people/`, `pricing/`
+   - …plus any domain-specific subfolder defined in `domain.md`. Create a new one only if no existing one fits, and update `raw_taxonomy` when you do.
+3. Rename to kebab-case, preserve the extension. Example: `Acme — Sales Battlecard (Battlecard).pdf` → `acme-battlecard.pdf`.
 4. **Move (don't copy)** into the destination. One copy only.
 5. Confirm the resulting layout to the user before proceeding to stage 02.
 
@@ -48,7 +47,7 @@ For each triaged file:
 
 1. Read the source.
 2. Discuss 2–3 key takeaways with the user; ask clarifying questions about context and emphasis.
-3. Create a summary page in `../../../../wiki/sources/` named after the source file. Required fields: `source_type`, `confidence`, citations back to the raw filename. Battlecards and other internal sales-enablement artifacts get `source_type: sales-battlecard` so downstream agents weight claims as own-POV, not neutral analysis.
+3. Create a summary page in `../../../../wiki/sources/` named after the source file. Required fields: `source_type`, `confidence`, citations back to the raw filename. Battlecards and other internal sales-enablement artifacts get `source_type: sales-battlecard` so downstream agents weight claims as our POV, not neutral analysis.
 4. Identify which existing wiki pages this source affects. Update them — don't create parallel versions. When the new source disagrees with an existing page, flag it (mark `confidence: contested`, log to [`../../maintenance/contradictions.md`](../../maintenance/contradictions.md)).
 5. Create new entity pages as warranted (products, features, personas, customers, competitors, concepts, initiatives, decisions, metrics, people).
 

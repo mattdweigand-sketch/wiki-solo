@@ -9,21 +9,21 @@ How to cite sources, mark inferences, and signal confidence inside wiki pages. L
 When stating a specific fact pulled from a source, append the source citation in parentheses:
 
 ```markdown
-The Foo battlecard puts Acme ahead on portal usability (source: [[foo-battlecard]]).
+The <competitor> battlecard puts our product ahead on portal usability (source: [[<competitor>-battlecard]]).
 ```
 
 The cited filename is the `wiki/sources/` page name (kebab-case, no extension). That source page itself cites the raw filename in `raw/<subfolder>/`.
 
 **Multiple sources support the same fact:**
 ```markdown
-Acme closed FY24 with 2,000+ customers (source: [[fy24-board-deck]], [[2024-press-release]]).
+The organization closed FY24 with 2,000+ customers (source: [[fy24-board-deck]], [[2024-press-release]]).
 ```
 
 **Two-hop citations are fine:**
 ```markdown
-LPs cited reporting cadence as a top frustration (source: [[2024-lp-research-summary]]).
+Customers cited reporting cadence as a top frustration (source: [[2024-customer-research-summary]]).
 ```
-The reader can follow `[[2024-lp-research-summary]]` to its page and from there to the raw interviews.
+The reader can follow `[[2024-customer-research-summary]]` to its page and from there to the raw interviews.
 
 ---
 
@@ -32,7 +32,7 @@ The reader can follow `[[2024-lp-research-summary]]` to its page and from there 
 When stating something the agent inferred (not lifted directly from a source), prefix the sentence with `Inference:` or `Hypothesis:`:
 
 ```markdown
-Inference: Foo's recent partner-portal push suggests they're targeting the same overlap Acme owns.
+Inference: <Competitor>'s recent partner-portal push suggests they're targeting the same admin overlap we own.
 
 Hypothesis: If LP reporting consolidation continues, the LP portal becomes the primary distribution channel within 18 months.
 ```

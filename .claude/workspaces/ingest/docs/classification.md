@@ -27,7 +27,7 @@ A new raw file goes into the subfolder whose contents it most resembles. Do not 
 | `raw/people/` | Org charts, role definitions, internal team docs |
 | `raw/pricing/` | Pricing pages, pricing decisions, packaging docs |
 | `raw/workshop-library/` | Workshop materials, training content |
-| `raw/<help-center-categories>/` | Help Center corpus (if applicable, mirror the help center taxonomy) |
+| `raw/<help-center-categories>/` | Help center / knowledge-base corpus (mirror the source taxonomy if applicable) |
 
 **Edge cases:**
 - A board deck about pricing → `board-and-strategy/` (the artifact type wins over the topic).
@@ -44,8 +44,8 @@ Every file gets renamed to kebab-case before moving:
 
 | Original | Renamed |
 |---|---|
-| `Gen II — Sales Battlecard (Battlecard).pdf` | `gen-ii-battlecard.pdf` |
-| `2024 LP Research Summary - Final v3.docx` | `2024-lp-research-summary.docx` |
+| `Acme — Sales Battlecard (Battlecard).pdf` | `acme-battlecard.pdf` |
+| `2024 Customer Research Summary - Final v3.docx` | `2024-customer-research-summary.docx` |
 | `Q3 Board Deck.pptx` | `q3-board-deck.pptx` |
 | `payments_pricing_v2.xlsx` | `payments-pricing-v2.xlsx` |
 
@@ -64,7 +64,7 @@ After triage, when you create the `wiki/sources/` page in stage 02, the page get
 
 | `source_type` | Use for |
 |---|---|
-| `help-doc` | Help Center / documentation articles |
+| `help-doc` | Help center / knowledge-base articles |
 | `slack-thread` | Internal Slack conversations |
 | `call-transcript` | Customer or partner call recordings/transcripts |
 | `exec-memo` | Internal exec narrative docs |
@@ -75,7 +75,7 @@ After triage, when you create the `wiki/sources/` page in stage 02, the page get
 | `press` | Press releases, external announcements |
 | `analyst-report` | Third-party analyst material |
 | `competitor-collateral` | Competitor's own marketing/sales material |
-| `sales-battlecard` | Internal competitor battlecard (treat as own-POV, not neutral) |
+| `sales-battlecard` | Internal competitor battlecard (treat as our POV, not neutral) |
 | `product-spec` | Engineering or product spec docs |
 | `board-doc` | Board decks, board-prep memos |
 | `synthesis` | LLM-generated synthesis integrating multiple sources (treat with care) |
