@@ -6,7 +6,13 @@
 
 ## Trigger
 
-At session start, [`CLAUDE.md`](CLAUDE.md) tells you to read [`wiki/domain.md`](wiki/domain.md). If that file has `status: unconfigured` in its frontmatter, **do this before answering any other question.** Tell the user:
+At session start, the repo's map file routes you to [`wiki/domain.md`](wiki/domain.md). Which map file depends on your agent:
+
+- **Claude Code** auto-loads [`CLAUDE.md`](CLAUDE.md) — read its "Session Start Checklist."
+- **OpenAI Codex** auto-loads [`AGENTS.md`](AGENTS.md), which forwards to `CLAUDE.md`. Same checklist applies.
+- **Cursor / other agents:** point yourself at `CLAUDE.md` manually; the checklist there is agent-agnostic.
+
+In all cases, the checklist tells you to read [`wiki/domain.md`](wiki/domain.md). If that file has `status: unconfigured` in its frontmatter, **do this before answering any other question.** Tell the user:
 
 > "This wiki is in template state. I can interview you for ~2 minutes to configure it for your organization — or you can skip and just start dropping sources into `raw/`. Want to run setup?"
 
