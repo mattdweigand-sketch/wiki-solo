@@ -1,0 +1,1 @@
+Run the lint workflow. The lint workflow lives in [`.claude/workspaces/maintenance/CONTEXT.md`](../workspaces/maintenance/CONTEXT.md). Read that and follow the "Lint the wiki" task. Criteria are in [`.claude/workspaces/maintenance/docs/lint-criteria.md`](../workspaces/maintenance/docs/lint-criteria.md).
