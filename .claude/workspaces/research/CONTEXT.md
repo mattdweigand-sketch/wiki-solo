@@ -51,7 +51,7 @@ A research session flows like a conversation, not a pipeline:
    Pages consulted: ...
    Output filed: yes/no — <filename if yes>
    ```
-   Then run `python3 ../../commands/rebuild_referenced_by.py` if a file was created.
+   Then run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root if a file was created.
 
 ---
 

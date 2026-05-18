@@ -92,7 +92,7 @@ Output filed: yes — analyses/<slug>.md   (or: no)
 Wiki gaps noticed: ... (if any)
 ```
 
-If a file was created, run `python3 ../../../commands/rebuild_referenced_by.py` to refresh backlinks across the wiki.
+If a file was created, run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh backlinks across the wiki.
 
 Even if the answer wasn't filed, the log entry is useful — it shows what was asked and what existed at the time.
 

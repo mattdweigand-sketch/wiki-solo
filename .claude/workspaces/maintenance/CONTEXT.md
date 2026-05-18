@@ -47,7 +47,7 @@ The user says "lint" or "lint the wiki." See [`docs/lint-criteria.md`](docs/lint
 3. Ask which to apply. Apply the approved ones.
 4. Update [`contradictions.md`](contradictions.md): resolved → closed, new → opened.
 5. Update [`sourcing-queue.md`](sourcing-queue.md) if gaps shifted.
-6. Run `python ../../commands/rebuild_referenced_by.py` from the repo root.
+6. Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root.
 7. Append a log entry:
    ```
    ## [YYYY-MM-DD] lint

@@ -1,6 +1,6 @@
 ---
 title: Sourcing Queue
-type: style
+type: maintenance
 created: 2026-05-17
 updated: 2026-05-17
 ---

@@ -72,7 +72,7 @@ A "Brief" output format (executive 1-pager) caps at 400 words and skips most sub
 - **Standalone.** A reader can understand it without going back to the cited pages — but the citations are there if they want depth.
 - **Question-first.** The slug, title, and Question section all name the question. Future agents can search by question and find this page.
 - **Honest about confidence.** If the synthesis rests on contested or thin sources, say so — don't smooth it over.
-- **Linked back.** Every cited entity page should have this analysis added under its "Related pages" section. (Run `python ../../../commands/rebuild_referenced_by.py` to refresh the auto-generated `## Referenced by` sections after filing.)
+- **Linked back.** Every cited entity page should have this analysis added under its "Related pages" section. (Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh the auto-generated `## Referenced by` sections after filing.)
 
 ---
 

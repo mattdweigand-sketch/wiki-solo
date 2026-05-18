@@ -1,6 +1,6 @@
 ---
-title: Design Notes — Divergences from the Karpathy LLM-Wiki Pattern
-type: style
+title: Design Notes
+type: maintenance
 created: 2026-05-17
 updated: 2026-05-17
 ---

@@ -45,7 +45,7 @@ Patterns to check:
 - Decisions ↔ initiatives/products/metrics (each decision links to what it affects)
 - Analyses → entity pages cited (and entity pages → analyses that reference them)
 
-The auto-generated `## Referenced by` section is rebuilt by `python ../../../commands/rebuild_referenced_by.py` — run that as part of every lint cycle to catch these mechanically.
+The auto-generated `## Referenced by` section is rebuilt by running `python3 .claude/commands/rebuild_referenced_by.py` from the repo root — do this as part of every lint cycle to catch these mechanically.
 
 ### 5. Terminology Drift
 The same concept being called by different names across pages.
@@ -55,7 +55,7 @@ Process:
 - Find pages using non-canonical synonyms.
 - Propose normalizing them (or, if a synonym is genuinely the audience-appropriate term in context, note the deprecated mapping in `glossary.md`).
 
-Private-markets terminology is precise — carried interest, waterfall, NAV, capital call, distribution, subscription document all have specific meanings. Don't tolerate paraphrase here.
+Domain-specific terms defined in the glossary must be used precisely and consistently. Don't allow agents to paraphrase terms that have an exact definition.
 
 ### 6. Concepts Mentioned Without Their Own Page
 A page references a concept (e.g., "GP-led secondary," "NAV facility") that lacks a `wiki/concepts/<term>.md` of its own. The reader can't follow the link.
@@ -86,28 +86,28 @@ Group findings by category. Cap at 10–15 top items. Order by impact (contradic
 - …
 
 ### Stale (3)
-- [[product-payments]] last updated 2024-12-01; superseded by [[2025-payments-spec-v2]]
+- [[product-core]] last updated 2024-12-01; superseded by [[2025-core-product-spec]]
 - …
 
 ### Orphans (5)
-- [[concept-nav-facility]]: no inbound links — propose adding from [[product-payments]], [[customer-greenstreet]]
+- [[concept-example-term]]: no inbound links — propose adding from [[product-core]], [[customer-acme]]
 - …
 
 ### Missing Cross-Refs (4)
-- [[customer-greenstreet]] uses Payments but doesn't link to [[product-payments]]
+- [[customer-acme]] uses the core product but doesn't link to [[product-core]]
 - …
 
 ### Terminology Drift (2)
-- "subscription doc" vs. "subscription document" — glossary canonical is "subscription document"
+- "widget" vs. "component" — glossary canonical is "component"
 - …
 
 ### Confidence Upgrades (2)
-- [[product-lp-portal]]: low → medium (3 supporting sources now)
+- [[product-portal]]: low → medium (3 supporting sources now)
 - …
 ```
 
 After approval and application:
 - Update [`../contradictions.md`](../contradictions.md) — opened, closed, status changes.
 - Update [`../sourcing-queue.md`](../sourcing-queue.md) — gaps that closed, new gaps surfaced.
-- Run `python ../../../commands/rebuild_referenced_by.py` from the repo root.
+- Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root.
 - Log it.

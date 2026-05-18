@@ -71,7 +71,7 @@ After extraction:
    Key additions: ...
    Contradictions flagged: ...
    ```
-6. Run `python ../../../commands/rebuild_referenced_by.py` from the repo root to refresh `## Referenced by` sections.
+6. Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh `## Referenced by` sections.
 
 ---
 

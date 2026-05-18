@@ -8,31 +8,26 @@ How to decide where a new raw file goes, what to rename it to, and what `source_
 
 A new raw file goes into the subfolder whose contents it most resembles. Do not invent a new subfolder unless none of the existing ones fit.
 
+The subfolders below are common starting points. The authoritative list for a configured wiki is in [`../../../../wiki/domain.md`](../../../../wiki/domain.md) under `raw_taxonomy` — during setup the user names their own categories, and those become the actual subfolders. Use the table below as a reference when categorizing; add domain-specific folders only after confirming with the user.
+
 | Subfolder | What lives here |
 |---|---|
 | `raw/competitive-intel/` | Battlecards, analyst reports, win/loss notes, competitor collateral |
 | `raw/customer-research/` | Customer interview notes, account briefs, call transcripts |
 | `raw/internal-meetings/` | Recordings/notes from internal team meetings |
 | `raw/internal-memos/` | Exec memos, written-down decisions, narrative docs |
-| `raw/board-and-strategy/` | Board decks, multi-year strategy docs, strategy-export artifacts |
-| `raw/strategy-export/` | Strategic exports specifically (overlaps with board-and-strategy — pick the more specific one if both fit) |
+| `raw/board-and-strategy/` | Board decks, multi-year strategy docs |
 | `raw/release-notes/` | Shipped-feature announcements, dated changelogs |
 | `raw/product-resources/` | Product specs, internal product docs |
 | `raw/product-marketing/` | External-facing product positioning, marketing collateral |
-| `raw/payments/`, `raw/transactions/` | Payments-product or transactions-product specific artifacts |
-| `raw/contracts/` | Contract templates and executed contracts |
-| `raw/legal-compliance/`, `raw/security-compliance/` | Compliance docs, audit material |
-| `raw/investor-reporting/` | Materials about LP/investor reporting (the function, not the product) |
 | `raw/ai-resources/` | Prompts, AI tooling docs, internal AI research |
 | `raw/people/` | Org charts, role definitions, internal team docs |
 | `raw/pricing/` | Pricing pages, pricing decisions, packaging docs |
-| `raw/workshop-library/` | Workshop materials, training content |
-| `raw/<help-center-categories>/` | Help center / knowledge-base corpus (mirror the source taxonomy if applicable) |
 
 **Edge cases:**
 - A board deck about pricing → `board-and-strategy/` (the artifact type wins over the topic).
 - A customer call transcript that contains competitive intel → `customer-research/` (the artifact origin wins).
-- A help-doc about transactions → mirror the help center category, not `transactions/`.
+- A help-doc or support article → place under its closest product/topic subfolder, not a generic `help-docs/` bucket.
 
 If none of these fit, propose a new subfolder name to the user before creating it.
 
