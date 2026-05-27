@@ -6,11 +6,11 @@
 
 ## Trigger
 
-At session start, the repo's map file routes you to [`wiki/domain.md`](wiki/domain.md). Which map file depends on your agent:
+At session start, the repo's canonical map file routes you to [`wiki/domain.md`](wiki/domain.md):
 
-- **Claude Code** auto-loads [`CLAUDE.md`](CLAUDE.md) — read its "Session Start Checklist."
-- **OpenAI Codex** auto-loads [`AGENTS.md`](AGENTS.md), which forwards to `CLAUDE.md`. Same checklist applies.
-- **Cursor / other agents:** point yourself at `CLAUDE.md` manually; the checklist there is agent-agnostic.
+- **OpenAI Codex, Cursor, and other AGENTS-aware tools:** read [`AGENTS.md`](AGENTS.md) first. It is canonical.
+- **Claude Code:** auto-loads [`CLAUDE.md`](CLAUDE.md), which is only a thin wrapper that imports `AGENTS.md`.
+- **Other agents:** point yourself at `AGENTS.md` manually.
 
 In all cases, the checklist tells you to read [`wiki/domain.md`](wiki/domain.md). If that file has `status: unconfigured` in its frontmatter, **do this before answering any other question.** Tell the user:
 
@@ -50,10 +50,12 @@ Three files have `<Organization>` placeholders that need the user's org name:
 | File | Line | What to replace |
 |---|---|---|
 | [`README.md`](README.md) | 1 | `# <Organization> Wiki` → `# <Their Org> Wiki` |
-| [`CLAUDE.md`](CLAUDE.md) | 1 | `# <Organization> Wiki — Map` → `# <Their Org> Wiki — Map` |
+| [`AGENTS.md`](AGENTS.md) | 1 | `# <Organization> Wiki` → `# <Their Org> Wiki` |
 | [`CONTEXT.md`](CONTEXT.md) | 1 | `# <Organization> Wiki — Task Router` → `# <Their Org> Wiki — Task Router` |
 
 Other framework files (`schema.md`, `classification.md`, etc.) reference [`domain.md`](wiki/domain.md) rather than hardcoding a name, so no further edits needed there.
+
+Do not rewrite [`CLAUDE.md`](CLAUDE.md) during setup or future operating-map updates. It stays a wrapper around `AGENTS.md`.
 
 ### 3. Create raw/ subfolders
 

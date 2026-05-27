@@ -12,7 +12,7 @@ The wiki is designed as a **reference guide for AI agents**. There are three mod
 
 ### 1. Ask a question (default)
 
-Just ask. Claude Code auto-loads [`CLAUDE.md`](CLAUDE.md); OpenAI Codex (and other agents that follow the `AGENTS.md` convention) auto-load [`AGENTS.md`](AGENTS.md), which forwards to the same instructions. From there the agent follows [`CONTEXT.md`](CONTEXT.md) into the [research workspace](.claude/workspaces/research/CONTEXT.md), which tells it how to find the right pages, cite sources, and respect confidence ratings. No command needed.
+Just ask. [`AGENTS.md`](AGENTS.md) is canonical. OpenAI Codex, Cursor, and other AGENTS-aware tools should read it directly. Claude Code auto-loads [`CLAUDE.md`](CLAUDE.md), which is only a thin wrapper that imports `AGENTS.md`. From there the agent follows [`CONTEXT.md`](CONTEXT.md) into the [research workspace](.claude/workspaces/research/CONTEXT.md), which tells it how to find the right pages, cite sources, and respect confidence ratings. No command needed.
 
 Example question shapes (fill in your own domain):
 - "How does `<our product>` compare to `<competitor>`?"
@@ -53,7 +53,8 @@ Start at [`wiki/index.md`](wiki/index.md) — the master catalog of every page, 
 
 ```
 <wiki-root>/
-├── CLAUDE.md       Map of the repo. Always loaded by agents.
+├── AGENTS.md       Canonical project operating map for agents.
+├── CLAUDE.md       Thin Claude Code wrapper that imports AGENTS.md.
 ├── CONTEXT.md      Task router.
 ├── SETUP.md        First-session config (when wiki/domain.md is unconfigured).
 ├── README.md       This file.
