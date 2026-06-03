@@ -5,7 +5,11 @@ Lint the wiki against its own rules, split by enforcement tier.
 Tier 1 (deterministic, machine-checkable): hard failures. A rule here is true
 or false with no judgment. The script decides, and a Tier-1 failure exits
 non-zero so it can gate a commit. Examples: frontmatter keys, type/folder
-match, dangling [[links]], index coverage.
+match, dangling [[links]], index coverage, and typed-link reciprocity (if a
+feature links to its product, the product must link back). Reciprocity is the
+deterministic slice of "missing cross-references": symmetry is machine-checkable,
+but completeness (did the product link to ALL its features?) needs judgment and
+stays in Tier 3.
 
 Tier 2 (expert-checkable): ranked candidates, not verdicts. The script computes
 signals a maintainer cannot eyeball across hundreds of pages (near-duplicates,
@@ -53,7 +57,18 @@ VALID_SOURCE_TYPE = {
 }
 BASE_KEYS = {"title", "type", "created", "updated", "sources", "tags", "confidence"}
 
+# Structural type-pairs where a link in one direction must be reciprocated.
+# Thin generic reciprocity code, parameterized by this data table. Only genuine
+# containment pairs belong here: products and features are mutually owned, so a
+# one-way link is an error. Many-to-one and citation relationships (a product is
+# used by many customers; an analysis cites many entities) are deliberately
+# excluded — forcing the "one" side to curate-link every "many" is noise, and the
+# auto-generated "## Referenced by" section already gives that discoverability.
+# Extend per-org once the taxonomy is configured.
+RECIPROCAL_PAIRS = {frozenset({"products", "features"})}
+
 LINK_RE = re.compile(r"\[\[(?:[^/\]|]+/)?([^\]|]+?)(?:\|[^\]]+)?\]\]")
+REFERENCED_BY_RE = re.compile(r"## Referenced by\n.*?(?=\n## |\Z)", re.DOTALL)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-")
@@ -104,6 +119,13 @@ def authored_body(body):
     return body[:cut]
 
 
+def curated_links(text):
+    """Outbound [[links]] from authored + Related-pages content, excluding the
+    auto-generated Referenced-by section. Reciprocity must be expressed in
+    curated links, not satisfied by the auto-backlink the tool writes."""
+    return set(LINK_RE.findall(REFERENCED_BY_RE.sub("", text)))
+
+
 def tokens(text):
     text = re.sub(r"\[\[[^\]]*\]\]", " ", text)
     text = re.sub(r"[`*#|>_\-\[\]()]", " ", text)
@@ -123,11 +145,17 @@ def tier1(entity_pages, valid_slugs, index_targets):
         return str(p.relative_to(WIKI_ROOT))
 
     entity_relpaths = set()
+    page_folder = {}   # stem -> folder name (or None for root pages)
+    page_curated = {}  # stem -> set of curated outbound link slugs
+    page_rel = {}      # stem -> relpath
     for p in entity_pages:
         r = rel(p)
         entity_relpaths.add(r)
         folder = p.parent.name if p.parent != WIKI_ROOT else None
         text = p.read_text(encoding="utf-8")
+        page_folder[p.stem] = folder
+        page_curated[p.stem] = curated_links(text)
+        page_rel[p.stem] = r
 
         # filename
         if not KEBAB_RE.match(p.stem):
@@ -180,6 +208,17 @@ def tier1(entity_pages, valid_slugs, index_targets):
         for slug in LINK_RE.findall(text):
             if slug not in valid_slugs:
                 fails.append(("dangling-link", r, f"[[{slug}]] resolves to nothing"))
+
+    # typed-link reciprocity (deterministic slice of missing cross-refs)
+    for stem in sorted(page_curated):
+        fa = page_folder.get(stem)
+        for b in sorted(page_curated[stem]):
+            fb = page_folder.get(b)
+            if fb is None:
+                continue  # dangling or root-page target; handled elsewhere
+            if frozenset({fa, fb}) in RECIPROCAL_PAIRS and stem not in page_curated.get(b, set()):
+                fails.append(("reciprocity", page_rel[stem],
+                              f"links to [[{b}]] ({fb}) but [[{b}]] does not link back"))
 
     # index coverage (only for paths that name an entity folder)
     for r in sorted(entity_relpaths - index_targets):
