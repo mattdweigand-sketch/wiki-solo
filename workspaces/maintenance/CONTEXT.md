@@ -4,8 +4,8 @@
 
 Wiki hygiene. The substrate gets messy as it grows: contradictions appear, claims go stale, terms drift, sources get queued but never ingested. This workspace is where periodic upkeep happens — and where decisions get captured before they become folklore.
 
-**Inputs:** [`../../../wiki/`](../../../wiki/), this workspace's own scratchpads ([`contradictions.md`](contradictions.md), [`sourcing-queue.md`](sourcing-queue.md), [`design-notes.md`](design-notes.md)).
-**Outputs:** Updated wiki pages, updated scratchpads, new decision pages in [`../../../wiki/decisions/`](../../../wiki/decisions/), entries in [`../../../wiki/log.md`](../../../wiki/log.md).
+**Inputs:** [`../../wiki/`](../../wiki/), this workspace's own scratchpads ([`contradictions.md`](contradictions.md), [`sourcing-queue.md`](sourcing-queue.md), [`design-notes.md`](design-notes.md)).
+**Outputs:** Updated wiki pages, updated scratchpads, new decision pages in [`../../wiki/decisions/`](../../wiki/decisions/), entries in [`../../wiki/log.md`](../../wiki/log.md).
 
 ---
 
@@ -13,9 +13,9 @@ Wiki hygiene. The substrate gets messy as it grows: contradictions appear, claim
 
 | Task | Load These | Skip These |
 |---|---|---|
-| Lint the wiki | [`docs/lint-criteria.md`](docs/lint-criteria.md), [`contradictions.md`](contradictions.md), [`../../../wiki/index.md`](../../../wiki/index.md), then pages on demand | ingest/, research/ docs |
+| Lint the wiki | [`docs/lint-criteria.md`](docs/lint-criteria.md), [`contradictions.md`](contradictions.md), [`../../wiki/index.md`](../../wiki/index.md), then pages on demand | ingest/, research/ docs |
 | Capture a decision | [`docs/decision-capture.md`](docs/decision-capture.md), the affected entity pages | docs/lint-criteria.md, contradictions.md (unless the decision resolves one) |
-| Refresh sourcing queue | [`sourcing-queue.md`](sourcing-queue.md), recent entries in [`../../../wiki/log.md`](../../../wiki/log.md) | docs/decision-capture.md, docs/lint-criteria.md |
+| Refresh sourcing queue | [`sourcing-queue.md`](sourcing-queue.md), recent entries in [`../../wiki/log.md`](../../wiki/log.md) | docs/decision-capture.md, docs/lint-criteria.md |
 | Resolve a contradiction | [`contradictions.md`](contradictions.md), the two (or more) pages in conflict, their cited sources | docs/lint-criteria.md (you're surgical here, not sweeping) |
 
 ---
@@ -47,7 +47,7 @@ The user says "lint" or "lint the wiki." See [`docs/lint-criteria.md`](docs/lint
 3. Ask which to apply. Apply the approved ones.
 4. Update [`contradictions.md`](contradictions.md): resolved → closed, new → opened.
 5. Update [`sourcing-queue.md`](sourcing-queue.md) if gaps shifted.
-6. Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root.
+6. Run `python3 scripts/rebuild_referenced_by.py` from the repo root.
 7. Append a log entry:
    ```
    ## [YYYY-MM-DD] lint
@@ -59,7 +59,7 @@ The user says "lint" or "lint the wiki." See [`docs/lint-criteria.md`](docs/lint
 ### Capture a decision
 The user says "capture decision [topic]" or describes a decision in passing. See [`docs/decision-capture.md`](docs/decision-capture.md) for page format. Process:
 
-1. Create `../../../wiki/decisions/<slug>.md` with full frontmatter and body.
+1. Create `../../wiki/decisions/<slug>.md` with full frontmatter and body.
 2. Cross-link from affected entity pages back to the decision.
 3. Append a log entry:
    ```

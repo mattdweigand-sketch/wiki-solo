@@ -12,7 +12,7 @@ The wiki is designed as a **reference guide for AI agents**. There are three mod
 
 ### 1. Ask a question (default)
 
-Just ask. [`AGENTS.md`](AGENTS.md) is canonical. OpenAI Codex, Cursor, and other AGENTS-aware tools should read it directly. Claude Code auto-loads [`CLAUDE.md`](CLAUDE.md), which is only a thin wrapper that imports `AGENTS.md`. From there the agent follows [`CONTEXT.md`](CONTEXT.md) into the [research workspace](.claude/workspaces/research/CONTEXT.md), which tells it how to find the right pages, cite sources, and respect confidence ratings. No command needed.
+Just ask. [`AGENTS.md`](AGENTS.md) is canonical. OpenAI Codex, Cursor, and other AGENTS-aware tools should read it directly. Claude Code auto-loads [`CLAUDE.md`](CLAUDE.md), which is only a thin wrapper that imports `AGENTS.md`. From there the agent follows [`CONTEXT.md`](CONTEXT.md) into the [research workspace](workspaces/research/CONTEXT.md), which tells it how to find the right pages, cite sources, and respect confidence ratings. No command needed.
 
 Example question shapes (fill in your own domain):
 - "How does `<our product>` compare to `<competitor>`?"
@@ -33,7 +33,7 @@ Drop the file into the appropriate `raw/` subfolder, then run:
 
 This runs the 3-stage ingest pipeline (triage → extract → link), creates or updates the relevant entity pages, rebuilds backlinks, and appends a log entry.
 
-> **No slash commands?** `/ingest` and `/lint` are Claude Code shortcuts. On Codex or any other agent, point it at [`.claude/workspaces/ingest/CONTEXT.md`](.claude/workspaces/ingest/CONTEXT.md) and ask it to follow the pipeline — the prose workflow is the same.
+> **No slash commands?** `/ingest` and `/lint` are Claude Code shortcuts. On Codex or any other agent, point it at [`workspaces/ingest/CONTEXT.md`](workspaces/ingest/CONTEXT.md) and ask it to follow the pipeline — the prose workflow is the same.
 
 ### 3. Maintain the wiki
 
@@ -43,7 +43,7 @@ This runs the 3-stage ingest pipeline (triage → extract → link), creates or 
 
 Checks for contradictions, stale claims, orphan pages, missing cross-references, terminology drift, and confidence miscalibration. Reports findings, asks which to apply, then applies approved fixes.
 
-For decisions, contradictions, or sourcing-queue updates, just describe the task — the agent will route through the [maintenance workspace](.claude/workspaces/maintenance/CONTEXT.md).
+For decisions, contradictions, or sourcing-queue updates, just describe the task — the agent will route through the [maintenance workspace](workspaces/maintenance/CONTEXT.md).
 
 ### Browsing manually
 
@@ -61,7 +61,9 @@ Start at [`wiki/index.md`](wiki/index.md) — the master catalog of every page, 
 │
 ├── raw/            Source documents. Immutable — never edited.
 ├── wiki/           Knowledge layer. All entity pages live here.
-└── .claude/        Workspace machinery and slash commands.
+├── workspaces/     Vendor-neutral workflow routing (ingest, research, maintenance).
+├── scripts/        Vendor-neutral helpers (rebuild_referenced_by.py).
+└── .claude/        Claude Code slash-command wrappers only. Optional.
 ```
 
 ## What's in the wiki
@@ -102,7 +104,7 @@ Each page carries a `confidence:` rating in its frontmatter:
 | `high` | Sourced from authoritative document |
 | `medium` | Probable; may rest on a single source |
 | `low` | Hypothesis; treat as a starting point |
-| `contested` | Sources disagree — see [`contradictions.md`](.claude/workspaces/maintenance/contradictions.md) |
+| `contested` | Sources disagree — see [`contradictions.md`](workspaces/maintenance/contradictions.md) |
 
 Every factual claim cites its source as `(source: [[source-slug]])`. Inferences are prefixed `Inference:` or `Hypothesis:`.
 
@@ -113,7 +115,7 @@ Every factual claim cites its source as `(source: [[source-slug]])`. Inferences 
 - **`raw/` is immutable** — source files are never edited; new sources are appended
 - **Cite the wiki page**, not the raw source, in agent-to-human output
 
-For the full schema, see [`.claude/workspaces/ingest/docs/schema.md`](.claude/workspaces/ingest/docs/schema.md).
+For the full schema, see [`workspaces/ingest/docs/schema.md`](workspaces/ingest/docs/schema.md).
 
 ## Workspaces
 
@@ -121,9 +123,9 @@ Three workspaces govern how work happens. Each has its own `CONTEXT.md` with tas
 
 | Workspace | Purpose |
 |---|---|
-| [`ingest/`](.claude/workspaces/ingest/CONTEXT.md) | Raw source → structured wiki page(s) |
-| [`research/`](.claude/workspaces/research/CONTEXT.md) | Wiki → synthesized answer with citations |
-| [`maintenance/`](.claude/workspaces/maintenance/CONTEXT.md) | Lint, contradictions, sourcing queue, decision capture |
+| [`ingest/`](workspaces/ingest/CONTEXT.md) | Raw source → structured wiki page(s) |
+| [`research/`](workspaces/research/CONTEXT.md) | Wiki → synthesized answer with citations |
+| [`maintenance/`](workspaces/maintenance/CONTEXT.md) | Lint, contradictions, sourcing queue, decision capture |
 
 ## Why a wiki instead of RAG
 

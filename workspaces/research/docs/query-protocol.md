@@ -18,11 +18,11 @@ How to answer a user question against the wiki. Read once to internalize.
 
 ## 1. Orient
 
-Always start with [`../../../../wiki/index.md`](../../../../wiki/index.md). It lists every wiki page with a one-line summary. Skim until you can identify which 3–8 pages are most relevant.
+Always start with [`../../../wiki/index.md`](../../../wiki/index.md). It lists every wiki page with a one-line summary. Skim until you can identify which 3–8 pages are most relevant.
 
-If the question type is fuzzy ("what should we know about X?" or "help me think through Y"), also read [`../../../../wiki/primer.md`](../../../../wiki/primer.md) — it points to the right entry pages by question type (sales question, product question, strategy question, etc.).
+If the question type is fuzzy ("what should we know about X?" or "help me think through Y"), also read [`../../../wiki/primer.md`](../../../wiki/primer.md) — it points to the right entry pages by question type (sales question, product question, strategy question, etc.).
 
-If the question hinges on a specific term, also check [`../../../../wiki/glossary.md`](../../../../wiki/glossary.md) to confirm the canonical definition.
+If the question hinges on a specific term, also check [`../../../wiki/glossary.md`](../../../wiki/glossary.md) to confirm the canonical definition.
 
 **Don't** read more than these three top-level files at the orientation step.
 
@@ -36,7 +36,7 @@ Read the 3–8 entity pages you identified. Heuristics:
 - For a competitor question → the competitor page + the products being compared + any sales-battlecard sources
 - For a decision question → the decision page + the initiatives/products it affects
 - For a market or strategy question → `wiki/overview.md` + relevant initiatives + relevant decisions
-- For a "what's our position on X" question → start at [`../../../../wiki/primer.md`](../../../../wiki/primer.md), follow the routing
+- For a "what's our position on X" question → start at [`../../../wiki/primer.md`](../../../wiki/primer.md), follow the routing
 
 If after reading those pages you're still missing context, pull 1–2 more. **Stop at 8.** If 8 pages don't answer the question, that's a signal the wiki has a gap — see step 4.
 
@@ -58,7 +58,7 @@ The answer should stand alone. Someone reading it without the wiki should still 
 
 ## 4. Auto-File if Meaningful
 
-**File the answer to `../../../../wiki/analyses/<slug>.md` automatically when both are true:**
+**File the answer to `../../../wiki/analyses/<slug>.md` automatically when both are true:**
 
 1. The answer synthesized **3+ wiki pages** (real cross-page synthesis, not a lookup).
 2. The answer is **>300 words** (substantive, not a quick fact).
@@ -73,7 +73,7 @@ When filing:
 - Use [`analysis-template.md`](analysis-template.md) for structure.
 - Add proper frontmatter (`type: analysis`, `confidence`, `agent_use_cases`, etc. — see [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md)).
 - Add cross-references back to the entity pages cited.
-- Update [`../../../../wiki/index.md`](../../../../wiki/index.md) with a one-line summary of the new analysis.
+- Update [`../../../wiki/index.md`](../../../wiki/index.md) with a one-line summary of the new analysis.
 
 If both criteria aren't met, skip filing — the answer stays in chat. Deletion is cheaper than recall, so err on the side of filing when the criteria are met.
 
@@ -83,7 +83,7 @@ If you noticed a wiki gap (step 2 ran out of pages, or a key claim had no cited 
 
 ## 5. Log
 
-Append to [`../../../../wiki/log.md`](../../../../wiki/log.md):
+Append to [`../../../wiki/log.md`](../../../wiki/log.md):
 
 ```
 ## [YYYY-MM-DD] query | <one-line question>
@@ -92,7 +92,7 @@ Output filed: yes — analyses/<slug>.md   (or: no)
 Wiki gaps noticed: ... (if any)
 ```
 
-If a file was created, run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh backlinks across the wiki.
+If a file was created, run `python3 scripts/rebuild_referenced_by.py` from the repo root to refresh backlinks across the wiki.
 
 Even if the answer wasn't filed, the log entry is useful — it shows what was asked and what existed at the time.
 

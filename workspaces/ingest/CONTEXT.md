@@ -2,10 +2,10 @@
 
 ## What This Workspace Is
 
-Where new raw sources become structured wiki pages. The user drops a file in `raw/` (or anywhere) and says "ingest" — this workspace handles triage, extraction, and linking. Output: new and updated pages in [`../../../wiki/`](../../../wiki/).
+Where new raw sources become structured wiki pages. The user drops a file in `raw/` (or anywhere) and says "ingest" — this workspace handles triage, extraction, and linking. Output: new and updated pages in [`../../wiki/`](../../wiki/).
 
 **Upstream:** the user adds files to `../../../raw/`.
-**Downstream:** [`../../../wiki/`](../../../wiki/) gains/updates entity pages and indexes; [`../../../wiki/log.md`](../../../wiki/log.md) records the session.
+**Downstream:** [`../../wiki/`](../../wiki/) gains/updates entity pages and indexes; [`../../wiki/log.md`](../../wiki/log.md) records the session.
 
 ---
 
@@ -16,7 +16,7 @@ Where new raw sources become structured wiki pages. The user drops a file in `ra
 | Triage a new raw file | [`docs/classification.md`](docs/classification.md) | docs/schema.md (not needed yet), citation-rules.md |
 | Extract entities from a source | [`docs/schema.md`](docs/schema.md), [`docs/citation-rules.md`](docs/citation-rules.md), the source itself, any existing pages it touches | docs/classification.md |
 | Update an existing page from a new source | [`docs/schema.md`](docs/schema.md), [`docs/citation-rules.md`](docs/citation-rules.md), the existing page, the new source | docs/classification.md |
-| Link a freshly extracted page set | [`../../../wiki/index.md`](../../../wiki/index.md), [`../../../wiki/glossary.md`](../../../wiki/glossary.md), [`../../../wiki/log.md`](../../../wiki/log.md) | docs/* — already loaded earlier in pipeline |
+| Link a freshly extracted page set | [`../../wiki/index.md`](../../wiki/index.md), [`../../wiki/glossary.md`](../../wiki/glossary.md), [`../../wiki/log.md`](../../wiki/log.md) | docs/* — already loaded earlier in pipeline |
 
 For the full per-stage routing, see [`workflows/CONTEXT.md`](workflows/CONTEXT.md).
 
@@ -38,7 +38,7 @@ ingest/
     └── 03-link/            ← Stage 3 scratchpads (cross-link plans)
 ```
 
-The `01-/02-/03-` folders are mostly empty by design — they're scratchpad space for in-flight work. Most ingest output lands in `../../../wiki/` and `../../../raw/<subfolder>/`, not here.
+The `01-/02-/03-` folders are mostly empty by design — they're scratchpad space for in-flight work. Most ingest output lands in `../../wiki/` and `../../../raw/<subfolder>/`, not here.
 
 ---
 

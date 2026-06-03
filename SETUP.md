@@ -28,7 +28,7 @@ Ask these in order. Keep it conversational; one question at a time unless the us
 
 1. **Organization name.** "What's the name of the organization, team, or project this wiki is about?"
 2. **Domain.** "One line — what subject area does this wiki cover? (Examples: 'private-markets fintech,' 'developer tools for payments,' 'biotech research at a Series B startup.')"
-3. **Entity types.** Show the user the 13 default types from [`.claude/workspaces/ingest/docs/schema.md`](.claude/workspaces/ingest/docs/schema.md) and ask which to keep. Default is all 13. Common drops: a B2C product may not need `customer` as named accounts; a research lab may not need `competitor`.
+3. **Entity types.** Show the user the 13 default types from [`workspaces/ingest/docs/schema.md`](workspaces/ingest/docs/schema.md) and ask which to keep. Default is all 13. Common drops: a B2C product may not need `customer` as named accounts; a research lab may not need `competitor`.
 4. **Custom entity types.** "Any entity types specific to your domain that aren't in the default 13? (Examples: 'integrations' for a SaaS product, 'experiments' for a research lab, 'regulations' for a compliance team.)"
 5. **Source taxonomy.** "What subfolders should exist under `raw/`? Pick categories that match where your source documents come from. (Examples: `competitive-intel`, `customer-research`, `internal-memos`, `release-notes`, `press`.)"
 6. **Example queries.** "3–5 questions you want this wiki to answer well. These guide what to ingest first and what `agent_use_cases` to write into entity pages."
@@ -65,7 +65,7 @@ For each entry in `raw_taxonomy`, create `raw/<name>/` with a `.gitkeep` file in
 
 For each of the 13 default entity types **not** in `entity_types_active`, delete the corresponding `wiki/<type>/` folder. For each entry in `entity_types_custom`, create a new `wiki/<type>/` folder with a `.gitkeep`.
 
-If you add custom entity types, also append a row for each to the "Entity Types" table in [`.claude/workspaces/ingest/docs/schema.md`](.claude/workspaces/ingest/docs/schema.md) so the ingest workflow knows about them.
+If you add custom entity types, also append a row for each to the "Entity Types" table in [`workspaces/ingest/docs/schema.md`](workspaces/ingest/docs/schema.md) so the ingest workflow knows about them.
 
 ### 5. Log the configuration
 
@@ -91,11 +91,12 @@ Show a one-paragraph summary of what changed and what's next: "Configured. Drop 
 
 Hands off:
 
-- [`.claude/commands/`](.claude/commands/) — slash command definitions and the backlink rebuild script
-- [`.claude/workspaces/ingest/workflows/`](.claude/workspaces/ingest/workflows/) — the 3-stage ingest pipeline (triage, extract, link)
-- [`.claude/workspaces/*/CONTEXT.md`](.claude/workspaces/) — workspace task routers
-- [`.claude/workspaces/maintenance/docs/`](.claude/workspaces/maintenance/docs/) — lint criteria, decision capture
-- The schema's "Page Format," "Source-Type Summary Templates," and "Confidence Values" sections in [`schema.md`](.claude/workspaces/ingest/docs/schema.md) — domain-agnostic infrastructure
+- [`scripts/`](scripts/) — the backlink rebuild script (`rebuild_referenced_by.py`)
+- [`.claude/commands/`](.claude/commands/) — Claude Code slash-command wrappers
+- [`workspaces/ingest/workflows/`](workspaces/ingest/workflows/) — the 3-stage ingest pipeline (triage, extract, link)
+- [`workspaces/*/CONTEXT.md`](workspaces/) — workspace task routers
+- [`workspaces/maintenance/docs/`](workspaces/maintenance/docs/) — lint criteria, decision capture
+- The schema's "Page Format," "Source-Type Summary Templates," and "Confidence Values" sections in [`schema.md`](workspaces/ingest/docs/schema.md) — domain-agnostic infrastructure
 
 The only schema edit during setup is appending custom entity-type rows to the "Entity Types" table (step 4 above).
 

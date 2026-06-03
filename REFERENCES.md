@@ -26,8 +26,8 @@ Every file sits at one of five layers, defined by *when* it loads relative to a 
 |---|---|---|
 | **L0** | Always — orientation and routing | `AGENTS.md` (`CLAUDE.md` is the pointer for Claude agents), `CONTEXT.md`, `wiki/domain.md` (config-status gate) |
 | **L1** | Session start — completes orientation | `REFERENCES.md`, `wiki/index.md`, `wiki/primer.md` |
-| **L2** | Per task — workspace entry + workflow | `.claude/workspaces/<workspace>/CONTEXT.md`, `.claude/workspaces/ingest/workflows/CONTEXT.md` |
-| **L3** | Per task — stable reference, loaded on demand | `.claude/workspaces/*/docs/*` (schema, citation-rules, classification, query-protocol, analysis-template, lint-criteria, decision-capture), `wiki/glossary.md`, `wiki/overview.md`, `.claude/workspaces/maintenance/{contradictions,sourcing-queue,design-notes}.md` |
+| **L2** | Per task — workspace entry + workflow | `workspaces/<workspace>/CONTEXT.md`, `workspaces/ingest/workflows/CONTEXT.md` |
+| **L3** | Per task — stable reference, loaded on demand | `workspaces/*/docs/*` (schema, citation-rules, classification, query-protocol, analysis-template, lint-criteria, decision-capture), `wiki/glossary.md`, `wiki/overview.md`, `workspaces/maintenance/{contradictions,sourcing-queue,design-notes}.md` |
 | **L4** | During work — content read or written | `wiki/log.md`, `wiki/<entity>/*.md`, `raw/*` |
 
 Loading principle: an agent starting a task loads L0 + L1, then the L2 entry for the task, then pulls L3 references only when that workspace's `CONTEXT.md` calls for them. L4 is read or written as the work proceeds. Each workspace `CONTEXT.md` already declares its own Load / Skip list — this model is the why behind those lists.

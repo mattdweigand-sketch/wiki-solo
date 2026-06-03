@@ -41,7 +41,7 @@ When `status: configured`, the wiki is ready to ingest sources and answer questi
 |---|---|
 | `org` | The organization (company, team, project) this wiki is about |
 | `domain` | One-line description of the subject area |
-| `entity_types_active` | Subset of the 13 entity types from [`schema.md`](../.claude/workspaces/ingest/docs/schema.md) that this wiki uses. Drop any that don't fit your domain. |
+| `entity_types_active` | Subset of the 13 entity types from [`schema.md`](../workspaces/ingest/docs/schema.md) that this wiki uses. Drop any that don't fit your domain. |
 | `entity_types_custom` | Any new entity types this domain needs that aren't in the default 13 |
 | `raw_taxonomy` | Subfolder names that should exist under `raw/` for source-document organization |
 | `example_queries` | 3–5 questions the wiki should answer well — useful for sanity-checking coverage |
@@ -49,3 +49,7 @@ When `status: configured`, the wiki is ready to ingest sources and answer questi
 ## After configuration
 
 The agent updates this file's `status:` to `configured`, replaces `<Organization>` placeholders in the framework files (see [`SETUP.md`](../SETUP.md) for the exact list), and appends a log entry to [`log.md`](log.md).
+
+## Referenced by
+
+_No inbound links yet._

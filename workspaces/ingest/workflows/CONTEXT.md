@@ -13,10 +13,10 @@ Three stages. Each stage's output is the next stage's input. Forward flow only.
 | Stage | Input | Also Load | Output | Skills |
 |---|---|---|---|---|
 | **01-triage** | New file in `../../../../raw/` (often the root, or a misclassified subfolder) | [`../docs/classification.md`](../docs/classification.md) | File renamed to kebab-case and moved into the right `raw/<subfolder>/`. Confirm layout to user before proceeding. | `/pdf`, `/xlsx`, `/docx`, `/pptx` (just to peek at the file type) |
-| **02-extract** | Triaged file in `raw/<subfolder>/` | [`../docs/schema.md`](../docs/schema.md), [`../docs/citation-rules.md`](../docs/citation-rules.md), any existing wiki pages this source touches | Source page in `../../../../wiki/sources/`. New or updated entity pages in `../../../../wiki/<entity-type>/`. | Web Search (verify external claims), file-type skills as needed |
-| **03-link** | Extracted entity pages from stage 02 | [`../../../../wiki/index.md`](../../../../wiki/index.md), [`../../../../wiki/glossary.md`](../../../../wiki/glossary.md), [`../../../../wiki/log.md`](../../../../wiki/log.md) | Updated `index.md` (new pages added, changed pages refreshed). Updated `glossary.md` (new/refined terms). New entry appended to `log.md`. Updated `overview.md` if the source shifts the big picture. | — |
+| **02-extract** | Triaged file in `raw/<subfolder>/` | [`../docs/schema.md`](../docs/schema.md), [`../docs/citation-rules.md`](../docs/citation-rules.md), any existing wiki pages this source touches | Source page in `../../../wiki/sources/`. New or updated entity pages in `../../../wiki/<entity-type>/`. | Web Search (verify external claims), file-type skills as needed |
+| **03-link** | Extracted entity pages from stage 02 | [`../../../wiki/index.md`](../../../wiki/index.md), [`../../../wiki/glossary.md`](../../../wiki/glossary.md), [`../../../wiki/log.md`](../../../wiki/log.md) | Updated `index.md` (new pages added, changed pages refreshed). Updated `glossary.md` (new/refined terms). New entry appended to `log.md`. Updated `overview.md` if the source shifts the big picture. | — |
 
-Skills accumulate as you move forward: triage uses file readers to peek; extract uses the same readers plus Web Search for verification; link is mostly bookkeeping inside `../../../../wiki/`.
+Skills accumulate as you move forward: triage uses file readers to peek; extract uses the same readers plus Web Search for verification; link is mostly bookkeeping inside `../../../wiki/`.
 
 ---
 
@@ -25,7 +25,7 @@ Skills accumulate as you move forward: triage uses file readers to peek; extract
 When the user says "ingest" (with or without arguments):
 
 1. Scan `../../../../raw/` for files that don't yet sit in an organized subfolder. Check the root and any unfamiliar subfolders.
-2. For each new file, decide the right destination subfolder by content type. The expected taxonomy lives in [`../../../../wiki/domain.md`](../../../../wiki/domain.md) under `raw_taxonomy`, mirrored by the actual subfolders currently in `raw/`. Common categories you'll see across most domains:
+2. For each new file, decide the right destination subfolder by content type. The expected taxonomy lives in [`../../../wiki/domain.md`](../../../wiki/domain.md) under `raw_taxonomy`, mirrored by the actual subfolders currently in `raw/`. Common categories you'll see across most domains:
    - `competitive-intel/` — battlecards, analyst reports, win/loss notes
    - `customer-research/` — interview notes, account briefs
    - `internal-memos/`, `internal-meetings/` — exec and team comms
@@ -47,7 +47,7 @@ For each triaged file:
 
 1. Read the source.
 2. Discuss 2–3 key takeaways with the user; ask clarifying questions about context and emphasis.
-3. Create a summary page in `../../../../wiki/sources/` named after the source file. Required fields: `source_type`, `confidence`, citations back to the raw filename. Battlecards and other internal sales-enablement artifacts get `source_type: sales-battlecard` so downstream agents weight claims as our POV, not neutral analysis.
+3. Create a summary page in `../../../wiki/sources/` named after the source file. Required fields: `source_type`, `confidence`, citations back to the raw filename. Battlecards and other internal sales-enablement artifacts get `source_type: sales-battlecard` so downstream agents weight claims as our POV, not neutral analysis.
 4. Identify which existing wiki pages this source affects. Update them — don't create parallel versions. When the new source disagrees with an existing page, flag it (mark `confidence: contested`, log to [`../../maintenance/contradictions.md`](../../maintenance/contradictions.md)).
 5. Create new entity pages as warranted (products, features, personas, customers, competitors, concepts, initiatives, decisions, metrics, people).
 
@@ -59,11 +59,11 @@ Frontmatter spec, source-type templates, and confidence values are all in [`../d
 
 After extraction:
 
-1. Update [`../../../../wiki/index.md`](../../../../wiki/index.md) — add new pages, refresh summaries of changed pages.
-2. Update [`../../../../wiki/glossary.md`](../../../../wiki/glossary.md) with new or refined terms. If a new term conflicts with an existing entry, reconcile and note the deprecated form.
-3. Update [`../../../../wiki/overview.md`](../../../../wiki/overview.md) if the source shifts the big picture.
+1. Update [`../../../wiki/index.md`](../../../wiki/index.md) — add new pages, refresh summaries of changed pages.
+2. Update [`../../../wiki/glossary.md`](../../../wiki/glossary.md) with new or refined terms. If a new term conflicts with an existing entry, reconcile and note the deprecated form.
+3. Update [`../../../wiki/overview.md`](../../../wiki/overview.md) if the source shifts the big picture.
 4. Add back-links: products link to features; features link back to products; customers link to products used, personas involved, competitors considered; decisions link to the initiatives, products, or metrics they affect.
-5. Append an entry to [`../../../../wiki/log.md`](../../../../wiki/log.md):
+5. Append an entry to [`../../../wiki/log.md`](../../../wiki/log.md):
    ```
    ## [YYYY-MM-DD] ingest | <source title>
    Pages created: ...
@@ -71,7 +71,7 @@ After extraction:
    Key additions: ...
    Contradictions flagged: ...
    ```
-6. Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh `## Referenced by` sections.
+6. Run `python3 scripts/rebuild_referenced_by.py` from the repo root to refresh `## Referenced by` sections.
 
 ---
 

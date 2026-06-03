@@ -8,7 +8,7 @@ Decisions are first-class because they're what makes this a *company context lay
 
 ## Page Format
 
-`../../../../wiki/decisions/<slug>.md`
+`../../../wiki/decisions/<slug>.md`
 
 ```yaml
 ---
@@ -70,8 +70,8 @@ decider: <role or person>
 A decision page is only useful if it's reachable. After creating:
 
 1. Add a back-link from each entity in the **Affects** list. Add a "Decisions" or "Recent decisions" section to those entity pages if one doesn't exist.
-2. If the decision has a metric implication, link from [`../../../../wiki/metrics/`](../../../../wiki/metrics/) too.
-3. Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh the auto-generated `## Referenced by` sections.
+2. If the decision has a metric implication, link from [`../../../wiki/metrics/`](../../../wiki/metrics/) too.
+3. Run `python3 scripts/rebuild_referenced_by.py` from the repo root to refresh the auto-generated `## Referenced by` sections.
 
 ---
 
@@ -99,7 +99,7 @@ Do NOT capture when:
 
 ## Logging
 
-After creating the page, append to [`../../../../wiki/log.md`](../../../../wiki/log.md):
+After creating the page, append to [`../../../wiki/log.md`](../../../wiki/log.md):
 
 ```
 ## [YYYY-MM-DD] decision | <one-line decision summary>

@@ -8,7 +8,7 @@ How to decide where a new raw file goes, what to rename it to, and what `source_
 
 A new raw file goes into the subfolder whose contents it most resembles. Do not invent a new subfolder unless none of the existing ones fit.
 
-The subfolders below are common starting points. The authoritative list for a configured wiki is in [`../../../../wiki/domain.md`](../../../../wiki/domain.md) under `raw_taxonomy` — during setup the user names their own categories, and those become the actual subfolders. Use the table below as a reference when categorizing; add domain-specific folders only after confirming with the user.
+The subfolders below are common starting points. The authoritative list for a configured wiki is in [`../../../wiki/domain.md`](../../../wiki/domain.md) under `raw_taxonomy` — during setup the user names their own categories, and those become the actual subfolders. Use the table below as a reference when categorizing; add domain-specific folders only after confirming with the user.
 
 | Subfolder | What lives here |
 |---|---|
