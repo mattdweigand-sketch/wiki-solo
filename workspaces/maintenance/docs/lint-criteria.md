@@ -6,9 +6,21 @@ A lint is **diagnosis, not surgery.** Report findings. The user approves fixes. 
 
 ---
 
+## Run the deterministic linter first
+
+Before reading any pages, run `python3 scripts/lint.py` from the repo root. It splits the wiki's rules by how they can be enforced:
+
+- **Tier 1 (deterministic):** machine-checkable structure with no judgment involved — frontmatter keys, `type` matching its folder, valid `confidence` and `source_type` values, kebab-case filenames, dangling `[[links]]`, index coverage. These are hard failures. The script exits non-zero when any fail, so they can gate a commit. Fix every Tier-1 finding before anything else.
+- **Tier 2 (ranked candidates):** signals a maintainer cannot eyeball across hundreds of pages — orphans, near-duplicates, uncited pages, thin pages, confidence-upgrade candidates, missing cross-references by co-citation. The script ranks them; a human or agent decides. Tier 2 never fails the run unless you pass `--strict`.
+- **Tier 3 (genuine judgment):** contradictions, stale claims, terminology drift, concepts mentioned without a page, confidence downgrades. A script cannot decide these. They are the checklist below.
+
+The checklist below is tagged by tier. The Tier-1 and Tier-2 items are already computed by `scripts/lint.py` — use its output instead of eyeballing them. Spend your reading on Tier 3, where judgment is the whole job.
+
+---
+
 ## What to Check
 
-### 1. Contradictions
+### 1. Contradictions (Tier 3 — judgment)
 Two or more pages making incompatible claims about the same entity. Most common forms:
 - Different facts (Customer X uses Product A vs. Product B)
 - Different framings (Competitor Y is "weak on payments" vs. "strong on payments")
@@ -16,7 +28,7 @@ Two or more pages making incompatible claims about the same entity. Most common 
 
 When found: open or update an entry in [`../contradictions.md`](../contradictions.md). Update the affected pages to `confidence: contested` if not already.
 
-### 2. Stale Claims
+### 2. Stale Claims (Tier 3 — judgment)
 A claim superseded by a newer source but not yet reflected on the page.
 
 Signals:
@@ -26,7 +38,7 @@ Signals:
 
 When found: propose the update. After applying, refresh the page's `updated:` date.
 
-### 3. Orphan Pages
+### 3. Orphan Pages (Tier 2 — `scripts/lint.py` lists them)
 A page with no inbound `[[links]]` from other wiki pages. Either:
 - It needs back-links added (the page is fine but no one links to it)
 - It belongs in the index/glossary/overview but isn't there yet
@@ -34,7 +46,7 @@ A page with no inbound `[[links]]` from other wiki pages. Either:
 
 When found: propose adding back-links from the obvious candidates (the products it relates to, the customers it affects, the initiatives it informs). If genuinely vestigial, ask the user before deleting.
 
-### 4. Missing Cross-References
+### 4. Missing Cross-References (Tier 2 — `scripts/lint.py` ranks co-citation candidates; the typed pairs below stay judgment)
 Two pages that *should* link to each other but don't.
 
 Patterns to check:
@@ -47,7 +59,7 @@ Patterns to check:
 
 The auto-generated `## Referenced by` section is rebuilt by running `python3 scripts/rebuild_referenced_by.py` from the repo root — do this as part of every lint cycle to catch these mechanically.
 
-### 5. Terminology Drift
+### 5. Terminology Drift (Tier 3 — judgment)
 The same concept being called by different names across pages.
 
 Process:
@@ -57,17 +69,17 @@ Process:
 
 Domain-specific terms defined in the glossary must be used precisely and consistently. Don't allow agents to paraphrase terms that have an exact definition.
 
-### 6. Concepts Mentioned Without Their Own Page
+### 6. Concepts Mentioned Without Their Own Page (Tier 3 — judgment)
 A page references a concept (e.g., "GP-led secondary," "NAV facility") that lacks a `wiki/concepts/<term>.md` of its own. The reader can't follow the link.
 
 When found: propose creating the concept page. If it would be substantial enough to warrant ingestion of a source, add to [`../sourcing-queue.md`](../sourcing-queue.md) instead.
 
-### 7. Confidence Upgrades
+### 7. Confidence Upgrades (Tier 2 — `scripts/lint.py` flags low-confidence pages with inbound links)
 Pages currently marked `confidence: low` that have accumulated enough sources since their last update to upgrade to `medium` or `high`.
 
 When found: propose the upgrade. Apply on approval.
 
-### 8. Confidence Downgrades / `contested` Surfacing
+### 8. Confidence Downgrades / `contested` Surfacing (Tier 3 — judgment)
 Inverse of #7. A page marked `high` that turns out to rest on a single thin source. Or a page where the contributing sources have started disagreeing.
 
 When found: propose the downgrade or the `contested` flag.

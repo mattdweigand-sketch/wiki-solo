@@ -42,13 +42,14 @@ Note: `contradictions.md`, `sourcing-queue.md`, and `design-notes.md` used to li
 ### Lint the wiki
 The user says "lint" or "lint the wiki." See [`docs/lint-criteria.md`](docs/lint-criteria.md) for the full checklist (contradictions, stale claims, orphans, missing cross-refs, terminology drift, confidence upgrades). Process:
 
-1. Read the wiki using `wiki/index.md` as the entry point. For deep lints, sample-read pages by category.
-2. Report findings grouped by category. Don't propose 50 fixes at once — top 10–15.
-3. Ask which to apply. Apply the approved ones.
-4. Update [`contradictions.md`](contradictions.md): resolved → closed, new → opened.
-5. Update [`sourcing-queue.md`](sourcing-queue.md) if gaps shifted.
-6. Run `python3 scripts/rebuild_referenced_by.py` from the repo root.
-7. Append a log entry:
+1. Run `python3 scripts/lint.py` from the repo root. Fix every Tier-1 failure first (it exits non-zero until they are clean), then carry its Tier-2 candidates into the report. The script handles the machine-checkable rules so you don't eyeball them.
+2. Read the wiki using `wiki/index.md` as the entry point for the Tier-3 judgment checks. For deep lints, sample-read pages by category.
+3. Report findings grouped by category. Don't propose 50 fixes at once — top 10–15.
+4. Ask which to apply. Apply the approved ones.
+5. Update [`contradictions.md`](contradictions.md): resolved → closed, new → opened.
+6. Update [`sourcing-queue.md`](sourcing-queue.md) if gaps shifted.
+7. Run `python3 scripts/rebuild_referenced_by.py` from the repo root, then re-run `python3 scripts/lint.py` to confirm Tier 1 is clean.
+8. Append a log entry:
    ```
    ## [YYYY-MM-DD] lint
    Issues found: ...
