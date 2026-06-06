@@ -41,4 +41,35 @@ Use `[[filename-without-extension]]` for all internal links. Two link sections p
 - `## Related pages` — curated outbound links you write by hand. Editorial: pick the meaningful ones.
 - `## Referenced by` — auto-generated inbound links. **Never hand-edit.** Rebuilt from the `[[ ]]` graph by `rebuild_referenced_by.py`, which the ingest, research, and maintenance workflows run. Write your `[[ ]]` links and the inbound list maintains itself.
 
+`## Related pages` may use lightweight relationship labels to explain why the outbound link matters. The label is plain markdown text; the page reference stays an ordinary `[[wikilink]]`.
+
+Allowed labels:
+
+| Label | Meaning |
+|---|---|
+| `Supports: [[page]]` | This page strengthens, evidences, or confirms the linked page. |
+| `Contradicts: [[page]]` | This page conflicts with or materially challenges the linked page. |
+| `Depends on: [[page]]` | This page requires the linked page to be understood first or true. |
+| `Derived from: [[page]]` | This page was created from, generalized from, or synthesized out of the linked page. |
+| `Part of: [[page]]` | This page is a component of the linked larger system, project, or framework. |
+| `Related: [[page]]` | Meaningful connection, but no stronger typed relationship fits. |
+
+Examples:
+
+```markdown
+- Depends on: [[agent-harness]]
+- Supports: [[context-as-moat]]
+- Part of: [[sales-harness-os]]
+- Derived from: [[outreach-architecture-of-autonomy]]
+- Related: [[agent-security]]
+```
+
+Plain links remain valid:
+
+```markdown
+- [[page]]
+```
+
+Do not mechanically backfill every existing related link. Add labels when touching or adjudicating a page, especially in `## Related pages`. Use `Related:` as the fallback when the relationship matters but is not precise.
+
 When stating a fact, append `(source: [[source-page]])`. When stating an opinion or inference, prefix with `Inference:` or `Hypothesis:`.

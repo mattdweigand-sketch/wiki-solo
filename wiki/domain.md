@@ -49,7 +49,3 @@ When `status: configured`, the wiki is ready to ingest sources and answer questi
 ## After configuration
 
 The agent updates this file's `status:` to `configured`, replaces `<Organization>` placeholders in the framework files (see [`SETUP.md`](../SETUP.md) for the exact list), and appends a log entry to [`log.md`](log.md).
-
-## Referenced by
-
-_No inbound links yet._
