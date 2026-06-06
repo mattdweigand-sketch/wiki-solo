@@ -52,10 +52,12 @@ agent_use_cases:
 - <If a question can't be answered without new sourcing, name it>
 
 ## Related Pages
-- [[<entity-page-1>]]
-- [[<entity-page-2>]]
-- [[<other-analysis-if-relevant>]]
+- Derived from: [[<entity-page-1>]]
+- Supports: [[<entity-page-2>]]
+- Related: [[<other-analysis-if-relevant>]]
 ```
+
+Use the relationship labels from [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md) when the connection is clear. Plain `- [[page]]` links remain valid.
 
 ---
 
@@ -72,7 +74,7 @@ A "Brief" output format (executive 1-pager) caps at 400 words and skips most sub
 - **Standalone.** A reader can understand it without going back to the cited pages — but the citations are there if they want depth.
 - **Question-first.** The slug, title, and Question section all name the question. Future agents can search by question and find this page.
 - **Honest about confidence.** If the synthesis rests on contested or thin sources, say so — don't smooth it over.
-- **Linked back.** Every cited entity page should have this analysis added under its "Related pages" section. (Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh the auto-generated `## Referenced by` sections after filing.)
+- **Linked back.** Every cited entity page should have this analysis added under its "Related pages" section, using a typed label when the relationship is clear. (Run `python3 .agents/scripts/rebuild_referenced_by.py` from the repo root to refresh the auto-generated `## Referenced by` sections after filing.)
 
 ---
 

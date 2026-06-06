@@ -72,7 +72,7 @@ Pick a slug that names the *question*, not the answer (e.g., `<product>-vs-<comp
 When filing:
 - Use [`analysis-template.md`](analysis-template.md) for structure.
 - Add proper frontmatter (`type: analysis`, `confidence`, `agent_use_cases`, etc. — see [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md)).
-- Add cross-references back to the entity pages cited.
+- Add cross-references back to the entity pages cited. In `## Related pages`, use typed relationship labels from [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md) when the relationship is clear; plain `- [[page]]` links remain valid.
 - Update [`../../../../wiki/index.md`](../../../../wiki/index.md) with a one-line summary of the new analysis.
 
 If both criteria aren't met, skip filing — the answer stays in chat. Deletion is cheaper than recall, so err on the side of filing when the criteria are met.
@@ -92,7 +92,7 @@ Output filed: yes — analyses/<slug>.md   (or: no)
 Wiki gaps noticed: ... (if any)
 ```
 
-If a file was created, run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh backlinks across the wiki.
+If a file was created, run `python3 .agents/scripts/rebuild_referenced_by.py` from the repo root to refresh backlinks across the wiki.
 
 Even if the answer wasn't filed, the log entry is useful — it shows what was asked and what existed at the time.
 

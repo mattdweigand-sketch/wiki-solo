@@ -7,5 +7,6 @@ raw/*
 !raw/.gitkeep
 !raw/README.md
 
-# Local Claude Code settings
+# Local agent settings
 .claude/settings.local.json
+.agents/settings.local.json

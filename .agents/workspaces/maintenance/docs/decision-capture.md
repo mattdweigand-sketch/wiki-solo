@@ -69,9 +69,9 @@ decider: <role or person>
 
 A decision page is only useful if it's reachable. After creating:
 
-1. Add a back-link from each entity in the **Affects** list. Add a "Decisions" or "Recent decisions" section to those entity pages if one doesn't exist.
+1. Add a back-link from each entity in the **Affects** list. Add a "Decisions" or "Recent decisions" section to those entity pages if one doesn't exist. If you add the decision under `## Related pages`, use a typed relationship label from [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md) when the relationship is clear.
 2. If the decision has a metric implication, link from [`../../../../wiki/metrics/`](../../../../wiki/metrics/) too.
-3. Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root to refresh the auto-generated `## Referenced by` sections.
+3. Run `python3 .agents/scripts/rebuild_referenced_by.py` from the repo root to refresh the auto-generated `## Referenced by` sections.
 
 ---
 

@@ -9,6 +9,6 @@ updated: 2026-05-17
 
 Master catalog of every page in this wiki, grouped by entity type with one-line summaries and confidence ratings.
 
-No entries yet — pages appear here as `/ingest` runs.
+No entries yet — pages appear here as the ingest workflow runs.
 
 See [`primer.md`](primer.md) for routing by question type and [`domain.md`](domain.md) for the wiki's scope.

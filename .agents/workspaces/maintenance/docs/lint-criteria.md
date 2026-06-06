@@ -45,7 +45,9 @@ Patterns to check:
 - Decisions ↔ initiatives/products/metrics (each decision links to what it affects)
 - Analyses → entity pages cited (and entity pages → analyses that reference them)
 
-The auto-generated `## Referenced by` section is rebuilt by running `python3 .claude/commands/rebuild_referenced_by.py` from the repo root — do this as part of every lint cycle to catch these mechanically.
+When adding or adjudicating links in `## Related pages`, prefer the allowed relationship labels from [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md): `Supports:`, `Contradicts:`, `Depends on:`, `Derived from:`, `Part of:`, or `Related:`. Keep the target as a normal `[[wikilink]]`. Plain `- [[page]]` remains valid, and labels should not be mass-backfilled without judgment.
+
+The auto-generated `## Referenced by` section is rebuilt by running `python3 .agents/scripts/rebuild_referenced_by.py` from the repo root — do this as part of every lint cycle to catch these mechanically.
 
 ### 5. Terminology Drift
 The same concept being called by different names across pages.
@@ -109,5 +111,5 @@ Group findings by category. Cap at 10–15 top items. Order by impact (contradic
 After approval and application:
 - Update [`../contradictions.md`](../contradictions.md) — opened, closed, status changes.
 - Update [`../sourcing-queue.md`](../sourcing-queue.md) — gaps that closed, new gaps surfaced.
-- Run `python3 .claude/commands/rebuild_referenced_by.py` from the repo root.
+- Run `python3 .agents/scripts/rebuild_referenced_by.py` from the repo root.
 - Log it.

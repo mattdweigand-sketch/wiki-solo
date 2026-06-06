@@ -7,11 +7,11 @@ Thanks for improving wiki-solo. This is a template repo — contributions that m
 ## What's worth contributing
 
 **Good fits:**
-- Bug fixes in `rebuild_referenced_by.py`
+- Bug fixes in `.agents/scripts/rebuild_referenced_by.py`
 - Corrections or clarifications to workspace docs (`CONTEXT.md` files, schema, citation rules)
 - New `source_type` entries in `schema.md` and `classification.md` that are broadly applicable
 - Improvements to the setup interview flow in `SETUP.md`
-- Agent-compatibility improvements (e.g., better `AGENTS.md` for a specific agent runtime)
+- Agent-compatibility improvements that keep shared workflow logic in `.agents/`
 
 **Not a good fit:**
 - Domain-specific entity types, subfolders, or terminology — those belong in your own configured wiki, not the template
@@ -23,8 +23,8 @@ Thanks for improving wiki-solo. This is a template repo — contributions that m
 
 1. **Fork** the repo and create a branch from `main`.
 2. Make your changes. Keep commits focused — one logical change per commit.
-3. **Test the pipeline end-to-end** if you've touched ingest, research, or maintenance workflows: drop a sample file into `raw/`, run `/ingest`, ask a question, run `/lint`, and confirm the output looks right.
-4. If you've touched `rebuild_referenced_by.py`, run it against a populated wiki and confirm `## Referenced by` sections update correctly.
+3. **Test the pipeline end-to-end** if you've touched ingest, research, or maintenance workflows: drop a sample file into `raw/`, follow `.agents/workspaces/ingest/CONTEXT.md`, ask a question, follow `.agents/workspaces/maintenance/CONTEXT.md`, and confirm the output looks right.
+4. If you've touched `.agents/scripts/rebuild_referenced_by.py`, run it against a populated wiki and confirm `## Referenced by` sections update correctly.
 5. Open a pull request with a clear description of what changed and why.
 
 ---
@@ -36,6 +36,7 @@ Thanks for improving wiki-solo. This is a template repo — contributions that m
 - **Prose style:** direct and instructional; written for an AI agent as the primary reader, a human as the secondary reader
 - **No hardcoded domain content:** the template must work for any organization. If an example is needed, use generic placeholders (`<organization>`, `[[product-core]]`, `[[customer-acme]]`)
 - **Workspace isolation:** each workspace's `CONTEXT.md` controls exactly what that workspace loads — don't add cross-workspace dependencies
+- **Adapter isolation:** shared workflow logic lives in `.agents/`; provider-specific folders only point to it.
 
 ---
 

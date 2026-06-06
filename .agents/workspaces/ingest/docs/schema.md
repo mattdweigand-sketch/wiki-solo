@@ -50,11 +50,45 @@ Followed by:
 1. **One-line summary** (used in `index.md` and in agent-retrieved snippets)
 2. **Body** — structured with headers, lists, and tables
 3. **Open questions / gaps** section — what we don't know yet
-4. **Related pages** section — `[[wiki-page-name]]` links
+4. **Related pages** section — `[[wiki-page-name]]` links, with typed labels when the relationship is clear
 
 **Filenames:** kebab-case, no extension prefix. Page titles in frontmatter may be title-cased.
 
 **Citations:** When stating a specific fact, append `(source: [[source-filename]])`. When stating an opinion or inference, prefix with "Inference:" or "Hypothesis:".
+
+### Related Pages Relationship Labels
+
+Use lightweight labels in `## Related pages` to say why two pages are connected. The label is plain markdown text; the page reference stays an ordinary `[[wikilink]]` so backlink and index scripts still work.
+
+Allowed labels:
+
+| Label | Meaning |
+|---|---|
+| `Supports: [[page]]` | This page strengthens, evidences, or confirms the linked page. |
+| `Contradicts: [[page]]` | This page conflicts with or materially challenges the linked page. |
+| `Depends on: [[page]]` | This page requires the linked page to be understood first or true. |
+| `Derived from: [[page]]` | This page was created from, generalized from, or synthesized out of the linked page. |
+| `Part of: [[page]]` | This page is a component of the linked larger system, project, or framework. |
+| `Related: [[page]]` | Meaningful connection, but no stronger typed relationship fits. |
+
+Examples:
+
+```markdown
+## Related pages
+- Depends on: [[agent-harness]]
+- Supports: [[context-as-moat]]
+- Part of: [[sales-harness-os]]
+- Derived from: [[outreach-architecture-of-autonomy]]
+- Related: [[agent-security]]
+```
+
+Plain links remain valid:
+
+```markdown
+- [[page]]
+```
+
+Do not mechanically backfill every existing related link. Add labels when touching or adjudicating a page, especially in `## Related pages`. Use `Related:` as the fallback when the relationship matters but is not precise.
 
 ---
 
