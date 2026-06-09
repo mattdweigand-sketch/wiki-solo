@@ -28,7 +28,7 @@ If a chat answer, draft, prompt, naming rule, workflow note, or script idea shou
 
 ### Add A Source
 
-Put the file under `raw/`, then ask the agent to ingest it. Claude users may use `/ingest`; other agents follow [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md).
+Put the file under `raw/`, then ask the agent to ingest it. The shared ingest workflow lives in [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md).
 
 Images and screenshots can be ingested too. They route through the visual-evidence harness, and a same-stem `.ocr.txt` sidecar can provide the visible text the agent needs to summarize them safely.
 
@@ -63,7 +63,7 @@ python3 scripts/lint.py --tier1
 
 ### Maintain The Wiki
 
-Claude users may use `/lint`; other agents route through [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md).
+For linting, promotion, harness evaluation, and other upkeep, route through [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md).
 
 Maintenance includes:
 

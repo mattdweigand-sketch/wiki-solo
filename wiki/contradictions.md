@@ -7,6 +7,6 @@ updated: 2026-05-17
 
 # Contradictions
 
-Open issues where sources disagree. Maintenance workspace appends entries here when `/lint` or `/ingest` surfaces a conflict.
+Open issues where sources disagree. Maintenance workflows append entries here when lint or ingest surfaces a conflict.
 
 No entries yet.

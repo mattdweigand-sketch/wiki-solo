@@ -83,7 +83,7 @@ Raw taxonomy: <list>
 
 ### 6. Confirm with the user
 
-Show a one-paragraph summary of what changed and what's next: "Configured. Drop your first source into `raw/<one of their subfolders>` and run `/ingest`."
+Show a one-paragraph summary of what changed and what's next: "Configured. Drop your first source into `raw/<one of their subfolders>` and ask the agent to ingest it."
 
 ---
 

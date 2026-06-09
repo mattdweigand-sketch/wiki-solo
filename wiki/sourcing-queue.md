@@ -9,6 +9,6 @@ updated: 2026-05-17
 
 Gaps where the wiki needs more grounding — entity pages with `confidence: low` or `medium` that would benefit from additional source documents.
 
-Maintenance workspace refreshes this list during `/lint` runs.
+Maintenance workflows refresh this list during lint runs.
 
 No entries yet.
