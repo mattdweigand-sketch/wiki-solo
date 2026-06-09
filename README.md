@@ -34,11 +34,13 @@ Images and screenshots can be ingested too. They route through the visual-eviden
 
 ### Workflow Thresholds
 
-| Workflow | Use when |
-|---|---|
-| Analysis | An answer synthesizes 3+ wiki pages, is over 300 words, and answers a durable domain question |
-| Harness | The route check says review, the task is not ordinary ingest, or a visual/social source needs evidence before writing |
-| Promotion | A reusable output should be saved, but it is not just a raw source and not already a clear analysis |
+These are routing thresholds, not importance scores. They keep quick work lightweight and send durable or risky work through the right review path.
+
+| Workflow | Threshold | Why |
+|---|---|---|
+| Analysis | All three must be true: synthesizes 3+ wiki pages, runs over 300 words, and answers a durable domain question | Keeps simple lookups and short answers in chat; saves only reusable cross-page synthesis |
+| Harness | The route policy returns `review`, the task is not ordinary ingest, or a visual/social source needs evidence before writing | Inspects no-write artifacts before risky durable edits; ordinary policy-pass ingest stays direct |
+| Promotion | The output has future reuse value, but is not simply a raw source and does not already meet the analysis threshold | Chooses one durable home before saving: existing page, new page, workflow, schema, fixture, or script |
 
 Every ordinary ingest starts with:
 
