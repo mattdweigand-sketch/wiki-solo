@@ -22,6 +22,19 @@ Just ask. The agent follows [`CONTEXT.md`](CONTEXT.md) into [`workflows/research
 
 Substantial answers can be filed to `wiki/analyses/`, but only through `scripts/capture_gate.py`. If approval is required, the agent must show the exact approval block before writing.
 
+### Promote A Reusable Artifact
+
+Use promotion when a chat answer, draft, prompt, script idea, operating rule, or other working artifact should become durable wiki memory. It is the route for useful material that is not simply a raw source ingest and not already a clearly substantial research analysis.
+
+Ask the agent to audit the artifact through [`workflows/maintenance/artifact-promotion.md`](workflows/maintenance/artifact-promotion.md). The workflow has two modes:
+
+| Mode | Meaning |
+|---|---|
+| `Audit only` | Recommend one primary home without editing files |
+| `Apply` | Make the chosen wiki, workflow, schema, script, or fixture update |
+
+Before applying a promotion, the agent runs `scripts/capture_gate.py` with the proposed route. If approval is required, it must show the exact approval block before writing.
+
 ### Add A Source
 
 Put the file under `raw/`, then ask the agent to ingest it. Claude users may use `/ingest`; other agents follow [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md).

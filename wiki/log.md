@@ -11,6 +11,14 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-08 — maintenance | README promotion workflow
+
+Change: Added a README usage section for artifact promotion.
+Reason: The README explained research analysis capture and source ingest but only listed promotion under maintenance without showing when or how to use the workflow.
+Validation: PASS — doc-audit loop, Tier-1 lint, full wiki eval, markdown-link audit, and `git diff --check`.
+
+---
+
 ## 2026-06-08 — maintenance | doc-refactor alignment
 
 Change: Audited root, setup, reference, source, research, and maintenance docs against the template-modernization refactor.
