@@ -48,7 +48,7 @@ For each triaged file:
 1. Read the source.
 2. Discuss 2–3 key takeaways with the user; ask clarifying questions about context and emphasis.
 3. Create a summary page in `../../../wiki/sources/` named after the source file. Required fields: `source_type`, `confidence`, citations back to the raw filename. Battlecards and other internal sales-enablement artifacts get `source_type: sales-battlecard` so downstream agents weight claims as our POV, not neutral analysis.
-4. Identify which existing wiki pages this source affects. Update them — don't create parallel versions. When the new source disagrees with an existing page, flag it (mark `confidence: contested`, log to [`../../maintenance/contradictions.md`](../../maintenance/contradictions.md)).
+4. Identify which existing wiki pages this source affects. Update them — don't create parallel versions. When the new source disagrees with an existing page, flag it (mark `confidence: contested`, log to [`../../../wiki/contradictions.md`](../../../wiki/contradictions.md)).
 5. Create new entity pages as warranted (products, features, personas, customers, competitors, concepts, initiatives, decisions, metrics, people).
 
 Frontmatter spec, source-type templates, and confidence values are all in [`../../../wiki/SCHEMA.md`](../../../wiki/SCHEMA.md). Citation patterns are in [`../docs/citation-rules.md`](../docs/citation-rules.md).
@@ -80,5 +80,5 @@ After extraction:
 1. **Forward flow only.** Triage → extract → link. No skipping. Changed source → re-run downstream stages.
 2. **Each stage loads only what it needs.** See the routing table above.
 3. **Never modify `raw/` content.** Triage *moves* and *renames* files; extraction *reads* them. Renaming is a path change, not a content change.
-4. **Contradictions get flagged, not resolved.** Flagging is a stage-02 output (mark page `contested`, log to [`../../maintenance/contradictions.md`](../../maintenance/contradictions.md)). Resolution is a maintenance-workspace job.
+4. **Contradictions get flagged, not resolved.** Flagging is a stage-02 output (mark page `contested`, log to [`../../../wiki/contradictions.md`](../../../wiki/contradictions.md)). Resolution is a maintenance workflow job.
 5. **Stage 03 is non-negotiable.** No ingest is "done" until index, glossary, and log are updated.

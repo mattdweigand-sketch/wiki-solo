@@ -13,7 +13,7 @@ Start by reading `wiki/domain.md`. If `status: unconfigured`, route to `SETUP.md
 - `AGENTS.md` — canonical operating map (this file). `CLAUDE.md` is a thin wrapper that imports it.
 - `CONTEXT.md` — task router; read after this file to find the right workflow.
 - `SETUP.md` — first-session configuration workflow for a fresh clone.
-- `workflows/` — vendor-neutral prose workflows grouped into three workspaces: `ingest/`, `research/`, and `maintenance/`.
+- `workflows/` — vendor-neutral prose workflows grouped into three workflow areas: `ingest/`, `research/`, and `maintenance/`.
 - `.claude/commands/` — optional Claude Code slash-command wrappers over the same workflows.
 - `scripts/` — vendor-neutral helper scripts. `capture_gate.py` guards analysis capture and artifact promotion; `wiki_route_policy.py` is the no-write route preflight before ingest edits; `wiki_pipeline.py` and related `wiki_*` scripts run the no-write harness under `tmp/wiki-runs/`; `rebuild_referenced_by.py` regenerates inbound links; `lint.py --tier1` is the deterministic validation gate.
 - `config/` — harness/provider manifests.
@@ -34,7 +34,7 @@ Routing lives in `CONTEXT.md`, the source of truth for which workflow handles wh
 
 ## Capture Approval Gate
 
-Run `python3 scripts/capture_gate.py` only before filing a research answer as `wiki/analyses/` or applying an artifact promotion. Ordinary source ingest does not require this approval gate; neither do routine page updates, decision capture, observation capture, workflow updates, or project updates unless they are part of an analysis-capture or artifact-promotion route.
+Use `scripts/capture_gate.py` with the workflow-specific arguments only before filing a research answer as `wiki/analyses/` or applying an artifact promotion. Ordinary source ingest does not require this approval gate; neither do routine page updates, decision capture, observation capture, workflow updates, or project updates unless they are part of an analysis-capture or artifact-promotion route.
 
 If the script prints `APPROVAL REQUIRED`, show that exact block and stop until the user approves the exact mode, primary home, and touched files. Re-run with `--approved` only after that approval.
 

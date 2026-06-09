@@ -26,7 +26,7 @@ Two or more pages making incompatible claims about the same entity. Most common 
 - Different framings (Competitor Y is "weak on payments" vs. "strong on payments")
 - Different time windows treated as "current" (a stale claim hasn't been superseded)
 
-When found: open or update an entry in [`../contradictions.md`](../contradictions.md). Update the affected pages to `confidence: contested` if not already.
+When found: open or update an entry in [`../../../wiki/contradictions.md`](../../../wiki/contradictions.md). Update the affected pages to `confidence: contested` if not already.
 
 ### 2. Stale Claims (Tier 3 — judgment)
 A claim superseded by a newer source but not yet reflected on the page.
@@ -78,7 +78,7 @@ Domain-specific terms defined in the glossary must be used precisely and consist
 ### 6. Concepts Mentioned Without Their Own Page (Tier 3 — judgment)
 A page references a concept (e.g., "GP-led secondary," "NAV facility") that lacks a `wiki/concepts/<term>.md` of its own. The reader can't follow the link.
 
-When found: propose creating the concept page. If it would be substantial enough to warrant ingestion of a source, add to [`../sourcing-queue.md`](../sourcing-queue.md) instead.
+When found: propose creating the concept page. If it would be substantial enough to warrant ingestion of a source, add to [`../../../wiki/sourcing-queue.md`](../../../wiki/sourcing-queue.md) instead.
 
 ### 7. Confidence Upgrades (Tier 2 — `scripts/lint.py` flags low-confidence pages with inbound links)
 Pages currently marked `confidence: low` that have accumulated enough sources since their last update to upgrade to `medium` or `high`.
@@ -125,7 +125,7 @@ Group findings by category. Cap at 10–15 top items. Order by impact (contradic
 ```
 
 After approval and application:
-- Update [`../contradictions.md`](../contradictions.md) — opened, closed, status changes.
-- Update [`../sourcing-queue.md`](../sourcing-queue.md) — gaps that closed, new gaps surfaced.
+- Update [`../../../wiki/contradictions.md`](../../../wiki/contradictions.md) — opened, closed, status changes.
+- Update [`../../../wiki/sourcing-queue.md`](../../../wiki/sourcing-queue.md) — gaps that closed, new gaps surfaced.
 - Run `python3 scripts/rebuild_referenced_by.py` from the repo root.
 - Log it.

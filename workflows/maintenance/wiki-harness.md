@@ -334,4 +334,4 @@ python3 scripts/wiki_eval.py --suite tier1
 
 ## Source of truth
 
-The implementation spec is `wiki/analyses/wiki-autonomous-maintenance-prd.md`. If behavior diverges from that PRD, update the PRD through the appropriate wiki workflow rather than letting script behavior become the only documentation.
+The template-modernization spec is [`template-modernization-spec.md`](template-modernization-spec.md). This file is the operational harness workflow. If script behavior diverges from either document, update the affected workflow doc through the appropriate maintenance route rather than letting script behavior become the only documentation.

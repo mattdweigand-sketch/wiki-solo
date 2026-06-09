@@ -93,7 +93,7 @@ Do NOT capture when:
 - `high` — the decision was explicitly made by an authoritative decider (exec, board) and recorded in a primary source (memo, deck, meeting notes).
 - `medium` — strong signal of the decision but not formalized (e.g., consistent across multiple Slack threads, but no single artifact).
 - `low` — inferred from behavior or off-hand mention. Document what would upgrade confidence.
-- `contested` — sources disagree on whether the decision was actually made or what it actually was. Flag and link to [`../contradictions.md`](../contradictions.md).
+- `contested` — sources disagree on whether the decision was actually made or what it actually was. Flag and link to [`../../../wiki/contradictions.md`](../../../wiki/contradictions.md).
 
 ---
 

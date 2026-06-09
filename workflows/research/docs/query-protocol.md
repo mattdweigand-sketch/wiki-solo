@@ -10,7 +10,7 @@ How to answer a user question against the wiki. Read once to internalize.
 1. Orient     — read index, optionally primer
 2. Pull       — load 3–8 entity pages
 3. Synthesize — answer with citations
-4. Auto-file  — file to wiki/analyses/ if meaningful (no ask)
+4. Capture     — file to wiki/analyses/ if meaningful and the capture gate allows it
 5. Log        — append to wiki/log.md, rebuild backlinks if filed
 ```
 
@@ -56,14 +56,28 @@ The answer should stand alone. Someone reading it without the wiki should still 
 
 ---
 
-## 4. Auto-File if Meaningful
+## 4. Capture if Meaningful
 
-**File the answer to `../../../wiki/analyses/<slug>.md` automatically when both are true:**
+**File the answer to `../../../wiki/analyses/<slug>.md` only when all three are true:**
 
 1. The answer synthesized **3+ wiki pages** (real cross-page synthesis, not a lookup).
 2. The answer is **>300 words** (substantive, not a quick fact).
+3. The answer addresses a durable question about this wiki's configured domain.
 
-**Don't ask first.** Notify in one line after filing:
+Before writing the analysis, run the capture gate with the proposed path and touched pages:
+
+```bash
+python3 scripts/capture_gate.py \
+  --artifact "<question summary>" \
+  --phase accepted \
+  --primary-home "wiki/analyses/<slug>.md" \
+  --pages-touched "<comma-separated wiki pages>" \
+  --synthesized-pages <count> \
+  --word-count <count> \
+  --domain-context yes
+```
+
+If the gate prints `APPROVAL REQUIRED`, show that exact block and wait. Re-run with `--approved` only after the user approves the exact analysis route. If the gate does not require approval, file the analysis and notify in one line:
 
 > Filed as `analyses/<slug>.md` — delete if not useful.
 
@@ -75,9 +89,9 @@ When filing:
 - Add cross-references back to the entity pages cited. In `## Related pages`, use typed relationship labels from [`../../../wiki/SCHEMA.md`](../../../wiki/SCHEMA.md) when the relationship is clear; plain `- [[page]]` links remain valid.
 - Update [`../../../wiki/index.md`](../../../wiki/index.md) with a one-line summary of the new analysis.
 
-If both criteria aren't met, skip filing — the answer stays in chat. Deletion is cheaper than recall, so err on the side of filing when the criteria are met.
+If any criterion is not met, skip filing — the answer stays in chat. Deletion is cheaper than recall, so err on the side of filing only when the criteria and capture gate both allow it.
 
-If you noticed a wiki gap (step 2 ran out of pages, or a key claim had no cited source), flag it — either suggest filing a new entity page, or suggest adding to [`../../maintenance/sourcing-queue.md`](../../maintenance/sourcing-queue.md).
+If you noticed a wiki gap (step 2 ran out of pages, or a key claim had no cited source), flag it — either suggest filing a new entity page, or suggest adding to [`../../../wiki/sourcing-queue.md`](../../../wiki/sourcing-queue.md).
 
 ---
 

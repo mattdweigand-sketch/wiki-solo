@@ -55,7 +55,7 @@ When `confidence: low` or `contested`, **restate it in the body** — downstream
 > **Confidence: contested** — sources disagree on whether this initiative is funded for FY26. See "Disagreement" below.
 ```
 
-For `contested`, include a "Disagreement" section that names the sources on each side. Cross-link to the open question in [`../../maintenance/contradictions.md`](../../maintenance/contradictions.md).
+For `contested`, include a "Disagreement" section that names the sources on each side. Cross-link to the open question in [`../../../wiki/contradictions.md`](../../../wiki/contradictions.md).
 
 ---
 

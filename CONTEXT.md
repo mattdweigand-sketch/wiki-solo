@@ -15,10 +15,14 @@ It returns `direct_edit`, `full_harness`, or `blocked`, and `workflows/ingest/CO
 Analysis capture and artifact promotion share one executable approval preflight:
 
 ```bash
-python3 scripts/capture_gate.py
+python3 scripts/capture_gate.py \
+  --artifact "<artifact summary>" \
+  --phase accepted|workflow \
+  --primary-home "<path or none>" \
+  --pages-touched "<comma-separated paths>"
 ```
 
-Run it before filing a substantial research answer as `wiki/analyses/` or applying an artifact promotion. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the exact output and wait for approval before editing files.
+Run it with the workflow-specific arguments before filing a substantial research answer as `wiki/analyses/` or applying an artifact promotion. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the exact output and wait for approval before editing files.
 
 ---
 
