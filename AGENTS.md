@@ -14,7 +14,7 @@ Start by reading `wiki/domain.md`. If `status: unconfigured`, route to `SETUP.md
 - `CONTEXT.md` — task router; read after this file to find the right workflow.
 - `SETUP.md` — first-session configuration workflow for a fresh clone.
 - `workflows/` — vendor-neutral prose workflows grouped into three workflow areas: `ingest/`, `research/`, and `maintenance/`.
-- `.claude/commands/` — optional Claude Code slash-command wrappers over the same workflows.
+- `.claude/commands/` and `.codex/commands/` — optional slash-command wrappers over the same workflows.
 - `scripts/` — vendor-neutral helper scripts and workflow shortcuts. `wiki_promote.py` starts a no-write promotion audit; `capture_gate.py` guards analysis capture and artifact promotion apply routes; `wiki_route_policy.py` is the no-write route preflight before ingest edits; `wiki_pipeline.py` and related `wiki_*` scripts run the no-write harness under `tmp/wiki-runs/`; `rebuild_referenced_by.py` regenerates inbound links; `lint.py --tier1` is the deterministic validation gate.
 - `config/` — harness/provider manifests.
 - `schemas/` — JSON schemas for harness packets, provider artifacts, apply plans, and manifests.
@@ -31,6 +31,8 @@ Create new entity types only during setup or after an explicit schema decision.
 ## Routing
 
 Routing lives in `CONTEXT.md`, the source of truth for which workflow handles which task. Read it after this file, find the task, and open the workflow file it points to. Each workflow opens with its own Load / Skip list.
+
+Routine command surface only: `/ingest`, `/capture`, `/lint`, and `/promote`. `/ingest` turns raw sources into durable wiki pages. `/capture` records first-person context, usually decisions or lived experiences. `/promote` routes useful artifacts from chats, drafts, scripts, prompts, or work outputs into the right durable home, or decides not to save them. `/lint` runs deterministic wiki checks. These commands are shortcuts; canonical behavior stays in `CONTEXT.md`, `workflows/`, `scripts/`, and `wiki/SCHEMA.md`.
 
 ## Capture Approval Gate
 

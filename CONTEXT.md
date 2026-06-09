@@ -4,6 +4,8 @@
 
 Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md`, read this file, then open the workflow for the task.
 
+Optional wrappers keep the common command surface small: `/ingest` for raw sources, `/capture` for first-person decisions or lived context, `/promote` for useful artifacts whose durable home is not obvious, and `/lint` for deterministic wiki checks. The wrappers are shortcuts only; this router and the workflow files are canonical.
+
 Ordinary source ingest starts with a no-write route preflight:
 
 ```bash

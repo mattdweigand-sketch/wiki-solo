@@ -16,6 +16,13 @@ Start with [`SETUP.md`](SETUP.md). An agent reads [`AGENTS.md`](AGENTS.md), chec
 
 ## How To Use It
 
+Common commands:
+
+- `/ingest` — turn raw sources into durable wiki pages.
+- `/capture` — record first-person context, usually decisions or lived experiences.
+- `/promote` — route useful artifacts from chats, drafts, scripts, prompts, or work outputs into the right durable home, or decide not to save them.
+- `/lint` — run deterministic wiki checks.
+
 ### Ask A Question
 
 The analysis workflow answers from the wiki. The agent follows [`CONTEXT.md`](CONTEXT.md) into [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md), reads `wiki/index.md`, pulls only relevant pages, and answers with citations like `(source: [[source-slug]])`.
@@ -24,7 +31,7 @@ If the answer becomes substantial cross-page synthesis, the agent can save it as
 
 ### Preserve A Working Artifact
 
-The promotion workflow is for useful material that is not simply a source and not already a clear analysis. Promotion means deciding the right durable home: an existing page, a new wiki page, a workflow note, a schema change, a fixture, a script, a decision, or an analysis.
+The promotion workflow is for useful material that is not simply a source and not already a clear analysis. Promotion means deciding the right durable home: an existing page, a new wiki page, a workflow note, a schema change, a fixture, a script, a decision, or an analysis. Direct decisions or lived context use `/capture`; `/promote` is for artifacts whose durable home is not obvious.
 
 Agents can use the shared shortcut `python3 scripts/wiki_promote.py "<artifact>"` to start a promotion audit.
 
@@ -49,8 +56,7 @@ Maintenance includes:
 - linting
 - artifact promotion
 - harness evaluation
-- decision capture
-- observation or field-note capture
+- capture via `/capture`: decisions and lived context
 - sourcing-queue refresh
 
 ## Repo Structure

@@ -5,11 +5,11 @@ description: Router for wiki hygiene, harness evaluation, artifact promotion, de
 
 # Maintenance Workspace
 
-Wiki hygiene, harness evaluation, artifact promotion, decision capture, observation capture, and sourcing queue refresh. Load this router, then open only the one task file the work calls for. Don't pull every task file into context.
+Wiki hygiene, harness evaluation, artifact promotion, decision capture, observation capture, and sourcing queue refresh. `/capture` is a shortcut for decision capture or experience capture, not a separate workflow. Load this router, then open only the one task file the work calls for. Don't pull every task file into context.
 
 The wiki harness is the no-write review and eval layer. Ordinary ingest reaches it only when `scripts/wiki_route_policy.py` returns `full_harness`, or when the user explicitly asks to run or extend the harness.
 
-Artifact promotion uses the shared capture preflight. Before applying artifact promotion, run `python3 scripts/capture_gate.py` with the proposed route and stop if it requires approval. Decision capture, observation capture, workflow updates, and routine page updates do not require this approval gate unless they are part of a promotion or analysis-capture route.
+Artifact promotion uses the shared capture preflight. Before applying artifact promotion, run `python3 scripts/capture_gate.py` with the proposed route and stop if it requires approval. Decision capture, observation capture, workflow updates, and routine page updates do not require this approval gate unless they are part of a promotion or analysis-capture route. If the user directly says they made a decision or lived through something they want remembered, use `/capture`; use `/promote` only when evaluating a separate artifact.
 
 ## Load / Skip
 

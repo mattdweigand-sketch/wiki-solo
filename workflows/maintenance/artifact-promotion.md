@@ -5,11 +5,11 @@ description: Use this workflow when a useful output, draft, chat answer, script,
 
 # Artifact Promotion Workflow
 
-Artifact promotion turns useful work into the right durable layer of the wiki. It is not a new entity type. It is a routing decision for artifacts that start outside the wiki or inside a temporary answer and may deserve to become source, concept, analysis, decision, initiative, style, workflow, schema, or script material.
+Artifact promotion turns useful work into the right durable layer of the wiki. It is not a new entity type. It is a routing decision for artifacts that start outside the wiki or inside a temporary answer and may deserve to become source, concept, analysis, decision, initiative, style, workflow, schema, or script material. Direct decisions or lived context should use `/capture` instead; `/promote` is for artifacts whose durable home is not obvious.
 
 This workflow is both the PRD and implementation spec for promotion. The executable gate is `scripts/capture_gate.py`, which standardizes the approval preflight for artifact promotion and analysis capture. Use code for the checkable approval boundary; use this workflow for judgment about the right home, page quality, links, and logging.
 
-Agents may use `python3 scripts/wiki_promote.py "<artifact>"` as an agent-neutral shortcut to start an audit. The shortcut writes no files. It delegates apply approval to `scripts/capture_gate.py` when run with `--apply`.
+Agents may use `python3 scripts/wiki_promote.py "<artifact>"` as an agent-neutral shortcut to start an audit. The shortcut writes no files. It delegates apply approval to `scripts/capture_gate.py` when run with `--apply`. `/promote` can still route an artifact into a decision or experience page if the artifact itself is what is being promoted.
 
 Promotion has two modes:
 
@@ -18,7 +18,7 @@ Promotion has two modes:
 
 At the end of wiki-related work, if a useful reusable insight appears, run an audit automatically and show the recommended route. Apply the promotion only if the user has explicitly asked to promote, apply, save, file, update the wiki, ingest, commit, or otherwise make a durable repo change.
 
-Before applying any promotion or filing any analysis capture, run `python3 scripts/capture_gate.py` with the proposed artifact, phase, primary home, touched pages, and analysis criteria or promotion triggers. Ordinary ingest, decision capture, observation capture, workflow updates, and routine page updates do not require this approval gate unless they are part of an artifact-promotion or analysis-capture route.
+Before applying any promotion or filing any analysis capture, run `python3 scripts/capture_gate.py` with the proposed artifact, phase, primary home, touched pages, and analysis criteria or promotion triggers. Ordinary ingest, decision capture, observation capture, workflow updates, and routine page updates do not require this approval gate unless they are part of an artifact-promotion or analysis-capture route. If the user directly says they made a decision or lived through something they want remembered, route to `/capture`, not `/promote`.
 
 If the script prints `APPROVAL REQUIRED`, show that exact block and do not edit files until the user approves the exact route. Re-run with `--approved` only after that approval.
 
