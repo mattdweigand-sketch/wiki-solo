@@ -87,7 +87,7 @@ Then run the deterministic Tier-1 gate, the same one the promotion workflow uses
 python3 scripts/lint.py --tier1
 ```
 
-Tier-1 is machine-checkable: em dashes, filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, and index coverage. An ingest authors fresh frontmatter and links across many pages, which is exactly where these slip in, so the gate runs here rather than waiting for the next periodic lint. Run it after the backlink rebuild so the link graph is current.
+Tier-1 is machine-checkable: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, and index coverage. An ingest authors fresh frontmatter and links across many pages, which is exactly where these slip in, so the gate runs here rather than waiting for the next periodic lint. Run it after the backlink rebuild so the link graph is current.
 
 ## Step 7 — Promotion audit
 

@@ -18,7 +18,7 @@ Lint is split by enforcement tier. Machine-checkable rules run as a deterministi
    python3 scripts/lint.py
    ```
 
-   It reports two tiers. **Tier 1** is machine-checkable and exits non-zero on any failure: em dashes, filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, and index coverage. These are not judgment calls, so fix them rather than debating them. **Tier 2** is ranked candidates the script surfaces but cannot decide: near-duplicate pages, orphans, uncited pages, thin stubs, `confidence: low` pages with enough inbound links to upgrade, and missing cross-references (pages sharing several links but not linking each other). Treat Tier 2 as a worklist to adjudicate, not as failures.
+   It reports two tiers. **Tier 1** is machine-checkable and exits non-zero on any failure: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, and index coverage. These are not judgment calls, so fix them rather than debating them. **Tier 2** is ranked candidates the script surfaces but cannot decide: near-duplicate pages, orphans, uncited pages, thin stubs, `confidence: low` pages with enough inbound links to upgrade, and missing cross-references (pages sharing several links but not linking each other). Treat Tier 2 as a worklist to adjudicate, not as failures.
 
    Do not chase Tier 2 to zero. The ranked list rolls forward after fixes and will continue surfacing weaker overlap candidates. Add links only when the relationship is editorially meaningful. Leave weak candidates unresolved and log them as reviewed/no-change.
 
