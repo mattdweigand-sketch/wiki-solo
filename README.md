@@ -32,6 +32,14 @@ Put the file under `raw/`, then ask the agent to ingest it. Claude users may use
 
 Images and screenshots can be ingested too. They route through the visual-evidence harness, and a same-stem `.ocr.txt` sidecar can provide the visible text the agent needs to summarize them safely.
 
+### Workflow Thresholds
+
+| Workflow | Use when |
+|---|---|
+| Analysis | An answer synthesizes 3+ wiki pages, is over 300 words, and answers a durable domain question |
+| Harness | The route check says review, the task is not ordinary ingest, or a visual/social source needs evidence before writing |
+| Promotion | A reusable output should be saved, but it is not just a raw source and not already a clear analysis |
+
 Every ordinary ingest starts with:
 
 ```bash
