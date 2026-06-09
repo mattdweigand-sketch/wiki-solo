@@ -9,6 +9,8 @@ Artifact promotion turns useful work into the right durable layer of the wiki. I
 
 This workflow is both the PRD and implementation spec for promotion. The executable gate is `scripts/capture_gate.py`, which standardizes the approval preflight for artifact promotion and analysis capture. Use code for the checkable approval boundary; use this workflow for judgment about the right home, page quality, links, and logging.
 
+Agents may use `python3 scripts/wiki_promote.py "<artifact>"` as an agent-neutral shortcut to start an audit. The shortcut writes no files. It delegates apply approval to `scripts/capture_gate.py` when run with `--apply`.
+
 Promotion has two modes:
 
 - **Audit only** — evaluate the artifact and recommend one primary route. Do not edit files. Use when the user asks whether or how something should be promoted.

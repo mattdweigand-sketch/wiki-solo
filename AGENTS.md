@@ -15,7 +15,7 @@ Start by reading `wiki/domain.md`. If `status: unconfigured`, route to `SETUP.md
 - `SETUP.md` — first-session configuration workflow for a fresh clone.
 - `workflows/` — vendor-neutral prose workflows grouped into three workflow areas: `ingest/`, `research/`, and `maintenance/`.
 - `.claude/commands/` — optional Claude Code slash-command wrappers over the same workflows.
-- `scripts/` — vendor-neutral helper scripts. `capture_gate.py` guards analysis capture and artifact promotion; `wiki_route_policy.py` is the no-write route preflight before ingest edits; `wiki_pipeline.py` and related `wiki_*` scripts run the no-write harness under `tmp/wiki-runs/`; `rebuild_referenced_by.py` regenerates inbound links; `lint.py --tier1` is the deterministic validation gate.
+- `scripts/` — vendor-neutral helper scripts and workflow shortcuts. `wiki_promote.py` starts a no-write promotion audit; `capture_gate.py` guards analysis capture and artifact promotion apply routes; `wiki_route_policy.py` is the no-write route preflight before ingest edits; `wiki_pipeline.py` and related `wiki_*` scripts run the no-write harness under `tmp/wiki-runs/`; `rebuild_referenced_by.py` regenerates inbound links; `lint.py --tier1` is the deterministic validation gate.
 - `config/` — harness/provider manifests.
 - `schemas/` — JSON schemas for harness packets, provider artifacts, apply plans, and manifests.
 - `tests/fixtures/` — golden and negative fixtures for ingest, policy, route, run, semantic, provider, pipeline, apply-plan, and Tier-1 behavior.

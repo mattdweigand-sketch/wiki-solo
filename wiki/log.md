@@ -11,6 +11,14 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-08 — maintenance | agent-neutral promotion shortcut
+
+Change: Added `scripts/wiki_promote.py` as an agent-neutral shortcut for promotion audits, documented it in root routing, and clarified the README boundary between analysis and promotion.
+Reason: Promotion should have a convenient entrypoint without making `.claude/commands/` canonical, and readers should understand that analysis is a saved answer while promotion is a routing decision for ambiguous durable artifacts.
+Validation: PASS — shortcut audit mode, apply-gate approval path, `py_compile`, backlink rebuild, Tier-1 lint, provider manifest validation, full wiki eval, and `git diff --check`.
+
+---
+
 ## 2026-06-08 — maintenance | README promotion workflow
 
 Change: Simplified README usage sections for reusable-output promotion, image/screenshot source ingest, and save/review thresholds.

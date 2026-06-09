@@ -18,13 +18,15 @@ Start with [`SETUP.md`](SETUP.md). An agent reads [`AGENTS.md`](AGENTS.md), chec
 
 ### Ask A Question
 
-Just ask. The agent follows [`CONTEXT.md`](CONTEXT.md) into [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md), reads `wiki/index.md`, pulls only relevant pages, and answers with citations like `(source: [[source-slug]])`.
+The analysis workflow answers from the wiki. The agent follows [`CONTEXT.md`](CONTEXT.md) into [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md), reads `wiki/index.md`, pulls only relevant pages, and answers with citations like `(source: [[source-slug]])`.
 
-If the answer becomes a durable synthesis, the agent can save it as a citable analysis page.
+If the answer becomes substantial cross-page synthesis, the agent can save it as a citable analysis page.
 
-### Save A Reusable Output
+### Preserve A Working Artifact
 
-If a chat answer, draft, prompt, naming rule, workflow note, or script idea should be kept, ask the agent to promote it. Promotion means choosing the right durable home: an existing page, a new wiki page, a workflow note, a schema change, a fixture, or a script.
+The promotion workflow is for useful material that is not simply a source and not already a clear analysis. Promotion means deciding the right durable home: an existing page, a new wiki page, a workflow note, a schema change, a fixture, a script, a decision, or an analysis.
+
+Agents can use the shared shortcut `python3 scripts/wiki_promote.py "<artifact>"` to start a promotion audit.
 
 ### Add A Source
 
@@ -34,8 +36,8 @@ Images and screenshots can be ingested too. They route through the visual-eviden
 
 ### When Work Gets Saved
 
-- **Analysis:** save a citable page only for substantial cross-page synthesis: 3+ wiki pages, over 300 words, and a durable domain question.
-- **Promotion:** save smaller reusable outputs when they should change future wiki memory, workflow, naming, schema, fixtures, or scripts.
+- **Analysis:** a saved answer to a wiki question: 3+ wiki pages, over 300 words, and a durable domain question.
+- **Promotion:** a routing decision for a useful artifact whose correct home is not obvious.
 - **Harness:** inspect no-write artifacts before riskier edits, non-standard ingest, or visual/social sources that need evidence.
 
 ### Maintain The Wiki
@@ -63,7 +65,7 @@ Maintenance includes:
 ├── raw/            Immutable source artifacts.
 ├── wiki/           Knowledge layer and entity pages.
 ├── workflows/      Vendor-neutral workflow prose.
-├── scripts/        Deterministic helpers and no-write harness.
+├── scripts/        Deterministic helpers, workflow shortcuts, and no-write harness.
 ├── schemas/        JSON schemas for harness artifacts.
 ├── config/         Provider manifest.
 ├── tests/          Fixture-backed evals.
