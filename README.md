@@ -20,24 +20,17 @@ Start with [`SETUP.md`](SETUP.md). An agent reads [`AGENTS.md`](AGENTS.md), chec
 
 Just ask. The agent follows [`CONTEXT.md`](CONTEXT.md) into [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md), reads `wiki/index.md`, pulls only relevant pages, and answers with citations like `(source: [[source-slug]])`.
 
-Substantial answers can be filed to `wiki/analyses/`, but only through `scripts/capture_gate.py`. If approval is required, the agent must show the exact approval block before writing.
+If the answer becomes a durable synthesis, the agent can save it as a citable analysis page.
 
-### Promote A Reusable Artifact
+### Save A Reusable Output
 
-Use promotion when a chat answer, draft, prompt, script idea, operating rule, or other working artifact should become durable wiki memory. It is the route for useful material that is not simply a raw source ingest and not already a clearly substantial research analysis.
-
-Ask the agent to audit the artifact through [`workflows/maintenance/artifact-promotion.md`](workflows/maintenance/artifact-promotion.md). The workflow has two modes:
-
-| Mode | Meaning |
-|---|---|
-| `Audit only` | Recommend one primary home without editing files |
-| `Apply` | Make the chosen wiki, workflow, schema, script, or fixture update |
-
-Before applying a promotion, the agent runs `scripts/capture_gate.py` with the proposed route. If approval is required, it must show the exact approval block before writing.
+If a chat answer, draft, prompt, naming rule, workflow note, or script idea should be kept, ask the agent to promote it. Promotion means choosing the right durable home: an existing page, a new wiki page, a workflow note, a schema change, a fixture, or a script.
 
 ### Add A Source
 
 Put the file under `raw/`, then ask the agent to ingest it. Claude users may use `/ingest`; other agents follow [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md).
+
+Images and screenshots can be ingested too. They route through the visual-evidence harness, and a same-stem `.ocr.txt` sidecar can provide the visible text the agent needs to summarize them safely.
 
 Every ordinary ingest starts with:
 

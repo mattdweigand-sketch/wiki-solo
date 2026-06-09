@@ -13,8 +13,8 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ## 2026-06-08 — maintenance | README promotion workflow
 
-Change: Added a README usage section for artifact promotion.
-Reason: The README explained research analysis capture and source ingest but only listed promotion under maintenance without showing when or how to use the workflow.
+Change: Added and then simplified README usage sections for reusable-output promotion and image/screenshot source ingest.
+Reason: The README should explain the user-facing routes: ask a question, save a reusable output, or add a source. Detailed approval and visual-evidence mechanics stay in the workflow docs.
 Validation: PASS — doc-audit loop, Tier-1 lint, full wiki eval, markdown-link audit, and `git diff --check`.
 
 ---
