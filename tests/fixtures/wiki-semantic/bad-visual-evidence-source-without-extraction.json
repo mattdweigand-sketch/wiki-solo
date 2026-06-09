@@ -1,0 +1,19 @@
+{
+  "id": "bad-visual-evidence-source-without-extraction",
+  "run_id": "eval-bad-visual-evidence-source-without-extraction",
+  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
+  "mutations": [
+    {
+      "artifact": "evidence.json",
+      "set": [
+        {
+          "path": ["evidence_source"],
+          "value": "ocr"
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "visual evidence evidence_source must be none when extraction was not performed"
+  ]
+}

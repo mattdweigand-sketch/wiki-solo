@@ -1,0 +1,17 @@
+{
+  "id": "no-op-existing-source-plan",
+  "run_id": "eval-positive-apply-no-op",
+  "source_path": "raw/videos/2026-06-08-pewdiepie-did-it-again.md",
+  "expected_exit_code": 0,
+  "expected_status": "ready_for_approval",
+  "expected_target_files": [],
+  "expected_operation_ops": ["no_op"],
+  "expected_blockers": [],
+  "expected_review_reasons": [
+    "policy status is review",
+    "risk flag requires review: source_page_exists",
+    "v1 apply boundary requires explicit human approval"
+  ],
+  "expected_required_approval": true,
+  "expected_writes_wiki": false
+}

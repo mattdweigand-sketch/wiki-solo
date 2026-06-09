@@ -1,44 +1,41 @@
 # <Organization> Wiki — Task Router
 
-[`AGENTS.md`](AGENTS.md) is canonical and has the folder map and conventions. Claude Code reads it through the thin [`CLAUDE.md`](CLAUDE.md) wrapper. Non-Claude agents should read `AGENTS.md` first. **This file routes you to the right workspace.** Don't read everything — find your task, go to the workspace, follow its `CONTEXT.md`.
+`AGENTS.md` is canonical: it holds the folder map, conventions, and hard rules. This file routes a task to the right workflow. Do not read everything; find the task, open the workflow entry, and load only what it says to load.
 
----
+Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md`, read this file, then open the workflow for the task.
 
-## Task Routing
+Ordinary source ingest starts with a no-write route preflight:
 
-| Your Task | Go Here | You'll Also Need |
-|---|---|---|
-| **Ingest a new file** (raw → wiki page) | [`workspaces/ingest/CONTEXT.md`](workspaces/ingest/CONTEXT.md) | [`workspaces/ingest/docs/schema.md`](workspaces/ingest/docs/schema.md) for frontmatter spec |
-| **Answer a question from the wiki** | [`workspaces/research/CONTEXT.md`](workspaces/research/CONTEXT.md) | [`wiki/index.md`](wiki/index.md), [`wiki/primer.md`](wiki/primer.md) |
-| **Compare entities** (products vs. competitors, customer A vs. B) | [`workspaces/research/CONTEXT.md`](workspaces/research/CONTEXT.md) | [`wiki/index.md`](wiki/index.md) |
-| **Capture a decision** | [`workspaces/maintenance/CONTEXT.md`](workspaces/maintenance/CONTEXT.md) | [`workspaces/maintenance/docs/decision-capture.md`](workspaces/maintenance/docs/decision-capture.md) |
-| **Lint the wiki** (contradictions, stale, orphans) | [`workspaces/maintenance/CONTEXT.md`](workspaces/maintenance/CONTEXT.md) | [`workspaces/maintenance/docs/lint-criteria.md`](workspaces/maintenance/docs/lint-criteria.md) |
-| **Refresh sourcing queue** | [`workspaces/maintenance/CONTEXT.md`](workspaces/maintenance/CONTEXT.md) | [`workspaces/maintenance/sourcing-queue.md`](workspaces/maintenance/sourcing-queue.md) |
-| **Update an entity page from a new source** | [`workspaces/ingest/CONTEXT.md`](workspaces/ingest/CONTEXT.md) | The existing page + new source |
-| **Browse what's in the wiki** | [`wiki/index.md`](wiki/index.md) | — |
-
----
-
-## Workspace Summary
-
-| Workspace | Purpose | Pattern |
-|---|---|---|
-| [`workspaces/ingest/`](workspaces/ingest/) | Raw source → structured wiki page(s). Triage, extract, link. | Pipeline (3 stages) |
-| [`workspaces/research/`](workspaces/research/) | Read wiki → synthesize answer with citations. Optionally file as analysis. | Conversational |
-| [`workspaces/maintenance/`](workspaces/maintenance/) | Wiki hygiene: contradictions, lint, sourcing queue, decision capture. | Task-driven |
-
-Each workspace's `CONTEXT.md` says exactly what to load for each task type — and what to skip.
-
----
-
-## Cross-Workspace Flow
-
-```
-raw/  →  ingest/  →  wiki/  →  research/  →  wiki/analyses/
-                       ↑
-                  maintenance/
+```bash
+python3 scripts/wiki_route_policy.py <raw-source>
 ```
 
-- Ingest produces or updates wiki pages.
-- Research consumes wiki pages and produces analyses (which themselves become wiki pages, citable by future agents).
-- Maintenance keeps the substrate honest — finds contradictions, flags stale content, prompts new sourcing.
+It returns `direct_edit`, `full_harness`, or `blocked`, and `workflows/ingest/CONTEXT.md` owns the next step.
+
+Analysis capture and artifact promotion share one executable approval preflight:
+
+```bash
+python3 scripts/capture_gate.py
+```
+
+Run it before filing a substantial research answer as `wiki/analyses/` or applying an artifact promotion. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the exact output and wait for approval before editing files.
+
+---
+
+## Routing
+
+| Task | Workflow entry | Also load |
+|---|---|---|
+| Configure a fresh clone | [`SETUP.md`](SETUP.md) | `wiki/domain.md` |
+| Ingest a source (`raw/` to wiki page) | [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md) | `wiki/SCHEMA.md` |
+| Answer a question from the wiki | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) | `wiki/index.md`, then the pages it points to; `scripts/capture_gate.py` if filing analysis |
+| Compare entities | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) | `wiki/index.md`, relevant entity pages |
+| Lint the wiki | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) to [`lint.md`](workflows/maintenance/lint.md) | all wiki pages |
+| Run or extend the wiki autonomy harness | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) to [`wiki-harness.md`](workflows/maintenance/wiki-harness.md) | relevant `scripts/wiki_*.py`, `schemas/`, `tests/fixtures/` |
+| Promote a useful artifact into durable wiki memory | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) to [`artifact-promotion.md`](workflows/maintenance/artifact-promotion.md) | `wiki/SCHEMA.md`, `wiki/index.md`, `scripts/capture_gate.py` |
+| Capture a decision | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) to [`capture-decision.md`](workflows/maintenance/capture-decision.md) | `wiki/SCHEMA.md`, affected entity pages |
+| Capture an observation or field note | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) to [`capture-experience.md`](workflows/maintenance/capture-experience.md) | `wiki/SCHEMA.md`, affected entity pages |
+| Refresh the sourcing queue | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) to [`refresh-sourcing-queue.md`](workflows/maintenance/refresh-sourcing-queue.md) | `wiki/sourcing-queue.md` if present, otherwise workflow task file |
+| Browse what's in the wiki | [`wiki/index.md`](wiki/index.md) | `wiki/domain.md` |
+
+Each workflow opens with its own Load / Skip list. Follow that list instead of pulling the whole wiki into context.

@@ -1,0 +1,19 @@
+{
+  "id": "bad-visual-evidence-writes-wiki",
+  "run_id": "eval-bad-visual-evidence-writes-wiki",
+  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
+  "mutations": [
+    {
+      "artifact": "evidence.json",
+      "set": [
+        {
+          "path": ["writes_wiki"],
+          "value": true
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "visual evidence extractor must declare writes_wiki=false"
+  ]
+}

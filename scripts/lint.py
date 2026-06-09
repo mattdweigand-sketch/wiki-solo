@@ -19,7 +19,7 @@ human or agent to adjudicate. Tier 2 never fails the run unless --strict.
 Tier 3 (genuine judgment: contradictions, stale claims, terminology drift,
 concepts mentioned without their own page, confidence downgrades) is
 deliberately NOT attempted here. It stays in the prose lint workflow under
-workspaces/maintenance/docs/lint-criteria.md, because a script cannot decide it.
+workflows/maintenance/docs/lint-criteria.md, because a script cannot decide it.
 
 Vendor-neutral: stdlib only, no dependencies. Run from the repo root:
     python3 scripts/lint.py            # report both tiers, fail on Tier 1
@@ -36,8 +36,11 @@ WIKI_ROOT = Path("wiki")
 
 # Depth-1 infrastructure pages: config and indexes, not citable entities.
 # The maintenance scratchpads (contradictions, sourcing-queue, design-notes)
-# and the schema live under workspaces/, so they are not present here.
-META_PAGES = {"index", "log", "overview", "glossary", "primer", "domain"}
+# and the schema live under workflows/ or wiki/SCHEMA.md, so they are not present here.
+META_PAGES = {
+    "index", "log", "overview", "glossary", "primer", "domain", "SCHEMA",
+    "contradictions", "sourcing-queue", "design-notes",
+}
 META_DIRS = {"style"}
 
 # folder name -> expected frontmatter type value

@@ -1,0 +1,11 @@
+{
+  "id": "referenced-by-manual-edit-reject",
+  "expected_status": "reject",
+  "packet": {
+    "writes_files": false,
+    "risk_flags": ["manual_referenced_by_edit"],
+    "expected_touched_files": [
+      "wiki/sources/example-source.md"
+    ]
+  }
+}

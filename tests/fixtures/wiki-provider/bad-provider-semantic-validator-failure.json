@@ -1,0 +1,19 @@
+{
+  "id": "bad-provider-semantic-validator-failure",
+  "run_id": "eval-bad-provider-semantic-validator-failure",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "mutations": [
+    {
+      "artifact": "classifier.json",
+      "set": [
+        {
+          "path": ["page_home_mode"],
+          "value": "no_op"
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "classifier page_home_mode"
+  ]
+}

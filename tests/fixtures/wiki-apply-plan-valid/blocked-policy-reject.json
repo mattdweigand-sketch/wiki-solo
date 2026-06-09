@@ -1,0 +1,36 @@
+{
+  "id": "blocked-policy-reject",
+  "run_id": "eval-positive-apply-policy-reject",
+  "source_path": "raw/videos/2026-06-08-pewdiepie-did-it-again.md",
+  "mutations": [
+    {
+      "artifact": "policy.json",
+      "set": [
+        {
+          "path": ["status"],
+          "value": "reject"
+        }
+      ]
+    },
+    {
+      "artifact": "judge.json",
+      "set": [
+        {
+          "path": ["policy_status"],
+          "value": "reject"
+        }
+      ]
+    }
+  ],
+  "expected_exit_code": 2,
+  "expected_status": "blocked",
+  "expected_target_files": [],
+  "expected_operation_ops": ["no_op"],
+  "expected_blockers": ["policy status is reject"],
+  "expected_review_reasons": [
+    "risk flag requires review: source_page_exists",
+    "v1 apply boundary requires explicit human approval"
+  ],
+  "expected_required_approval": true,
+  "expected_writes_wiki": false
+}

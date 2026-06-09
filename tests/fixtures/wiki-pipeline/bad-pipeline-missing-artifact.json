@@ -1,0 +1,22 @@
+{
+  "id": "bad-pipeline-missing-artifact",
+  "run_id": "eval-bad-pipeline-missing-artifact",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "mutations": [
+    {
+      "artifact": "pipeline.json",
+      "set": [
+        {
+          "path": ["artifacts"],
+          "value": [
+            "packet.json",
+            "missing.json"
+          ]
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "pipeline listed artifact is missing"
+  ]
+}

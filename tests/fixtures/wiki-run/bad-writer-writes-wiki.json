@@ -1,0 +1,26 @@
+{
+  "id": "bad-writer-writes-wiki",
+  "run_id": "eval-bad-writer-writes-wiki",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "expected_policy_status": "pass",
+  "expected_judge_decision": "approve_for_review",
+  "expected_drafts": [
+    "draft/README.md",
+    "draft/manifest.json",
+    "draft/folder-organization-guide.md.stub"
+  ],
+  "mutations": [
+    {
+      "artifact": "writer.json",
+      "set": [
+        {
+          "path": ["writes_wiki"],
+          "value": true
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "writer must declare writes_wiki=false"
+  ]
+}

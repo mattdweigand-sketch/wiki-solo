@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wiki-provider-manifest.schema.json",
+  "title": "Wiki provider manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "architecture",
+    "provider_rule",
+    "slots",
+    "readiness_command",
+    "eval_command"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "wiki-provider-manifest.v1"
+    },
+    "architecture": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "minItems": 1
+    },
+    "provider_rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "slots": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visual_extractor",
+        "classifier",
+        "contradiction_detector",
+        "link_scorer",
+        "writer",
+        "judge"
+      ],
+      "patternProperties": {
+        "^(visual_extractor|classifier|contradiction_detector|link_scorer|writer|judge)$": {
+          "$ref": "#/$defs/slot"
+        }
+      }
+    },
+    "readiness_command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "eval_command": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supported_providers",
+        "input_artifacts",
+        "output_artifacts",
+        "validator_command",
+        "writes_wiki",
+        "human_review_required"
+      ],
+      "properties": {
+        "supported_providers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "input_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "output_artifacts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "validator_command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "writes_wiki": {
+          "const": false
+        },
+        "human_review_required": {
+          "const": true
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "id": "bad-classifier-page-home-mode",
+  "run_id": "eval-bad-classifier-page-home-mode",
+  "source_path": "raw/videos/2026-06-08-pewdiepie-did-it-again.md",
+  "mutations": [
+    {
+      "artifact": "classifier.json",
+      "set": [
+        {
+          "path": ["page_home_mode"],
+          "value": "source_only"
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "classifier page_home_mode"
+  ]
+}

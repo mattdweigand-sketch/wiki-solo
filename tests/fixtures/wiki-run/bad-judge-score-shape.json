@@ -1,0 +1,23 @@
+{
+  "id": "bad-judge-score-shape",
+  "run_id": "eval-bad-judge-score-shape",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "expected_policy_status": "pass",
+  "expected_judge_decision": "approve_for_review",
+  "expected_drafts": [
+    "draft/README.md",
+    "draft/manifest.json",
+    "draft/folder-organization-guide.md.stub"
+  ],
+  "mutations": [
+    {
+      "artifact": "judge.json",
+      "delete": [
+        ["scores", "scope_discipline"]
+      ]
+    }
+  ],
+  "expected_errors": [
+    "judge scores missing fields: scope_discipline"
+  ]
+}

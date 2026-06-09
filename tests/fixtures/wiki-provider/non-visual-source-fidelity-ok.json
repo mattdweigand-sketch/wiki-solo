@@ -1,0 +1,17 @@
+{
+  "id": "non-visual-source-fidelity-ok",
+  "run_id": "eval-provider-non-visual-source-fidelity-ok",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "mutations": [
+    {
+      "artifact": "judge.json",
+      "set": [
+        {
+          "path": ["scores", "source_fidelity"],
+          "value": 1.0
+        }
+      ]
+    }
+  ],
+  "expected_errors": []
+}

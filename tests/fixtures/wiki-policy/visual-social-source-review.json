@@ -1,0 +1,14 @@
+{
+  "id": "visual-social-source-review",
+  "expected_status": "review",
+  "packet": {
+    "writes_files": false,
+    "risk_flags": [
+      "visual_source_requires_review",
+      "social_source_requires_review"
+    ],
+    "expected_touched_files": [
+      "wiki/sources/deep-agents-rubrics-sydney-runkle.md"
+    ]
+  }
+}

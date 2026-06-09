@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wiki-draft-manifest.schema.json",
+  "title": "Wiki draft manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "manifest_version",
+    "source_path",
+    "primary_home",
+    "operations",
+    "writes_wiki"
+  ],
+  "properties": {
+    "manifest_version": {
+      "const": "wiki-draft-manifest.v1"
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primary_home": {
+      "type": "string",
+      "minLength": 1
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "target_path", "draft_path", "status"],
+        "properties": {
+          "op": {
+            "enum": ["create", "update", "delete", "no_op"]
+          },
+          "target_path": {
+            "type": "string"
+          },
+          "draft_path": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["stub", "drafted", "ready", "blocked"]
+          }
+        }
+      }
+    },
+    "writes_wiki": {
+      "const": false
+    }
+  }
+}

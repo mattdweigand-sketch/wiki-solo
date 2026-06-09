@@ -1,0 +1,17 @@
+Sydney Runkle @sydneyrunkle
+
+we just shipped support for rubrics in deepagents
+
+give your agent a clear definition of what "done" looks like, and force it to run in a loop until said goal is complete
+
+this is similar to /goal in claude code, but works for any agent
+
+from deepagents import RubricMiddleware, create_deep_agent
+
+agent = create_deep_agent(
+    model="google_genai:gemini-3.5-flash",
+    middleware=[RubricMiddleware(
+        model="anthropic:claude-haiku-4-5",
+        max_iterations=3,
+    )],
+)

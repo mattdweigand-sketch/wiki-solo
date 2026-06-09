@@ -1,76 +1,107 @@
 # <Organization> Wiki
 
-Shared project instructions for <Organization> Wiki.
+A clonable, agent-readable wiki template for an organization's durable context layer. Grounded in sources. Structured for downstream agents. Designed to compound instead of re-deriving context from raw documents.
 
-`AGENTS.md` is canonical. Codex and other AGENTS-aware tools read it directly. Claude Code reads
-it through the thin `CLAUDE.md` wrapper.
+`AGENTS.md` is canonical and agent-agnostic. Codex, Cursor, Claude, ChatGPT, or a raw API harness should drive this wiki the same way: read `AGENTS.md`, check `wiki/domain.md`, route through `CONTEXT.md`, then follow the vendor-neutral prose in `workflows/`. Claude Code reaches the same guidance through the thin `CLAUDE.md` wrapper. Nothing about core operation depends on `.claude/`.
 
-## What this project is
+Start by reading `wiki/domain.md`. If `status: unconfigured`, route to `SETUP.md` before doing wiki work. If `status: configured`, continue through `CONTEXT.md`.
 
-A clonable, agent-readable wiki template. Drop source documents into `raw/`, run the ingest workflow, and the wiki builds itself into a structured knowledge base that downstream agents can query and cite. Designed to compound: good answers get filed back into `wiki/analyses/` as first-class citable pages.
+---
 
-## How to work in this repo
+## Directory Structure
 
-Start by reading `wiki/domain.md`. If `status: unconfigured`, route to `SETUP.md` and run the configuration interview before anything else. If `status: configured`, proceed to the task router in `CONTEXT.md`.
+- `AGENTS.md` — canonical operating map (this file). `CLAUDE.md` is a thin wrapper that imports it.
+- `CONTEXT.md` — task router; read after this file to find the right workflow.
+- `SETUP.md` — first-session configuration workflow for a fresh clone.
+- `workflows/` — vendor-neutral prose workflows grouped into three workspaces: `ingest/`, `research/`, and `maintenance/`.
+- `.claude/commands/` — optional Claude Code slash-command wrappers over the same workflows.
+- `scripts/` — vendor-neutral helper scripts. `capture_gate.py` guards analysis capture and artifact promotion; `wiki_route_policy.py` is the no-write route preflight before ingest edits; `wiki_pipeline.py` and related `wiki_*` scripts run the no-write harness under `tmp/wiki-runs/`; `rebuild_referenced_by.py` regenerates inbound links; `lint.py --tier1` is the deterministic validation gate.
+- `config/` — harness/provider manifests.
+- `schemas/` — JSON schemas for harness packets, provider artifacts, apply plans, and manifests.
+- `tests/fixtures/` — golden and negative fixtures for ingest, policy, route, run, semantic, provider, pipeline, apply-plan, and Tier-1 behavior.
+- `raw/` — source artifacts; existing files are immutable.
+- `wiki/` — knowledge layer: `domain.md`, `index.md`, `overview.md`, `glossary.md`, `primer.md`, `log.md`, `SCHEMA.md`, and entity folders.
 
-Session start:
+Default entity folders: `sources`, `products`, `features`, `personas`, `customers`, `competitors`, `concepts`, `initiatives`, `decisions`, `metrics`, `people`, `analyses`, `style`.
+
+Create new entity types only during setup or after an explicit schema decision.
+
+---
+
+## Routing
+
+Routing lives in `CONTEXT.md`, the source of truth for which workflow handles which task. Read it after this file, find the task, and open the workflow file it points to. Each workflow opens with its own Load / Skip list.
+
+## Capture Approval Gate
+
+Run `python3 scripts/capture_gate.py` only before filing a research answer as `wiki/analyses/` or applying an artifact promotion. Ordinary source ingest does not require this approval gate; neither do routine page updates, decision capture, observation capture, workflow updates, or project updates unless they are part of an analysis-capture or artifact-promotion route.
+
+If the script prints `APPROVAL REQUIRED`, show that exact block and stop until the user approves the exact mode, primary home, and touched files. Re-run with `--approved` only after that approval.
+
+The script owns the checkable approval boundary. The prose workflows own judgment about what to write, how to cite it, where to link it, and how to log it.
+
+## Harness Route Policy
+
+Before an ordinary source ingest writes durable wiki files, run:
+
+```bash
+python3 scripts/wiki_route_policy.py <raw-source>
+```
+
+This writes no files. It returns `direct_edit`, `full_harness`, or `blocked`. `direct_edit` continues through the normal ingest workflow. `full_harness` runs the no-write harness for review before durable edits. `blocked` stops until the route is fixed or explicitly re-scoped.
+
+---
+
+## Session Start
 
 1. Read this file.
-2. Read `wiki/domain.md` and check `status`.
-3. Read `REFERENCES.md` to internalize the layer-loading model — what loads always, at session start, per task, and on demand.
-4. Read `CONTEXT.md` to find the right workspace.
-5. Read that workspace's `CONTEXT.md`.
-6. Skim the last 5 entries in `wiki/log.md`.
-7. Load only the docs the workspace `CONTEXT.md` says to load.
+2. Read `wiki/domain.md`; if unconfigured, route to `SETUP.md`.
+3. Read `CONTEXT.md` to route the task.
+4. Read `REFERENCES.md`.
+5. Read `wiki/index.md`.
+6. Read the last 5 entries in `wiki/log.md`.
+7. Ask what to do, unless the user already gave a clear task.
 
-Task routing:
+---
 
-| Task | Go here |
-|---|---|
-| Ingest a new source file | `workspaces/ingest/CONTEXT.md` |
-| Answer a question from the wiki | `workspaces/research/CONTEXT.md` |
-| Lint / contradictions / sourcing queue | `workspaces/maintenance/CONTEXT.md` |
-| Browse what's in the wiki | `wiki/index.md` |
+## Naming Conventions
 
-Claude Code shortcuts: `/ingest` and `/lint`. If your agent doesn't support slash commands, follow the prose workflows in the workspace `CONTEXT.md` files.
+All filenames are kebab-case, lowercase, no extension prefix, no date prefix. Chronology lives in `wiki/log.md`.
 
-## Project structure
+| Entity | Pattern | Example |
+|---|---|---|
+| Source page | kebab-case from source title | `q3-board-deck.md` |
+| Person/team page | kebab-case role, team, or name | `enterprise-sales.md` |
+| Decision page | kebab-case from decision topic | `pricing-packaging.md` |
+| Product / feature / persona / customer / competitor / concept / initiative / metric / analysis / style | kebab-case from canonical term | `workflow-automation.md` |
+| Workflow entry | `workflows/<workspace>/CONTEXT.md` | `workflows/ingest/CONTEXT.md` |
+| Maintenance task file | kebab-case verb or noun | `workflows/maintenance/artifact-promotion.md` |
 
-- `raw/` — source documents. Immutable: new sources append, existing files never change.
-- `wiki/` — knowledge layer. Entity pages, indexes, analyses, glossary, domain config, and log.
-- `workspaces/` — vendor-neutral workflow routing. The `ingest/`, `research/`, and `maintenance/` workspaces, each with a `CONTEXT.md` entry point. Any AGENTS-aware agent reads these by path.
-- `scripts/` — vendor-neutral helper scripts (`rebuild_referenced_by.py` regenerates the `## Referenced by` inbound-link sections). Run from the repo root.
-- `.claude/` — Claude Code slash-command wrappers only (`/ingest`, `/lint`). Optional: deleting `.claude/` leaves the wiki fully operable in any other agent.
-- `CONTEXT.md` — task router for choosing the right workspace.
-- `SETUP.md` — first-session configuration workflow when `wiki/domain.md` is unconfigured.
-- `CLAUDE.md` — thin Claude Code wrapper that imports this file.
+Predictable names let any agent find, organize, and reference files without reading the whole repo.
 
-## Conventions
+---
 
-- `AGENTS.md` is the project operating map. Update this file, not `CLAUDE.md`, when changing startup flow, folder maps, or hard rules.
-- `CLAUDE.md` is only a Claude Code compatibility wrapper. It must not contain project-specific instructions beyond importing `AGENTS.md`.
-- Cite every factual claim. Use `(source: [[source-page]])`. Mark inferences with `Inference:` or `Hypothesis:`.
-- Flag contradictions explicitly. Never silently overwrite a contested claim.
-- Workspaces are siloed. Each workspace's `CONTEXT.md` says exactly what to load.
-- Use kebab-case filenames and `[[page-name-without-extension]]` internal links.
-- Two link sections per page, with different ownership. `## Related pages` is curated by hand — the editorial outbound links you choose. `## Referenced by` is auto-generated by `rebuild_referenced_by.py` from the `[[ ]]` graph; **never hand-edit it.** Write your `[[ ]]` links and the inbound list maintains itself.
-- In `## Related pages`, prefer typed relationship labels when the connection is clear, while keeping the `[[wikilink]]` unchanged: `Supports: [[page]]`, `Contradicts: [[page]]`, `Depends on: [[page]]`, `Derived from: [[page]]`, `Part of: [[page]]`, or `Related: [[page]]`. Plain `- [[page]]` links remain valid. Use `Related:` as the fallback for meaningful connections that do not fit a stronger label.
-- Meaningful domain answers that synthesize 3+ wiki pages and exceed 300 words are filed to `wiki/analyses/<slug>.md`, logged in `wiki/log.md`, and followed by `python3 scripts/rebuild_referenced_by.py`.
+## Cross-Referencing
 
-## Do not do without asking
+Use `[[filename-without-extension]]` for all internal links. Two link sections have different ownership:
 
-- Modify existing files in `raw/`.
-- Silently resolve or overwrite contradictions.
-- Bulk-rewrite wiki pages during maintenance.
-- Delete entity folders, custom schema rows, or configured taxonomy outside the setup flow.
-- Perform external writes, risky deploys, migrations, or irreversible deletions.
+- `## Related pages` — curated outbound links written by hand. Pick meaningful links. When the relationship is clear, prefix the link with a typed relationship label:
+  - `Supports: [[page]]` — this page strengthens, evidences, or confirms the linked page
+  - `Contradicts: [[page]]` — this page conflicts with or materially challenges the linked page
+  - `Depends on: [[page]]` — this page requires the linked page to be understood or true
+  - `Derived from: [[page]]` — this page was created from, generalized from, or synthesized out of the linked page
+  - `Part of: [[page]]` — this page is a component of the linked larger system, project, or framework
+  - `Related: [[page]]` — meaningful connection, but no stronger typed relationship fits
+- `## Referenced by` — auto-generated inbound links. Never hand-edit this section. It is rebuilt from the `[[ ]]` graph by `scripts/rebuild_referenced_by.py`.
 
-## Deeper context
+## Terminology
 
-- `wiki/domain.md` — read first to determine whether this wiki is configured and which entity types are active.
-- `REFERENCES.md` — the layer-loading model (L0–L4): when each file in the repo loads relative to a task. Read once to internalize context economy.
-- `CONTEXT.md` — read after `wiki/domain.md` to route the current task.
-- `workspaces/ingest/CONTEXT.md` — read when turning raw sources into wiki pages.
-- `workspaces/research/CONTEXT.md` — read when answering questions from the wiki or filing analyses.
-- `workspaces/maintenance/CONTEXT.md` — read when linting, resolving contradictions, refreshing the sourcing queue, or capturing decisions.
-- `SETUP.md` — read only when `wiki/domain.md` has `status: unconfigured` or the user asks to refresh setup.
+New terms go in `wiki/glossary.md`. Conflicts get flagged explicitly. Always use the canonical glossary term once it exists.
+
+## Hard Rules
+
+- Do not edit existing files in `raw/`.
+- Flag contradictions before updating; never silently overwrite contested claims.
+- Prefer updating existing pages over creating new ones.
+- Write for AI agents first: structured, dense, cited.
+- Keep tool-specific wrappers thin; canonical behavior belongs in `AGENTS.md`, `CONTEXT.md`, `REFERENCES.md`, `workflows/`, `scripts/`, and `wiki/SCHEMA.md`.

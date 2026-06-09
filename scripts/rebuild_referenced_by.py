@@ -10,7 +10,7 @@ from collections import defaultdict
 
 WIKI_ROOT = Path("wiki")
 META_PAGES = {
-    "index", "log", "overview", "glossary", "primer", "domain",
+    "index", "log", "overview", "glossary", "primer", "domain", "SCHEMA",
     "sourcing-queue", "contradictions", "design-notes", "schema",
 }
 META_DIRS = {"style"}

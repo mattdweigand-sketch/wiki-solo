@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wiki-dry-run-packet.schema.json",
+  "title": "Wiki dry-run packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_type",
+    "source_path",
+    "source_path_exists",
+    "source_gitignored",
+    "source_tracked",
+    "inferred_source_type",
+    "target_slug",
+    "primary_home",
+    "primary_home_exists",
+    "page_home_decision",
+    "expected_touched_files",
+    "risk_flags",
+    "proposed_links",
+    "human_review_required",
+    "writes_files"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "wiki-dry-run-packet.v1"
+    },
+    "task_type": {
+      "enum": ["ingest", "promotion_audit", "lint_followup", "research_capture"]
+    },
+    "source_path": {
+      "type": "string"
+    },
+    "source_path_exists": {
+      "type": "boolean"
+    },
+    "source_gitignored": {
+      "type": "boolean"
+    },
+    "source_tracked": {
+      "type": "boolean"
+    },
+    "inferred_source_type": {
+      "type": "string"
+    },
+    "target_slug": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "primary_home": {
+      "type": "string"
+    },
+    "primary_home_exists": {
+      "type": "boolean"
+    },
+    "page_home_decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "rationale"],
+      "properties": {
+        "mode": {
+          "enum": [
+            "source_only",
+            "source_plus_existing_updates",
+            "source_plus_new_analysis",
+            "no_op"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "expected_touched_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risk_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "proposed_links": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "writes_files": {
+      "const": false
+    }
+  }
+}

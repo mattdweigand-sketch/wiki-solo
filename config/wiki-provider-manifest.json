@@ -1,0 +1,84 @@
+{
+  "manifest_version": "wiki-provider-manifest.v1",
+  "architecture": [
+    "dry-run",
+    "policy",
+    "semantic providers",
+    "writer provider",
+    "judge provider",
+    "validate run",
+    "apply plan",
+    "apply boundary",
+    "human review/apply"
+  ],
+  "provider_rule": "Local, cloud, and stub are providers, not workflows.",
+  "slots": {
+    "visual_extractor": {
+      "supported_providers": ["stub"],
+      "input_artifacts": ["packet.json"],
+      "output_artifacts": ["evidence.json"],
+      "validator_command": "python3 scripts/wiki_validate_semantic.py <run-dir>",
+      "writes_wiki": false,
+      "human_review_required": true
+    },
+    "classifier": {
+      "supported_providers": ["stub"],
+      "input_artifacts": ["packet.json"],
+      "output_artifacts": ["classifier.json"],
+      "validator_command": "python3 scripts/wiki_validate_semantic.py <run-dir>",
+      "writes_wiki": false,
+      "human_review_required": true
+    },
+    "contradiction_detector": {
+      "supported_providers": ["stub"],
+      "input_artifacts": ["packet.json"],
+      "output_artifacts": ["contradictions.json"],
+      "validator_command": "python3 scripts/wiki_validate_semantic.py <run-dir>",
+      "writes_wiki": false,
+      "human_review_required": true
+    },
+    "link_scorer": {
+      "supported_providers": ["stub"],
+      "input_artifacts": ["packet.json"],
+      "output_artifacts": ["links.json"],
+      "validator_command": "python3 scripts/wiki_validate_semantic.py <run-dir>",
+      "writes_wiki": false,
+      "human_review_required": true
+    },
+    "writer": {
+      "supported_providers": ["stub"],
+      "input_artifacts": [
+        "packet.json",
+        "policy.json",
+        "evidence.json",
+        "classifier.json",
+        "contradictions.json",
+        "links.json"
+      ],
+      "output_artifacts": [
+        "writer.json",
+        "draft/README.md",
+        "draft/manifest.json",
+        "draft/<target-slug>.md.stub"
+      ],
+      "validator_command": "python3 scripts/wiki_validate_run.py <run-dir>",
+      "writes_wiki": false,
+      "human_review_required": true
+    },
+    "judge": {
+      "supported_providers": ["stub"],
+      "input_artifacts": [
+        "packet.json",
+        "policy.json",
+        "writer.json",
+        "draft/manifest.json"
+      ],
+      "output_artifacts": ["judge.json"],
+      "validator_command": "python3 scripts/wiki_validate_run.py <run-dir>",
+      "writes_wiki": false,
+      "human_review_required": true
+    }
+  },
+  "readiness_command": "python3 scripts/wiki_provider_readiness.py <raw-source> --run-id <id> --overwrite",
+  "eval_command": "python3 scripts/wiki_eval.py --suite provider"
+}

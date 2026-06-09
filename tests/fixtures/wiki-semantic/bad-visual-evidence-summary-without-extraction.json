@@ -1,0 +1,18 @@
+{
+  "id": "bad-visual-evidence-summary-without-extraction",
+  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
+  "mutations": [
+    {
+      "artifact": "evidence.json",
+      "set": [
+        {
+          "path": ["visible_text_summary"],
+          "value": "Sydney Runkle says deepagents shipped support for rubrics."
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "visual evidence visible_text_summary must be empty when extraction was not performed"
+  ]
+}

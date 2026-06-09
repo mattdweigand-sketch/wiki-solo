@@ -1,0 +1,26 @@
+{
+  "id": "bad-judge-visual-fidelity-without-evidence",
+  "run_id": "eval-bad-judge-visual-fidelity-without-evidence",
+  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
+  "expected_policy_status": "review",
+  "expected_judge_decision": "approve_for_review",
+  "expected_drafts": [
+    "draft/README.md",
+    "draft/manifest.json",
+    "draft/deep-agents-rubrics-sydney-runkle.md.stub"
+  ],
+  "mutations": [
+    {
+      "artifact": "judge.json",
+      "set": [
+        {
+          "path": ["scores", "source_fidelity"],
+          "value": 1.0
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "judge source_fidelity cannot be scored without visual evidence extraction"
+  ]
+}

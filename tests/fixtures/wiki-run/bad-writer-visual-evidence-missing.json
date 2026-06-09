@@ -1,0 +1,23 @@
+{
+  "id": "bad-writer-visual-evidence-missing",
+  "run_id": "eval-bad-writer-visual-evidence-missing",
+  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
+  "expected_policy_status": "review",
+  "expected_judge_decision": "approve_for_review",
+  "expected_drafts": [
+    "draft/README.md",
+    "draft/manifest.json",
+    "draft/deep-agents-rubrics-sydney-runkle.md.stub"
+  ],
+  "mutations": [
+    {
+      "artifact": "writer.json",
+      "delete": [
+        ["provider_metadata", "visual_source_evidence"]
+      ]
+    }
+  ],
+  "expected_errors": [
+    "writer visual_source_evidence is required in provider_metadata"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "id": "existing-source-review",
+  "input_source": "raw/videos/2026-06-08-pewdiepie-did-it-again.md",
+  "expected_primary_home": "wiki/sources/pewdiepie-did-it-again.md",
+  "expected_source_type": "synthesis",
+  "expected_source_path_exists": true,
+  "expected_human_review_required": true,
+  "expected_writes_files": false,
+  "expected_page_home_mode": "no_op",
+  "expected_touched_files": [],
+  "expected_risk_flags": ["source_page_exists"],
+  "forbidden_touched_patterns": ["raw/*", "workflows/*", "scripts/*", "schemas/*", "AGENTS.md"],
+  "expected_policy_status": "review"
+}

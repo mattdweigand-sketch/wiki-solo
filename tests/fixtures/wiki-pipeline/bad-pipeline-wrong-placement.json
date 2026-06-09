@@ -1,0 +1,9 @@
+{
+  "id": "bad-pipeline-wrong-placement",
+  "run_id": "eval-bad-pipeline-wrong-placement",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "pipeline_path": "tmp/wiki-runs/eval-bad-pipeline-wrong-placement/draft/pipeline.json",
+  "expected_errors": [
+    "pipeline artifact must live directly under its run_dir"
+  ]
+}

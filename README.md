@@ -1,150 +1,124 @@
 # <Organization> Wiki
 
-A clonable, agent-readable wiki template. The company context layer for AI agents at the organization defined in [`wiki/domain.md`](wiki/domain.md).
+A clonable, agent-readable wiki template for an organization's durable context layer.
 
-A self-maintaining, LLM-readable knowledge base. Downstream agents (sales, product, customer success) read from it instead of re-deriving context from raw documents. Built on the [Karpathy LLM-wiki pattern](https://karpathy.ai/zero-to-one/).
+The wiki turns raw source documents into structured, cited pages that downstream agents can query, compare, and build on. It follows the Karpathy LLM-wiki pattern, with additional safety rails for durable writes: deterministic lint, generated backlinks, no-write ingest routing, and approval gates for analysis capture and artifact promotion.
 
-> **Just cloned this?** See [`SETUP.md`](SETUP.md) — your AI agent will read it on first session and offer to interview you to configure the wiki for your organization.
+## Fresh Clone
 
-## How to use it
+Start with [`SETUP.md`](SETUP.md). An agent reads [`AGENTS.md`](AGENTS.md), checks [`wiki/domain.md`](wiki/domain.md), and if `status: unconfigured`, interviews you to configure:
 
-The wiki is designed as a **reference guide for AI agents**. There are three modes of use.
+- organization name and domain
+- active entity types
+- custom entity types
+- `raw/` source taxonomy
+- example questions the wiki should answer
 
-### 1. Ask a question (default)
+## How To Use It
 
-Just ask. [`AGENTS.md`](AGENTS.md) is canonical. OpenAI Codex, Cursor, and other AGENTS-aware tools should read it directly. Claude Code auto-loads [`CLAUDE.md`](CLAUDE.md), which is only a thin wrapper that imports `AGENTS.md`. From there the agent follows [`CONTEXT.md`](CONTEXT.md) into the [research workspace](workspaces/research/CONTEXT.md), which tells it how to find the right pages, cite sources, and respect confidence ratings. No command needed.
+### Ask A Question
 
-Example question shapes (fill in your own domain):
-- "How does `<our product>` compare to `<competitor>`?"
-- "What's our positioning on `<market shift or theme>`?"
-- "What's our GTM strategy for `<segment>`?"
+Just ask. The agent follows [`CONTEXT.md`](CONTEXT.md) into [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md), reads `wiki/index.md`, pulls only relevant pages, and answers with citations like `(source: [[source-slug]])`.
 
-The agent answers with citations like `(source: [[sources/<source-slug>]])` so you can trace any claim back to its source.
+Substantial answers can be filed to `wiki/analyses/`, but only through `scripts/capture_gate.py`. If approval is required, the agent must show the exact approval block before writing.
 
-**Meaningful answers are auto-filed.** When the answer synthesizes 3+ wiki pages and runs >300 words, the agent saves it to [`wiki/analyses/`](wiki/analyses/) automatically and tells you in one line (*"Filed as `analyses/<slug>.md` — delete if not useful."*). This is how the wiki compounds — good answers don't disappear into chat history. Deletion is cheaper than re-asking the same question next month.
+### Add A Source
 
-### 2. Add a new source
+Put the file under `raw/`, then ask the agent to ingest it. Claude users may use `/ingest`; other agents follow [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md).
 
-Drop the file into the appropriate `raw/` subfolder, then run:
+Every ordinary ingest starts with:
 
-```
-/ingest
-```
-
-This runs the 3-stage ingest pipeline (triage → extract → link), creates or updates the relevant entity pages, rebuilds backlinks, and appends a log entry.
-
-> **No slash commands?** `/ingest` and `/lint` are Claude Code shortcuts. On Codex or any other agent, point it at [`workspaces/ingest/CONTEXT.md`](workspaces/ingest/CONTEXT.md) and ask it to follow the pipeline — the prose workflow is the same.
-
-### 3. Maintain the wiki
-
-```
-/lint
+```bash
+python3 scripts/wiki_route_policy.py <raw-source>
 ```
 
-Checks for contradictions, stale claims, orphan pages, missing cross-references, terminology drift, and confidence miscalibration. Reports findings, asks which to apply, then applies approved fixes.
+Routes:
 
-For decisions, contradictions, or sourcing-queue updates, just describe the task — the agent will route through the [maintenance workspace](workspaces/maintenance/CONTEXT.md).
+| Route | Meaning |
+|---|---|
+| `direct_edit` | Proceed with normal ingest |
+| `full_harness` | Run the no-write harness and inspect artifacts before durable edits |
+| `blocked` | Stop until the route is fixed or explicitly re-scoped |
 
-### Browsing manually
+After durable edits, the agent rebuilds inbound links and runs deterministic Tier-1 lint:
 
-Start at [`wiki/index.md`](wiki/index.md) — the master catalog of every page, grouped by entity type with one-line summaries and confidence ratings.
-
-## Repo structure
-
+```bash
+python3 scripts/rebuild_referenced_by.py
+python3 scripts/lint.py --tier1
 ```
+
+### Maintain The Wiki
+
+Claude users may use `/lint`; other agents route through [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md).
+
+Maintenance includes:
+
+- linting
+- artifact promotion
+- harness evaluation
+- decision capture
+- observation or field-note capture
+- sourcing-queue refresh
+
+## Repo Structure
+
+```text
 <wiki-root>/
 ├── AGENTS.md       Canonical project operating map for agents.
 ├── CLAUDE.md       Thin Claude Code wrapper that imports AGENTS.md.
 ├── CONTEXT.md      Task router.
-├── SETUP.md        First-session config (when wiki/domain.md is unconfigured).
-├── README.md       This file.
-│
-├── raw/            Source documents. Immutable — never edited.
-├── wiki/           Knowledge layer. All entity pages live here.
-├── workspaces/     Vendor-neutral workflow routing (ingest, research, maintenance).
-├── scripts/        Vendor-neutral helpers (rebuild_referenced_by.py).
-└── .claude/        Claude Code slash-command wrappers only. Optional.
+├── REFERENCES.md   Stable conventions and layer model.
+├── SETUP.md        First-session configuration workflow.
+├── raw/            Immutable source artifacts.
+├── wiki/           Knowledge layer and entity pages.
+├── workflows/      Vendor-neutral workflow prose.
+├── scripts/        Deterministic helpers and no-write harness.
+├── schemas/        JSON schemas for harness artifacts.
+├── config/         Provider manifest.
+├── tests/          Fixture-backed evals.
+└── .claude/        Optional slash-command wrappers.
 ```
 
-## What's in the wiki
-
-13 entity types out of the box. Drop the ones that don't fit your domain during setup; add custom types as needed.
+## Default Entity Types
 
 | Type | Purpose |
 |---|---|
-| Sources | Summaries of raw documents — what they contain, what they're trustworthy for |
+| Sources | Summaries of raw documents |
 | Products | What the organization offers |
-| Features | Specific capabilities within a product |
+| Features | Product capabilities |
 | Personas | User and buyer types |
 | Customers | Named customers or segments |
-| Competitors | Competing vendors and how they position |
-| Concepts | Domain ideas, terminology, and frameworks |
+| Competitors | Competing vendors and positioning |
+| Concepts | Domain ideas and frameworks |
 | Initiatives | Strategic bets, launches, programs |
-| Decisions | Choices made, alternatives rejected, when to revisit |
+| Decisions | Choices, rationale, alternatives, revisit timing |
 | Metrics | KPIs and North Stars |
 | People | Roles, teams, stakeholders |
-| Analyses | Synthesized outputs — comparisons, briefs, gap analyses |
-| Style Rules | Writing and naming conventions for agent-generated content |
+| Analyses | Synthesized outputs: comparisons, briefs, gap analyses |
+| Style Rules | Writing and naming conventions for agent output |
 
-Full catalog: [`wiki/index.md`](wiki/index.md). See [`wiki/domain.md`](wiki/domain.md) for which types this wiki has activated.
-
-## How agents consume it
-
-Four files cover most queries:
-
-1. [`wiki/domain.md`](wiki/domain.md) — org name, scope, active entity types
-2. [`wiki/index.md`](wiki/index.md) — master catalog
-3. [`wiki/overview.md`](wiki/overview.md) — synthesis of the organization
-4. [`wiki/glossary.md`](wiki/glossary.md) — canonical terminology
-
-Each page carries a `confidence:` rating in its frontmatter:
-
-| Rating | Meaning |
-|---|---|
-| `high` | Sourced from authoritative document |
-| `medium` | Probable; may rest on a single source |
-| `low` | Hypothesis; treat as a starting point |
-| `contested` | Sources disagree — see [`contradictions.md`](workspaces/maintenance/contradictions.md) |
-
-Every factual claim cites its source as `(source: [[source-slug]])`. Inferences are prefixed `Inference:` or `Hypothesis:`.
+The active subset lives in [`wiki/domain.md`](wiki/domain.md). The page format and source taxonomy live in [`wiki/SCHEMA.md`](wiki/SCHEMA.md).
 
 ## Conventions
 
-- **Filenames:** kebab-case, no prefix (e.g. `<competitor>-battlecard.md`)
-- **Internal links:** `[[page-name]]` (no folder, no extension)
-- **`raw/` is immutable** — source files are never edited; new sources are appended
-- **Cite the wiki page**, not the raw source, in agent-to-human output
+- `AGENTS.md` is canonical; `CLAUDE.md` is a wrapper.
+- `raw/` is immutable after a source is placed.
+- Use kebab-case filenames with no date prefix.
+- Use `[[page-name]]` links.
+- Use typed `## Related pages` labels when clear: `Supports`, `Contradicts`, `Depends on`, `Derived from`, `Part of`, `Related`.
+- Never hand-edit `## Referenced by`; run `scripts/rebuild_referenced_by.py`.
+- Cite factual claims with `(source: [[source-page]])`.
+- Mark interpretation with `Inference:` or `Hypothesis:`.
 
-For the full schema, see [`workspaces/ingest/docs/schema.md`](workspaces/ingest/docs/schema.md).
+## Why A Wiki Instead Of Plain RAG
 
-## Workspaces
+RAG retrieves raw chunks at query time. This wiki front-loads distillation at ingest time:
 
-Three workspaces govern how work happens. Each has its own `CONTEXT.md` with task-specific instructions.
+1. Sources become structured, cited entity pages.
+2. Contradictions are explicit instead of hidden in retrieved context.
+3. Relationships are typed and navigable.
+4. Good analyses can become citable pages.
+5. Agents load only the task-relevant workflow and pages.
+6. Deterministic scripts catch structural drift.
 
-| Workspace | Purpose |
-|---|---|
-| [`ingest/`](workspaces/ingest/CONTEXT.md) | Raw source → structured wiki page(s) |
-| [`research/`](workspaces/research/CONTEXT.md) | Wiki → synthesized answer with citations |
-| [`maintenance/`](workspaces/maintenance/CONTEXT.md) | Lint, contradictions, sourcing queue, decision capture |
-
-## Why a wiki instead of RAG
-
-RAG does one thing: at query time, embed the question, retrieve chunks from source docs, and stuff them into context. It front-loads nothing and compounds nothing.
-
-The wiki front-loads the hard work at ingest time and makes every session cheaper and more reliable:
-
-1. **Distillation, not retrieval.** The wiki reads each source once and distills it into structured entity pages. The query agent starts from signal, not raw chunks.
-
-2. **Explicit contradiction handling.** When sources disagree, the wiki flags it and marks pages `confidence: contested`. RAG retrieves both and lets the LLM guess.
-
-3. **Typed, navigable relationships.** 13 entity types, frontmatter, and `[[wikilinks]]` route agents directly to the right pages. No chunk-hunting.
-
-4. **Compounding knowledge.** Good answers get filed back into `wiki/analyses/` as citable pages. RAG accumulates source documents; the wiki accumulates understanding.
-
-5. **Scoped agent context.** Ingest, research, and maintenance agents each load only what they need. Smaller context, lower hallucination risk.
-
-6. **Domain-locked terminology.** The glossary prevents paraphrase drift on precise domain terms — definitions live in one place and downstream agents use them verbatim.
-
-## Activity
-
-See [`wiki/log.md`](wiki/log.md) for the append-only history of every ingest, lint, and decision capture.
+See [`wiki/log.md`](wiki/log.md) for the append-only history of ingests, queries, maintenance, and configuration changes.

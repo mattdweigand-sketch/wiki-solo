@@ -1,0 +1,33 @@
+{
+  "id": "bad-draft-manifest-target-outside-wiki",
+  "run_id": "eval-bad-draft-manifest-target-outside-wiki",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "expected_policy_status": "pass",
+  "expected_judge_decision": "approve_for_review",
+  "expected_drafts": [
+    "draft/README.md",
+    "draft/manifest.json",
+    "draft/folder-organization-guide.md.stub"
+  ],
+  "mutations": [
+    {
+      "artifact": "draft/manifest.json",
+      "set": [
+        {
+          "path": ["operations"],
+          "value": [
+            {
+              "op": "create",
+              "target_path": "tmp/wiki-runs/eval-bad-draft-manifest-target-outside-wiki/outside.md",
+              "draft_path": "tmp/wiki-runs/eval-bad-draft-manifest-target-outside-wiki/draft/folder-organization-guide.md.stub",
+              "status": "stub"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "target_path must be under wiki/"
+  ]
+}

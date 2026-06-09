@@ -1,0 +1,22 @@
+{
+  "id": "bad-pipeline-duplicate-artifact",
+  "run_id": "eval-bad-pipeline-duplicate-artifact",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "mutations": [
+    {
+      "artifact": "pipeline.json",
+      "set": [
+        {
+          "path": ["artifacts"],
+          "value": [
+            "packet.json",
+            "packet.json"
+          ]
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "artifacts must not contain duplicates"
+  ]
+}

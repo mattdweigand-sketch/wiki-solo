@@ -1,0 +1,16 @@
+{
+  "id": "bad-manifest-wrong-eval-command",
+  "mutations": [
+    {
+      "set": [
+        {
+          "path": ["eval_command"],
+          "value": "python3 scripts/wiki_eval.py --suite local"
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "eval_command must be python3 scripts/wiki_eval.py --suite provider"
+  ]
+}

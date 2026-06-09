@@ -1,0 +1,12 @@
+{
+  "id": "raw-mutation-reject",
+  "expected_status": "reject",
+  "packet": {
+    "writes_files": false,
+    "risk_flags": [],
+    "expected_touched_files": [
+      "raw/videos/example-source.md",
+      "wiki/sources/example-source.md"
+    ]
+  }
+}

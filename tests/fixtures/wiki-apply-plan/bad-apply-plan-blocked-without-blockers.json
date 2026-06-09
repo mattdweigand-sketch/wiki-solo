@@ -1,0 +1,20 @@
+{
+  "id": "bad-apply-plan-blocked-without-blockers",
+  "mutations": [
+    {
+      "set": [
+        {
+          "path": ["status"],
+          "value": "blocked"
+        },
+        {
+          "path": ["blockers"],
+          "value": []
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "blocked apply plan must include at least one blocker"
+  ]
+}

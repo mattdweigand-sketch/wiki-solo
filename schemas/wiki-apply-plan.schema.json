@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wiki-apply-plan.schema.json",
+  "title": "Wiki apply plan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "apply_plan_version",
+    "run_dir",
+    "status",
+    "required_approval",
+    "target_files",
+    "operations",
+    "blockers",
+    "review_reasons",
+    "writes_wiki"
+  ],
+  "properties": {
+    "apply_plan_version": {
+      "const": "wiki-apply-plan.v1"
+    },
+    "run_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["blocked", "ready_for_approval"]
+    },
+    "required_approval": {
+      "const": true
+    },
+    "target_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "target_path", "draft_path", "status"],
+        "properties": {
+          "op": {
+            "enum": ["create", "update", "delete", "no_op", null]
+          },
+          "target_path": {
+            "type": ["string", "null"]
+          },
+          "draft_path": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "enum": ["stub", "drafted", "ready", "blocked", null]
+          }
+        }
+      }
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "writes_wiki": {
+      "const": false
+    }
+  }
+}

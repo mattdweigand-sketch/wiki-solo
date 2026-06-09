@@ -1,0 +1,16 @@
+{
+  "id": "bad-manifest-writes-wiki",
+  "mutations": [
+    {
+      "set": [
+        {
+          "path": ["slots", "writer", "writes_wiki"],
+          "value": true
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "slot writer must declare writes_wiki=false"
+  ]
+}

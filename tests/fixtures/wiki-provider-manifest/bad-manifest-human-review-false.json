@@ -1,0 +1,16 @@
+{
+  "id": "bad-manifest-human-review-false",
+  "mutations": [
+    {
+      "set": [
+        {
+          "path": ["slots", "judge", "human_review_required"],
+          "value": false
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "slot judge must declare human_review_required=true"
+  ]
+}

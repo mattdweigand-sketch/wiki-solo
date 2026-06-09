@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wiki-link-scorer-artifact.schema.json",
+  "title": "Wiki link scorer artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "link_scorer_version",
+    "provider",
+    "source_path",
+    "primary_home",
+    "scored_links",
+    "findings",
+    "human_review_required",
+    "writes_wiki",
+    "provider_metadata"
+  ],
+  "properties": {
+    "link_scorer_version": {
+      "const": "wiki-link-scorer.v1"
+    },
+    "provider": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_path": {
+      "type": ["string", "null"]
+    },
+    "primary_home": {
+      "type": ["string", "null"]
+    },
+    "scored_links": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["target", "label", "score", "rationale"],
+        "properties": {
+          "target": {
+            "type": ["string", "null"]
+          },
+          "label": {
+            "type": ["string", "null"]
+          },
+          "score": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "rationale": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "human_review_required": {
+      "type": "boolean"
+    },
+    "writes_wiki": {
+      "const": false
+    },
+    "provider_metadata": {
+      "type": "object"
+    }
+  }
+}

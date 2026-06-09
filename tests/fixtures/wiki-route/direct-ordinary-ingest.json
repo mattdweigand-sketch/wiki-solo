@@ -1,0 +1,19 @@
+{
+  "id": "direct-ordinary-ingest",
+  "packet": {
+    "task_type": "ingest",
+    "source_path": "raw/articles/2026-06-08-clean-source.md",
+    "risk_flags": ["raw_path_gitignored", "raw_path_untracked"],
+    "expected_touched_files": [
+      "wiki/sources/clean-source.md",
+      "wiki/index.md",
+      "wiki/log.md"
+    ],
+    "writes_files": false
+  },
+  "expected_policy_status": "pass",
+  "expected_route": "direct_edit",
+  "expected_trigger_contains": [
+    "ordinary ingest passed deterministic diff policy"
+  ]
+}

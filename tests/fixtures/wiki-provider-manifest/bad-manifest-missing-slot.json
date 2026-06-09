@@ -1,0 +1,13 @@
+{
+  "id": "bad-manifest-missing-slot",
+  "mutations": [
+    {
+      "delete": [
+        ["slots", "judge"]
+      ]
+    }
+  ],
+  "expected_errors": [
+    "provider manifest missing slots: judge"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "id": "bad-provider-name-mismatch",
+  "run_id": "eval-bad-provider-name-mismatch",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "mutations": [
+    {
+      "artifact": "writer.json",
+      "set": [
+        {
+          "path": ["provider"],
+          "value": "cloud"
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "writer provider: expected 'stub', got 'cloud'"
+  ]
+}

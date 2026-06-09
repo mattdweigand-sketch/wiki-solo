@@ -1,0 +1,26 @@
+{
+  "id": "bad-judge-provider-mismatch",
+  "run_id": "eval-bad-judge-provider-mismatch",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "expected_policy_status": "pass",
+  "expected_judge_decision": "approve_for_review",
+  "expected_drafts": [
+    "draft/README.md",
+    "draft/manifest.json",
+    "draft/folder-organization-guide.md.stub"
+  ],
+  "mutations": [
+    {
+      "artifact": "judge.json",
+      "set": [
+        {
+          "path": ["writer_provider"],
+          "value": "cloud"
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "judge writer_provider must match writer provider"
+  ]
+}

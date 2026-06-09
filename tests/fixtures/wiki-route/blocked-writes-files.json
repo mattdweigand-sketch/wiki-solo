@@ -1,0 +1,17 @@
+{
+  "id": "blocked-writes-files",
+  "packet": {
+    "task_type": "ingest",
+    "source_path": "raw/articles/2026-06-08-write-claim.md",
+    "risk_flags": [],
+    "expected_touched_files": [
+      "wiki/sources/write-claim.md"
+    ],
+    "writes_files": true
+  },
+  "expected_policy_status": "reject",
+  "expected_route": "blocked",
+  "expected_trigger_contains": [
+    "packet must be a no-write dry run"
+  ]
+}

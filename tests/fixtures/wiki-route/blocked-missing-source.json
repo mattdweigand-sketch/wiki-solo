@@ -1,0 +1,15 @@
+{
+  "id": "blocked-missing-source",
+  "packet": {
+    "task_type": "ingest",
+    "source_path": "raw/articles/missing-source.md",
+    "risk_flags": ["source_path_missing"],
+    "expected_touched_files": [],
+    "writes_files": false
+  },
+  "expected_policy_status": "reject",
+  "expected_route": "blocked",
+  "expected_trigger_contains": [
+    "risk flag requires rejection: source_path_missing"
+  ]
+}

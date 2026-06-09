@@ -1,0 +1,19 @@
+{
+  "id": "bad-provider-visual-evidence-required-false",
+  "run_id": "eval-bad-provider-visual-evidence-required-false",
+  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
+  "mutations": [
+    {
+      "artifact": "writer.json",
+      "set": [
+        {
+          "path": ["provider_metadata", "visual_source_evidence", "required"],
+          "value": false
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "writer visual_source_evidence.required must be true for visual sources"
+  ]
+}

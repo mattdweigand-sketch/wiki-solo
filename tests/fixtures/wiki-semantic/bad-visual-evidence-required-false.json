@@ -1,0 +1,19 @@
+{
+  "id": "bad-visual-evidence-required-false",
+  "run_id": "eval-bad-visual-evidence-required-false",
+  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
+  "mutations": [
+    {
+      "artifact": "evidence.json",
+      "set": [
+        {
+          "path": ["required"],
+          "value": false
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "visual evidence required: expected True, got False"
+  ]
+}

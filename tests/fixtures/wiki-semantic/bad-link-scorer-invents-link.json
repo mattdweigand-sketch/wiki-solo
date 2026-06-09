@@ -1,0 +1,25 @@
+{
+  "id": "bad-link-scorer-invents-link",
+  "run_id": "eval-bad-link-scorer-invents-link",
+  "source_path": "raw/ai-research/folder-organization-guide.md",
+  "mutations": [
+    {
+      "artifact": "links.json",
+      "set": [
+        {
+          "path": ["scored_links"],
+          "value": [
+            {
+              "target": "wiki/concepts/example.md",
+              "label": "Related",
+              "score": 2
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "link scorer must score exactly packet proposed_links"
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "id": "new-source-direct",
+  "input_source": "raw/ai-research/folder-organization-guide.md",
+  "expected_primary_home": "wiki/sources/folder-organization-guide.md",
+  "expected_source_type": "analyst-report",
+  "expected_source_path_exists": true,
+  "expected_human_review_required": true,
+  "expected_writes_files": false,
+  "expected_page_home_mode": "source_only",
+  "expected_touched_files": [
+    "wiki/sources/folder-organization-guide.md",
+    "wiki/index.md",
+    "wiki/log.md"
+  ],
+  "expected_absent_risk_flags": ["source_path_missing", "source_page_exists"],
+  "forbidden_touched_patterns": ["raw/*", "workflows/*", "scripts/*", "schemas/*", "AGENTS.md"],
+  "expected_policy_status": "pass"
+}

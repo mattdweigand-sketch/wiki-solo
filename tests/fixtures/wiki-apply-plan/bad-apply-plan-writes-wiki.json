@@ -1,0 +1,16 @@
+{
+  "id": "bad-apply-plan-writes-wiki",
+  "mutations": [
+    {
+      "set": [
+        {
+          "path": ["writes_wiki"],
+          "value": true
+        }
+      ]
+    }
+  ],
+  "expected_errors": [
+    "apply plan must declare writes_wiki=false"
+  ]
+}

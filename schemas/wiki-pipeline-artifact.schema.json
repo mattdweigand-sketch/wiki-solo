@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "wiki-pipeline-artifact.schema.json",
+  "title": "Wiki pipeline artifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "pipeline_version",
+    "run_dir",
+    "source_path",
+    "task_type",
+    "providers",
+    "artifacts",
+    "writes_wiki"
+  ],
+  "properties": {
+    "pipeline_version": {
+      "const": "wiki-pipeline.v1"
+    },
+    "run_dir": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_type": {
+      "enum": ["ingest", "promotion_audit", "lint_followup", "research_capture"]
+    },
+    "providers": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["semantic", "writer", "judge"],
+      "properties": {
+        "semantic": {
+          "const": "stub"
+        },
+        "writer": {
+          "const": "stub"
+        },
+        "judge": {
+          "const": "stub"
+        }
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "writes_wiki": {
+      "const": false
+    }
+  }
+}

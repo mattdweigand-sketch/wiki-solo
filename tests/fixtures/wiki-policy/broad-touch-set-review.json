@@ -1,0 +1,19 @@
+{
+  "id": "broad-touch-set-review",
+  "expected_status": "review",
+  "packet": {
+    "writes_files": false,
+    "risk_flags": [],
+    "expected_touched_files": [
+      "wiki/sources/example-broad-source.md",
+      "wiki/concepts/example-one.md",
+      "wiki/concepts/example-two.md",
+      "wiki/concepts/example-three.md",
+      "wiki/analyses/example-four.md",
+      "wiki/projects/example-five.md",
+      "wiki/decisions/example-six.md",
+      "wiki/glossary.md",
+      "wiki/index.md"
+    ]
+  }
+}
