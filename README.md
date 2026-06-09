@@ -32,36 +32,11 @@ Put the file under `raw/`, then ask the agent to ingest it. The shared ingest wo
 
 Images and screenshots can be ingested too. They route through the visual-evidence harness, and a same-stem `.ocr.txt` sidecar can provide the visible text the agent needs to summarize them safely.
 
-### Workflow Thresholds
+### When Work Gets Saved
 
-These are routing thresholds, not importance scores. They keep quick work lightweight and send durable or risky work through the right review path.
-
-| Workflow | Threshold | Why |
-|---|---|---|
-| Analysis | All three must be true: synthesizes 3+ wiki pages, runs over 300 words, and answers a durable domain question | Keeps simple lookups and short answers in chat; saves only reusable cross-page synthesis |
-| Harness | The route policy returns `review`, the task is not ordinary ingest, or a visual/social source needs evidence before writing | Inspects no-write artifacts before risky durable edits; ordinary policy-pass ingest stays direct |
-| Promotion | The output has future reuse value, but is not simply a raw source and does not already meet the analysis threshold | Chooses one durable home before saving: existing page, new page, workflow, schema, fixture, or script |
-
-Every ordinary ingest starts with:
-
-```bash
-python3 scripts/wiki_route_policy.py <raw-source>
-```
-
-Routes:
-
-| Route | Meaning |
-|---|---|
-| `direct_edit` | Proceed with normal ingest |
-| `full_harness` | Run the no-write harness and inspect artifacts before durable edits |
-| `blocked` | Stop until the route is fixed or explicitly re-scoped |
-
-After durable edits, the agent rebuilds inbound links and runs deterministic Tier-1 lint:
-
-```bash
-python3 scripts/rebuild_referenced_by.py
-python3 scripts/lint.py --tier1
-```
+- **Analysis:** save a citable page only for substantial cross-page synthesis: 3+ wiki pages, over 300 words, and a durable domain question.
+- **Promotion:** save smaller reusable outputs when they should change future wiki memory, workflow, naming, schema, fixtures, or scripts.
+- **Harness:** inspect no-write artifacts before riskier edits, non-standard ingest, or visual/social sources that need evidence.
 
 ### Maintain The Wiki
 

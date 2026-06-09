@@ -13,8 +13,8 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ## 2026-06-08 — maintenance | README promotion workflow
 
-Change: Added and then simplified README usage sections for reusable-output promotion, image/screenshot source ingest, and workflow thresholds.
-Reason: The README should explain the agent-agnostic user-facing routes and define the analysis, harness, and promotion thresholds without making them look arbitrary. Detailed approval, visual-evidence, and tool-shortcut mechanics stay in the workflow docs.
+Change: Simplified README usage sections for reusable-output promotion, image/screenshot source ingest, and save/review thresholds.
+Reason: The README should explain the agent-agnostic user-facing routes without command-heavy route tables. Detailed route-policy, lint, approval, visual-evidence, and tool-shortcut mechanics stay in the workflow docs.
 Validation: PASS — doc-audit loop, Tier-1 lint, full wiki eval, markdown-link audit, and `git diff --check`.
 
 ---
