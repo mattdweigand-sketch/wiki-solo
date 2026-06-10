@@ -92,7 +92,7 @@ Show a one-paragraph summary of what changed and what's next: "Configured. Drop 
 Hands off:
 
 - [`scripts/`](scripts/) — deterministic helpers and the no-write harness
-- [`.claude/commands/`](.claude/commands/) — Claude Code slash-command wrappers
+- [`.claude/commands/`](.claude/commands/) and [`.codex/commands/`](.codex/commands/) — optional wrappers for `/ingest`, `/capture`, `/lint`, and `/promote`
 - [`workflows/*/CONTEXT.md`](workflows/) — workflow routers
 - [`workflows/maintenance/*.md`](workflows/maintenance/) — maintenance task workflows
 - The schema's "Page Format," "Source-Type Summary Templates," and "Confidence Values" sections in [`wiki/SCHEMA.md`](wiki/SCHEMA.md) — domain-agnostic infrastructure

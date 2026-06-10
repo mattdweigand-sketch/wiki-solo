@@ -1,1 +1,9 @@
-Run the lint workflow. The lint workflow lives in [`workflows/maintenance/CONTEXT.md`](../../workflows/maintenance/CONTEXT.md). Read that, open [`lint.md`](../../workflows/maintenance/lint.md), and follow the task. This command is just a Claude Code shortcut; the workflow files are canonical and agent-neutral.
+---
+description: Lint the wiki for deterministic structural issues
+---
+
+Run the lint workflow. Read `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/lint.md`, and follow the Load / Skip list exactly.
+
+This command is just a Claude Code shortcut. The workflow file is canonical and model-agnostic.
+
+$ARGUMENTS

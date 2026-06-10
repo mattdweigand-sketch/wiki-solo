@@ -6,6 +6,14 @@ Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness 
 
 Optional wrappers keep the common command surface small: `/ingest` for raw sources, `/capture` for first-person decisions or lived context, `/promote` for useful artifacts whose durable home is not obvious, and `/lint` for deterministic wiki checks. The wrappers are shortcuts only; this router and the workflow files are canonical.
 
+Durable work saves through a small set of routes:
+
+- **Ingest:** raw source to source page plus affected entity pages.
+- **Analysis:** substantial cross-page answer to a durable domain question.
+- **Promotion:** routing decision for a useful artifact whose home is not obvious.
+- **Capture:** first-person decision or lived context.
+- **Harness:** no-write review artifacts before riskier edits or provider work.
+
 Ordinary source ingest starts with a no-write route preflight:
 
 ```bash

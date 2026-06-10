@@ -2,7 +2,7 @@
 
 A clonable, agent-readable wiki template for an organization's durable context layer. Grounded in sources. Structured for downstream agents. Designed to compound instead of re-deriving context from raw documents.
 
-`AGENTS.md` is canonical and agent-agnostic. Codex, Cursor, Claude, ChatGPT, or a raw API harness should drive this wiki the same way: read `AGENTS.md`, check `wiki/domain.md`, route through `CONTEXT.md`, then follow the vendor-neutral prose in `workflows/`. Claude Code reaches the same guidance through the thin `CLAUDE.md` wrapper. Nothing about core operation depends on `.claude/`.
+`AGENTS.md` is canonical and agent-agnostic. Codex, Cursor, Claude, ChatGPT, or a raw API harness should drive this wiki the same way: read `AGENTS.md`, check `wiki/domain.md`, route through `CONTEXT.md`, then follow the vendor-neutral prose in `workflows/`. Claude Code reaches the same guidance through the thin `CLAUDE.md` wrapper. Nothing about core operation depends on `.claude/` or `.codex/`.
 
 Start by reading `wiki/domain.md`. If `status: unconfigured`, route to `SETUP.md` before doing wiki work. If `status: configured`, continue through `CONTEXT.md`.
 
@@ -14,7 +14,7 @@ Start by reading `wiki/domain.md`. If `status: unconfigured`, route to `SETUP.md
 - `CONTEXT.md` — task router; read after this file to find the right workflow.
 - `SETUP.md` — first-session configuration workflow for a fresh clone.
 - `workflows/` — vendor-neutral prose workflows grouped into three workflow areas: `ingest/`, `research/`, and `maintenance/`.
-- `.claude/commands/` and `.codex/commands/` — optional slash-command wrappers over the same workflows.
+- `.claude/commands/` and `.codex/commands/` — optional slash-command wrappers for the routine command surface: `/ingest`, `/capture`, `/lint`, and `/promote`.
 - `scripts/` — vendor-neutral helper scripts and workflow shortcuts. `wiki_promote.py` starts a no-write promotion audit; `capture_gate.py` guards analysis capture and artifact promotion apply routes; `wiki_route_policy.py` is the no-write route preflight before ingest edits; `wiki_pipeline.py` and related `wiki_*` scripts run the no-write harness under `tmp/wiki-runs/`; `rebuild_referenced_by.py` regenerates inbound links; `lint.py --tier1` is the deterministic validation gate.
 - `config/` — harness/provider manifests.
 - `schemas/` — JSON schemas for harness packets, provider artifacts, apply plans, and manifests.

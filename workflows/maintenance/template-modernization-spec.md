@@ -73,7 +73,7 @@ The harness is no-write by default. It may create review artifacts under `tmp/wi
 | Schema | Keep product, feature, persona, customer, competitor, initiative, metric taxonomy |
 | Setup | Keep the first-session interview and configurable entity types |
 | Scripts | Keep stdlib-only deterministic helpers |
-| Workflows | Keep vendor-neutral prose; `.claude/` remains optional |
+| Workflows | Keep vendor-neutral prose; `.claude/` and `.codex/` remain optional wrappers for `/ingest`, `/capture`, `/lint`, and `/promote` |
 | Capture gate | Prefer `--domain-context`; keep backward-compatible hidden `--life-context` only for compatibility |
 
 ## Acceptance Criteria
@@ -114,4 +114,4 @@ python3 scripts/wiki_eval.py --suite apply
 - The old `workspaces/` folder was renamed to `workflows/`.
 - The old `workflows/ingest/workflows/` nested pipeline is retained for backwards context but the main ingest entry is now `workflows/ingest/CONTEXT.md`.
 - `wiki/SCHEMA.md` mirrors the organization template schema so agents have a stable wiki-level schema path.
-- `.claude/commands/` should remain thin wrappers over `workflows/`; do not put canonical rules there.
+- `.claude/commands/` and `.codex/commands/` should remain thin wrappers over `workflows/`; do not put canonical rules there. Keep only `/ingest`, `/capture`, `/lint`, and `/promote` as command wrappers unless repeated real usage proves another workflow deserves a shortcut.

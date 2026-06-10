@@ -1,5 +1,9 @@
-Run the ingest workflow. The source to ingest is: $ARGUMENTS
+---
+description: Ingest a new source from raw/ into the wiki
+---
 
-If $ARGUMENTS is empty, check `raw/` for any new unorganized files and proceed with those.
+Run the ingest workflow. Read `workflows/ingest/CONTEXT.md` and follow it exactly, including its Load / Skip list.
 
-The ingest workflow lives in [`workflows/ingest/CONTEXT.md`](../../workflows/ingest/CONTEXT.md). Read that and follow its route policy, source-page, entity-update, backlink, lint, promotion-audit, and log steps. This command is just a Claude Code shortcut; the workflow files are canonical and agent-neutral.
+This command is just a Claude Code shortcut. The workflow file is canonical and model-agnostic.
+
+$ARGUMENTS

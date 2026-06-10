@@ -18,6 +18,8 @@ Ingest is a normal durable write. It does not require `scripts/capture_gate.py` 
 
 `raw/` holds source artifacts. Do not edit existing raw files. If the user provides a new source outside the proper location, place it once under the correct `raw/` subfolder with a kebab-case filename, then treat it as immutable.
 
+Images and screenshots can be ingested. Route visual/social sources through the visual-evidence harness when source fidelity depends on visible text or layout. If a same-stem `.ocr.txt` sidecar exists next to the source, use it as deterministic visible-text support for the harness; do not treat the sidecar as a durable wiki source by itself.
+
 1. Check for newly provided files in `raw/` root and any subfolders.
 2. For each new file:
    - Decide the right subfolder by content type (e.g. `raw/books/`, `raw/articles/`, `raw/notes/`, `raw/conversations/`, `raw/courses/`, `raw/research/`)
