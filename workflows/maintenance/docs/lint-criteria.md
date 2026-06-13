@@ -60,7 +60,7 @@ Patterns to check:
 - Decisions ↔ initiatives/products/metrics (each decision links to what it affects)
 - Analyses → entity pages cited (and entity pages → analyses that reference them)
 
-When adding or adjudicating links in `## Related pages`, prefer the allowed relationship labels from [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md): `Supports:`, `Contradicts:`, `Depends on:`, `Derived from:`, `Part of:`, or `Related:`. Keep the target as a normal `[[wikilink]]`. Plain `- [[page]]` remains valid, and labels should not be mass-backfilled without judgment.
+When adding or adjudicating links in `## Related pages`, prefer the allowed relationship labels from [`../../../wiki/SCHEMA.md`](../../../wiki/SCHEMA.md): `Supports:`, `Contradicts:`, `Depends on:`, `Derived from:`, `Part of:`, or `Related:`. Keep the target as a normal `[[wikilink]]`. Plain `- [[page]]` remains valid, and labels should not be mass-backfilled without judgment.
 
 The auto-generated `## Referenced by` section is rebuilt by running `python3 scripts/rebuild_referenced_by.py` from the repo root — do this as part of every lint cycle to catch these mechanically.
 
