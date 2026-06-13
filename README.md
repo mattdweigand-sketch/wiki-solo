@@ -45,6 +45,7 @@ Ask questions in plain language. Research answers can stay in chat or become ana
 |-- CONTEXT.md                  # Task router
 |-- REFERENCES.md               # Stable conventions and layer model
 |-- SETUP.md                    # First-session configuration workflow
+|-- .github/workflows/          # CI for deterministic wiki checks
 |-- archive/wiki-harness/       # Archived no-write autonomy harness
 |-- scripts/                    # Deterministic gates, lint, link helpers, eval fixtures
 |-- workflows/                  # Vendor-neutral workflows, grouped into 3 workspaces

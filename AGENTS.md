@@ -13,6 +13,7 @@ Start by reading `wiki/domain.md` only far enough to check `status:`. If `status
 - `AGENTS.md` - canonical operating map (this file). `CLAUDE.md` is a thin wrapper that imports it.
 - `CONTEXT.md` - task router; read after this file to find the right workflow.
 - `SETUP.md` - first-session configuration workflow for a fresh clone.
+- `.github/workflows/` - GitHub Actions CI for deterministic wiki checks.
 - `workflows/` - vendor-neutral prose workflows grouped into three workspaces, each with a `CONTEXT.md` entry point: `ingest/` (raw -> pages), `research/` (question -> answer), and `maintenance/` (lint, artifact-promotion, capture-decision, capture-experience, refresh-sourcing-queue, synthesize, export, plus the archived wiki-harness stub).
 - `.claude/commands/` and `.codex/commands/` - optional slash-command wrappers for `wiki-ingest`, `wiki-capture`, `wiki-lint`, `wiki-promote`, `wiki-synthesize`, and `wiki-export`. Keep these wrappers thin; canonical behavior lives in `workflows/` and is routed through `CONTEXT.md`.
 - `scripts/` - vendor-neutral deterministic tooling, self-contained. `capture_gate.py` is the deterministic approval preflight for analysis capture and artifact promotion; `rebuild_referenced_by.py` regenerates `## Referenced by` inbound-link sections; `lint.py --tier1` is the deterministic validation gate; `wiki_eval.py` runs the live guard suites.

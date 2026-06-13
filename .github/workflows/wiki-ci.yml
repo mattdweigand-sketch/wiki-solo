@@ -1,0 +1,29 @@
+name: Wiki CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  wiki-checks:
+    name: Wiki checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run wiki eval suite
+        run: python3 scripts/wiki_eval.py
+
+      - name: Run Tier-1 lint
+        run: python3 scripts/lint.py --tier1
