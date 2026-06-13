@@ -8,10 +8,13 @@ This folder is gitignored by default since source documents can be sensitive. On
 
 ## Subfolders
 
-This template starts unconfigured, so no source buckets are listed yet. During `SETUP.md`, fill `wiki/domain.md` `raw_taxonomy`, create matching `raw/<bucket>/` folders, and replace this section with a table:
+This template starts unconfigured. During `SETUP.md`, fill `wiki/domain.md` `raw_taxonomy`, create matching `raw/<bucket>/` folders, and replace or extend the placeholder rows below with the configured buckets. The table must list every actual top-level `raw/` bucket, because `scripts/lint.py --tier1` treats unlisted buckets as structural drift.
 
 | Folder | Holds |
 |---|---|
-| `ai-research/` | Example AI research and workflow sources included with the template |
-| `social/` | Example social or screenshot captures included with the template |
-| `videos/` | Example video transcript captures included with the template |
+| `customer-research/` | Customer interview notes, support findings, and user research |
+| `internal-memos/` | Strategy, planning, and operating memos |
+| `release-notes/` | Product, API, and changelog artifacts |
+| `ai-research/` | Example AI research and workflow sources, if present in this checkout |
+| `social/` | Example social or screenshot captures, if present in this checkout |
+| `videos/` | Example video transcript captures, if present in this checkout |
