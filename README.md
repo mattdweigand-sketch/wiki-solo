@@ -1,8 +1,8 @@
 # <Organization> Wiki
 
-A clonable, agent-readable wiki template for an organization's durable context layer, built on the [Karpathy LLM-wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
+A clonable, agent-readable wiki template for company, project, or personal context layers, built on the [Karpathy LLM-wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f).
 
-Source documents go into `raw/`. The AI reads them once and incrementally builds a structured, cited, interlinked wiki in `wiki/`. Downstream agents read the wiki to answer questions about the organization, its products, customers, competitors, decisions, metrics, and operating context.
+Source documents go into `raw/`. The AI reads them once and incrementally builds a structured, cited, interlinked wiki in `wiki/`. Downstream agents read the wiki to answer questions about the context owner: a company, team, project, person, body of work, decisions, goals, source material, and operating context.
 
 ---
 
@@ -38,7 +38,7 @@ Ask questions in plain language. Research answers can stay in chat or become ana
 
 1. Use this repository as a GitHub template, then open the new repo with your coding agent.
 2. Let the agent follow `AGENTS.md`. Because `wiki/domain.md` starts as `status: unconfigured`, it should route to `SETUP.md`.
-3. Configure a small fake or real domain: organization name, one-line domain, active entity types, and 2-3 `raw/` buckets.
+3. Configure a small fake or real domain: context owner, one-line domain, active entity types, and 2-3 `raw/` buckets.
 4. Add one short source file under a configured bucket, for example `raw/customer-research/q2-onboarding-notes.md`.
 5. Ask the agent to ingest it. The ingest should create a `wiki/sources/` page, update or create any relevant entity pages, add Markdown-path rows in `wiki/index.md`, rebuild `## Referenced by`, and append `wiki/log.md`.
 6. Run the local checks:
@@ -91,7 +91,7 @@ If both pass, the template is configured and ready for real sources.
 
 ## Configuration
 
-A fresh clone starts unconfigured. `SETUP.md` interviews the user for the organization name, domain, active entity types, custom entity types, `raw/` taxonomy, and example questions. The active entity set lives in [`wiki/domain.md`](wiki/domain.md). The full schema lives in [`wiki/SCHEMA.md`](wiki/SCHEMA.md).
+A fresh clone starts unconfigured. `SETUP.md` interviews the user for the context owner, domain, active entity types, custom entity types, `raw/` taxonomy, and example questions. The active entity set lives in [`wiki/domain.md`](wiki/domain.md). The full schema lives in [`wiki/SCHEMA.md`](wiki/SCHEMA.md).
 
 The old no-write harness is archived under `archive/wiki-harness/`. Ordinary ingest does not run a harness preflight.
 
