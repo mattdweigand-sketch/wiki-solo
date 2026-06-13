@@ -2,7 +2,7 @@
 
 A clonable, agent-readable wiki template for an organization's durable context layer. Grounded in sources. Structured for downstream agents. Designed to compound instead of re-deriving context from raw documents.
 
-`AGENTS.md` is canonical and agent-agnostic. Codex, Cursor, Claude, ChatGPT, or a raw API harness should drive this wiki the same way: read `AGENTS.md`, check `wiki/domain.md` for setup status, route through `CONTEXT.md`, then follow the vendor-neutral prose in `workflows/`. Claude Code reaches the same guidance through the thin `CLAUDE.md` wrapper. Nothing about core operation depends on `.claude/` or `.codex/`.
+`AGENTS.md` is canonical and agent-agnostic. Codex, Cursor, Claude, ChatGPT, or a raw API harness should drive this wiki the same way: read `AGENTS.md`, check `wiki/domain.md` for setup status, route through `CONTEXT.md`, then follow the vendor-neutral prose in `workflows/`. Claude Code reaches the same guidance through the thin `CLAUDE.md` wrapper and tracked `.claude/commands/`. Codex reaches the same guidance through tracked `.codex/commands/` mirrors and tracked `.codex/skills/` wrappers synced into the user's local Codex skill directory. Nothing about core operation depends on `.claude/` or `.codex/`.
 
 Start by reading `wiki/domain.md` only far enough to check `status:`. If `status: unconfigured`, route to `SETUP.md` before doing wiki work. If `status: configured`, continue through `CONTEXT.md`.
 
@@ -15,8 +15,10 @@ Start by reading `wiki/domain.md` only far enough to check `status:`. If `status
 - `SETUP.md` - first-session configuration workflow for a fresh clone.
 - `.github/workflows/` - GitHub Actions CI for deterministic wiki checks.
 - `workflows/` - vendor-neutral prose workflows grouped into three workspaces, each with a `CONTEXT.md` entry point: `ingest/` (raw -> pages), `research/` (question -> answer), and `maintenance/` (lint, artifact-promotion, capture-decision, capture-experience, refresh-sourcing-queue, synthesize, export, plus the archived wiki-harness stub).
-- `.claude/commands/` and `.codex/commands/` - optional slash-command wrappers for `wiki-ingest`, `wiki-capture`, `wiki-lint`, `wiki-promote`, `wiki-synthesize`, and `wiki-export`. Keep these wrappers thin; canonical behavior lives in `workflows/` and is routed through `CONTEXT.md`.
-- `scripts/` - vendor-neutral deterministic tooling, self-contained. `capture_gate.py` is the deterministic approval preflight for analysis capture and artifact promotion; `rebuild_referenced_by.py` regenerates `## Referenced by` inbound-link sections; `lint.py --tier1` is the deterministic validation gate; `wiki_eval.py` runs the live guard suites.
+- `.claude/commands/` - tracked Claude Code slash-command wrappers for `wiki-ingest`, `wiki-capture`, `wiki-lint`, `wiki-promote`, `wiki-synthesize`, and `wiki-export`. Keep these wrappers thin; canonical behavior lives in `workflows/` and is routed through `CONTEXT.md`.
+- `.codex/commands/` - tracked Codex command mirrors for the same six workflows. Current Codex shortcut discovery uses skills rather than this repo-local command folder, but these mirrors document the command shape.
+- `.codex/skills/` - tracked Codex skill wrappers for the six active wiki shortcuts. Sync them into the local Codex install directory with `python3 scripts/sync_codex_skills.py`. Treat `~/.codex/skills/` or `$CODEX_HOME/skills/` as installed runtime output, not the source of truth.
+- `scripts/` - vendor-neutral deterministic tooling, self-contained. `capture_gate.py` is the deterministic approval preflight for analysis capture and artifact promotion; `rebuild_referenced_by.py` regenerates `## Referenced by` inbound-link sections; `lint.py --tier1` is the deterministic validation gate; `wiki_eval.py` runs the live guard suites; `sync_codex_skills.py` copies tracked `.codex/skills/wiki-*` wrappers into the local Codex install directory.
 - `scripts/fixtures/` - eval mini-wikis for live tooling: `wiki-rebuild` guards link-graph invariants and `wiki-lint` proves lint checks can fire.
 - `scripts/lint-adjudications.json` - settled Tier-2 lint judgments with reasons and dates, so lint stops re-surfacing what has been adjudicated.
 - `archive/wiki-harness/` - archived autonomy harness: route policy, no-write pipeline, schemas, provider manifest, fixtures, and original workflow. Do not run or extend it unless the project deliberately reopens the harness.
@@ -36,7 +38,7 @@ Create new entity types only during setup or after an explicit schema decision.
 
 Routing lives in `CONTEXT.md`, the source of truth for which workflow handles which task. Read it after this file, find the task, and open the workflow file it points to. Each workflow opens with its own Load / Skip list.
 
-Routine command surface only: `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`. These commands are shortcuts; canonical behavior stays in `CONTEXT.md`, `workflows/`, `scripts/`, and `wiki/SCHEMA.md`.
+Routine command surface only: `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`. These commands are shortcuts; canonical behavior stays in `CONTEXT.md`, `workflows/`, `scripts/`, and `wiki/SCHEMA.md`. Claude Code reads `.claude/commands/` in the repo. Codex users can install the tracked skill wrappers with `python3 scripts/sync_codex_skills.py`.
 
 ## Capture Approval Gate
 

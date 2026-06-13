@@ -23,7 +23,7 @@ This wiki inverts that. The AI reads a source once, integrates it into a persist
 
 Sources live in `raw/`. Synthesized pages live in `wiki/`. Agents use `AGENTS.md`, `wiki/domain.md`, and `CONTEXT.md` to route each task into the right workflow.
 
-The repo has six common commands, available as slash commands in Claude Code and Codex. All share the `wiki-` prefix, so typing `/wiki` groups them in autocomplete. Other agents reach the same workflows in plain language through `CONTEXT.md` routing.
+The repo has six common commands, available as slash commands in Claude Code and Codex. All share the `wiki-` prefix, so typing `/wiki` groups them in autocomplete. Other agents reach the same workflows in plain language through `CONTEXT.md` routing. Claude Code wrappers are tracked in `.claude/commands/`. Codex skill wrappers are tracked in `.codex/skills/` and can be installed to `~/.codex/skills/` with `python3 scripts/sync_codex_skills.py`.
 
 - `/wiki-ingest` turns a raw source into durable wiki pages.
 - `/wiki-capture` records first-person context, usually a decision or lived experience.
@@ -50,6 +50,28 @@ python3 scripts/lint.py --tier1
 
 If both pass, the template is configured and ready for real sources.
 
+## Slash Commands
+
+Claude Code reads the tracked wrappers in `.claude/commands/` directly from the repo.
+
+Codex uses installed skills for slash-command discovery. To install this template's wiki commands into Codex, run:
+
+```bash
+python3 scripts/sync_codex_skills.py
+```
+
+To check whether the installed Codex skills match the tracked repo wrappers:
+
+```bash
+python3 scripts/sync_codex_skills.py --check
+```
+
+If your Codex home is not `~/.codex`, set `CODEX_HOME`:
+
+```bash
+CODEX_HOME=/path/to/codex-home python3 scripts/sync_codex_skills.py
+```
+
 ---
 
 ## Repo Structure
@@ -68,8 +90,9 @@ If both pass, the template is configured and ready for real sources.
 |   |-- ingest/CONTEXT.md       #   raw source -> wiki pages
 |   |-- research/CONTEXT.md     #   question -> answer, filed as analysis when substantial
 |   `-- maintenance/            #   hygiene, promotion, capture, synthesize, export
-|-- .claude/commands/           # Optional Claude Code wrappers over workflows/
-|-- .codex/commands/            # Optional Codex wrappers over the same workflows
+|-- .claude/commands/           # Claude Code wrappers over workflows/
+|-- .codex/commands/            # Codex command mirrors over the same workflows
+|-- .codex/skills/              # Tracked Codex skill wrappers, synced to ~/.codex/skills/
 |-- raw/                        # Source artifacts; existing files are immutable
 `-- wiki/                       # Knowledge layer
     |-- domain.md               # Organization configuration

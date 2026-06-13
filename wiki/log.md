@@ -11,6 +11,14 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-13 — maintenance | tracked Codex skill wrappers
+
+Change: Added tracked `.codex/skills/wiki-*` Codex skill wrappers, documented the Claude/Codex wrapper split, and added `scripts/sync_codex_skills.py` for installing the tracked Codex wrappers into a user's local Codex skill directory.
+Reason: General users should be able to use `/wiki-ingest`, `/wiki-capture`, `/wiki-promote`, `/wiki-lint`, `/wiki-synthesize`, and `/wiki-export` in Codex without relying on untracked local skill files.
+Validation: PASS — temp `CODEX_HOME` sync plus `--check`, `py_compile`, Tier-1 lint, full wiki eval, and `git diff --check`.
+
+---
+
 ## 2026-06-08 — maintenance | agent-neutral promotion shortcut
 
 Change: Added `scripts/wiki_promote.py` as an agent-neutral shortcut for promotion audits, documented it in root routing, and clarified the README boundary between analysis and promotion.
