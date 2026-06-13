@@ -45,7 +45,7 @@ Create new entity pages as warranted by the active entity types in `wiki/domain.
 ## Step 5 - Update wiki-wide files
 
 1. Update `wiki/glossary.md` with any new or refined terms.
-2. Update `wiki/index.md`: add new pages, refresh summaries of changed pages.
+2. Update `wiki/index.md`: add new pages and refresh summaries of changed pages. Index rows must use Markdown links to folder-qualified page paths, such as `[page-slug](concepts/page-slug.md)`, because Tier-1 lint uses those links to verify coverage. Use `[[wikilinks]]` inside authored page bodies and `## Related pages`, not as the index coverage link.
 3. Update `wiki/overview.md` if the source shifts the big picture.
 
 ## Step 6 - Rebuild inbound links
