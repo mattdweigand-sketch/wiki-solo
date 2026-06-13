@@ -7,107 +7,82 @@ description: Use this workflow when the user drops a file in raw/ and says "inge
 
 Turns a raw source into structured wiki pages. Single task: read the source, file it, update the pages and indexes it touches. This `CONTEXT.md` is the whole workflow.
 
-Ingest is a normal durable write. It does not require `scripts/capture_gate.py` approval. Use the capture gate only if the ingest turns into an analysis-capture or artifact-promotion apply route.
+Ingest is a normal durable write. It does not require `scripts/capture_gate.py` approval. Use the capture gate only if the ingest turns into an analysis-capture or artifact-promotion apply route. The former route preflight is archived with the autonomy harness; if an ingest genuinely seems to need staged review before durable edits, raise it with the user instead of running a script.
 
 ## Load / Skip
 
-- **Load:** `wiki/SCHEMA.md` (source-type templates + frontmatter), the source file(s) in `raw/`, and the specific existing pages the source touches. At the link step (Step 5), also `wiki/index.md`, `wiki/glossary.md`, `wiki/log.md`.
-- **Skip:** the rest of the wiki, the other workflows, and `wiki/contradictions.md` unless a clash actually surfaces.
+- **Load:** `wiki/SCHEMA.md` (source-type templates + frontmatter), `wiki/domain.md` for active entity types and raw taxonomy, the source file(s) in `raw/`, and the specific existing pages the source touches. At the link step (Step 5), also load `REFERENCES.md` (cross-referencing rules), `wiki/index.md`, `wiki/glossary.md`, and `wiki/log.md`.
+- **Skip:** the rest of the wiki, the other workspaces, and `wiki/contradictions.md` unless a clash actually surfaces.
 
-## Step 0 — File handling (before reading anything)
+## Step 0 - File handling (before reading anything)
 
 `raw/` holds source artifacts. Do not edit existing raw files. If the user provides a new source outside the proper location, place it once under the correct `raw/` subfolder with a kebab-case filename, then treat it as immutable.
 
-Images and screenshots can be ingested. Route visual/social sources through the visual-evidence harness when source fidelity depends on visible text or layout. If a same-stem `.ocr.txt` sidecar exists next to the source, use it as deterministic visible-text support for the harness; do not treat the sidecar as a durable wiki source by itself.
-
 1. Check for newly provided files in `raw/` root and any subfolders.
 2. For each new file:
-   - Decide the right subfolder by content type (e.g. `raw/books/`, `raw/articles/`, `raw/notes/`, `raw/conversations/`, `raw/courses/`, `raw/research/`)
-   - Rename to kebab-case, preserve the extension
-   - Move the file into its subfolder when it is already inside `raw/`; copy or move it into `raw/` when the user provided it elsewhere; do not alter its contents
+   - Decide the right subfolder from `wiki/domain.md` `raw_taxonomy`; check `raw/README.md` and `ls raw/` before inventing a new subfolder.
+   - Rename to kebab-case, preserve the extension.
+   - Move the file into its subfolder when it is already inside `raw/`; copy or move it into `raw/` when the user provided it elsewhere; do not alter its contents.
 3. Confirm the resulting file layout before proceeding.
 
-## Step 0.5 — Route preflight
+## Step 1 - Read and discuss
 
-Before durable wiki edits, run the deterministic route policy:
+1. Read the source file(s) from `raw/`.
+2. Discuss 2-3 key takeaways and ask any clarifying questions.
 
-```
-python3 scripts/wiki_route_policy.py <raw-source>
-```
-
-This is the lightweight harness boundary for every ingest. It writes no files and classifies the cluster:
-
-| Route | Meaning | Next step |
-|---|---|---|
-| `direct_edit` | Ordinary ingest passed deterministic policy | Continue with this ingest workflow |
-| `full_harness` | Review-triggered or non-ingest work cluster | Run `python3 scripts/wiki_pipeline.py <raw-source> --run-id <id> --overwrite`, inspect artifacts, then proceed only after the route is understood |
-| `blocked` | Reject-triggered packet | Stop; do not write durable wiki files until fixed or explicitly re-routed |
-
-Routing triggers are deterministic:
-
-- `blocked`: diff policy status is `reject`
-- `full_harness`: diff policy status is `review`
-- `full_harness`: task type is not `ingest`
-- `direct_edit`: task type is `ingest` and diff policy status is `pass`
-
-## Step 1 — Read and discuss
-
-1. Read the source file(s) from `raw/`
-2. Discuss 2–3 key takeaways and ask any clarifying questions
-
-## Step 2 — Create source page
+## Step 2 - Create source page
 
 Create a summary page in `wiki/sources/` named after the source file. Use `source_type` from `wiki/SCHEMA.md` to shape the summary.
 
-## Step 3 — Update existing pages
+## Step 3 - Update existing pages
 
-Identify which existing wiki pages are affected — update them.
+Identify which existing wiki pages are affected and update them.
 
-## Step 4 — Create new entity pages
+## Step 4 - Create new entity pages
 
 Create new entity pages as warranted by the active entity types in `wiki/domain.md` and the schema in `wiki/SCHEMA.md`.
 
-## Step 5 — Update wiki-wide files
+## Step 5 - Update wiki-wide files
 
-1. Update `wiki/glossary.md` with any new or refined terms
-2. Update `wiki/index.md` — add new pages, refresh summaries of changed pages
-3. Update `wiki/overview.md` if the source shifts the big picture
+1. Update `wiki/glossary.md` with any new or refined terms.
+2. Update `wiki/index.md`: add new pages, refresh summaries of changed pages.
+3. Update `wiki/overview.md` if the source shifts the big picture.
 
-## Step 6 — Rebuild inbound links
+## Step 6 - Rebuild inbound links
 
-After all `[[wikilinks]]` are written, refresh the auto-generated `## Referenced by` sections so the new page and every page it links appear in each other's inbound list:
+After all `[[wikilinks]]` are written, refresh the auto-generated `## Referenced by` sections:
 
-```
+```bash
 python3 scripts/rebuild_referenced_by.py
 ```
 
-Run from the repo root. The script is stdlib-only and idempotent — it rewrites the `## Referenced by` block on every entity page from the current `[[ ]]` graph. Never hand-edit a `## Referenced by` section; edit `## Related pages` (curated, outbound) and let the script regenerate the inbound list.
+Run from the repo root. The script is stdlib-only and idempotent. Never hand-edit a `## Referenced by` section; edit `## Related pages` and let the script regenerate the inbound list.
 
-Then run the deterministic Tier-1 gate, the same one the promotion workflow uses, and treat any failure as must-fix before logging:
+Then run the deterministic Tier-1 gate:
 
-```
+```bash
 python3 scripts/lint.py --tier1
 ```
 
-Tier-1 is machine-checkable: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, and index coverage. An ingest authors fresh frontmatter and links across many pages, which is exactly where these slip in, so the gate runs here rather than waiting for the next periodic lint. Run it after the backlink rebuild so the link graph is current.
+Tier-1 is machine-checkable: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, index coverage, repo structure, raw/deliverables hygiene, and related structural rules. Treat failures as must-fix before logging.
 
-## Step 7 — Promotion audit
+## Step 7 - Promotion audit
 
 Before logging, check whether the ingest produced a reusable artifact that belongs outside normal source/concept/analysis updates. Auto-audit if the ingest created or refined:
 
-- A reusable operating rule for future agents
-- A naming, style, or schema convention
-- A repeated workflow step that belongs in `workflows/`
-- A deterministic check that belongs in `scripts/`
-- A durable decision that should live in `wiki/decisions/`
+- A reusable operating rule for future agents.
+- A naming, style, or schema convention.
+- A repeated workflow step that belongs in `workflows/`.
+- A deterministic check that belongs in `scripts/`.
+- A durable decision that should live in `wiki/decisions/`.
 
 Do not apply extra promotion automatically unless the user asked to promote, apply, save, file, or update the wiki beyond the ingest. If applying a promotion, run `python3 scripts/capture_gate.py` for that promotion route and stop if it requires approval. Include the recommended route in the log as `Promotion audit: none | <recommended route>`.
 
-## Step 8 — Log
+## Step 8 - Log
 
 Append to `wiki/log.md`:
 
-```
+```text
 ## [YYYY-MM-DD] ingest | <source title>
 Pages created: ...
 Pages updated: ...
@@ -116,4 +91,4 @@ Contradictions flagged: ...
 Promotion audit: none | <recommended route>
 ```
 
-A single ingest may touch 5–15 wiki pages. That is expected.
+A single ingest may touch 5-15 wiki pages. That is expected.

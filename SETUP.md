@@ -57,9 +57,21 @@ Other framework files reference [`domain.md`](wiki/domain.md) or [`wiki/SCHEMA.m
 
 Do not rewrite [`CLAUDE.md`](CLAUDE.md) during setup or future operating-map updates. It stays a wrapper around `AGENTS.md`.
 
-### 3. Create raw/ subfolders
+### 3. Create raw/ subfolders and document the taxonomy
 
 For each entry in `raw_taxonomy`, create `raw/<name>/` with a `.gitkeep` file inside.
+
+Update [`raw/README.md`](raw/README.md) so it contains a concrete subfolder table for the configured wiki:
+
+```markdown
+## Subfolders
+
+| Folder | Holds |
+|---|---|
+| `customer-research/` | <what goes here> |
+```
+
+The exact descriptions can be brief. The important part is that `raw/README.md` and `wiki/domain.md` agree, because `scripts/lint.py --tier1` treats unlisted raw buckets as structural drift once setup is configured.
 
 ### 4. Drop unused entity folders
 
@@ -91,8 +103,9 @@ Show a one-paragraph summary of what changed and what's next: "Configured. Drop 
 
 Hands off:
 
-- [`scripts/`](scripts/) — deterministic helpers and the no-write harness
-- [`.claude/commands/`](.claude/commands/) and [`.codex/commands/`](.codex/commands/) — optional wrappers for `/ingest`, `/capture`, `/lint`, and `/promote`
+- [`scripts/`](scripts/) — deterministic helpers and live eval fixtures
+- [`archive/wiki-harness/`](archive/wiki-harness/) — archived no-write harness
+- [`.claude/commands/`](.claude/commands/) and [`.codex/commands/`](.codex/commands/) — optional wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`
 - [`workflows/*/CONTEXT.md`](workflows/) — workflow routers
 - [`workflows/maintenance/*.md`](workflows/maintenance/) — maintenance task workflows
 - The schema's "Page Format," "Source-Type Summary Templates," and "Confidence Values" sections in [`wiki/SCHEMA.md`](wiki/SCHEMA.md) — domain-agnostic infrastructure

@@ -10,8 +10,8 @@ A lint is **diagnosis, not surgery.** Report findings. The user approves fixes. 
 
 Before reading any pages, run `python3 scripts/lint.py` from the repo root. It splits the wiki's rules by how they can be enforced:
 
-- **Tier 1 (deterministic):** machine-checkable structure with no judgment involved — frontmatter keys, `type` matching its folder, valid `confidence` and `source_type` values, kebab-case filenames, dangling `[[links]]`, index coverage. These are hard failures. The script exits non-zero when any fail, so they can gate a commit. Fix every Tier-1 finding before anything else.
-- **Tier 2 (ranked candidates):** signals a maintainer cannot eyeball across hundreds of pages — orphans, near-duplicates, uncited pages, thin pages, confidence-upgrade candidates, missing cross-references by co-citation. The script ranks them; a human or agent decides. Tier 2 never fails the run unless you pass `--strict`.
+- **Tier 1 (deterministic):** machine-checkable structure with no judgment involved — frontmatter keys, `type` matching its folder, valid `confidence` and `source_type` values, kebab-case filenames, dangling `[[links]]`, index coverage, duplicate link stems, raw source references, repo structure, raw/deliverables hygiene, and `.DS_Store` files. These are hard failures. The script exits non-zero when any fail, so they can gate a commit. Fix every Tier-1 finding before anything else.
+- **Tier 2 (ranked candidates):** signals a maintainer cannot eyeball across hundreds of pages — orphans, near-duplicates, uncited pages, thin pages, confidence-upgrade candidates, missing cross-references by co-citation, and quote/source mismatches. The script ranks them; a human or agent decides. Tier 2 never fails the run unless you pass `--strict`.
 - **Tier 3 (genuine judgment):** contradictions, stale claims, terminology drift, concepts mentioned without a page, confidence downgrades. A script cannot decide these. They are the checklist below.
 
 The checklist below is tagged by tier. The Tier-1 and Tier-2 items are already computed by `scripts/lint.py` — use its output instead of eyeballing them. Spend your reading on Tier 3, where judgment is the whole job.
@@ -46,12 +46,11 @@ A page with no inbound `[[links]]` from other wiki pages. Either:
 
 When found: propose adding back-links from the obvious candidates (the products it relates to, the customers it affects, the initiatives it informs). If genuinely vestigial, ask the user before deleting.
 
-### 4. Missing Cross-References (Tier 1 reciprocity + Tier 2 co-citation; completeness stays Tier 3)
+### 4. Missing Cross-References (Tier 2 co-citation; completeness stays Tier 3)
 Two pages that *should* link to each other but don't. This splits across tiers:
 
-- **Reciprocity (Tier 1):** for structural containment pairs, a one-way link is a hard error. `scripts/lint.py` enforces `products ↔ features` — if a feature links to its product, the product must link back (and vice versa). The reciprocal link must be curated (body or `## Related pages`); the auto-generated `## Referenced by` entry does not satisfy it. Extend the `RECIPROCAL_PAIRS` table in `lint.py` to add pairs once the taxonomy is configured.
 - **Co-citation candidates (Tier 2):** `scripts/lint.py` ranks pairs that share 3+ outbound links but don't link to each other. Review and decide.
-- **Completeness (Tier 3):** whether a product links to *all* its features, or a customer to every product it uses, needs judgment about the ground-truth set. No script decides it.
+- **Completeness (Tier 3):** whether a product links to all its features, or a customer to every product it uses, needs judgment about the ground-truth set. No script decides it.
 
 Patterns to check:
 - Products ↔ features (every product page should link to its features; every feature should link back to its parent product)
