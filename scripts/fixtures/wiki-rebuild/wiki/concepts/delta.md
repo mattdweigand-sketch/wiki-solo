@@ -1,0 +1,3 @@
+## Related pages
+
+- Related: [[alpha]]

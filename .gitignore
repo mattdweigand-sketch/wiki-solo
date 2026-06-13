@@ -1,5 +1,8 @@
 # macOS
 .DS_Store
+.env
+*.swp
+*.swo
 
 # Source documents are user-specific and may be sensitive.
 # Override per-project if you want to version your raw corpus.
@@ -7,5 +10,11 @@ raw/*
 !raw/.gitkeep
 !raw/README.md
 
+# Export bundles and scratch artifacts are not wiki content.
+*.zip
+/deliverables/
+/tmp/
+
 # Local Claude Code settings
 .claude/settings.local.json
+.claude/worktrees/

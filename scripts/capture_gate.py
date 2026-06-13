@@ -25,6 +25,19 @@ PROMOTION_TRIGGERS = (
     "existing_page_update",
 )
 
+ACTION_LABELS = {
+    "analysis-capture": "File a substantial research answer as an analysis page.",
+    "promotion-audit": "Apply an artifact promotion to the wiki.",
+}
+
+TRIGGER_LABELS = {
+    "reusable_distinction": "reusable distinction",
+    "ranking_or_framework": "ranking or framework",
+    "open_question_resolution": "open-question resolution",
+    "future_agent_behavior": "future-agent behavior",
+    "existing_page_update": "existing page update",
+}
+
 
 def yn(value: str) -> bool:
     lowered = value.lower()
@@ -107,7 +120,7 @@ def classify(args: argparse.Namespace) -> tuple[str, str, str]:
         return (
             "capture-experience",
             args.primary_home or "wiki/<entity>/<slug>.md",
-            "The artifact records an observation, field note, or contextual experience.",
+            "The artifact records observed or first-person context.",
         )
 
     if args.phase == "workflow":
@@ -128,10 +141,11 @@ def classify(args: argparse.Namespace) -> tuple[str, str, str]:
         )
 
     if args.trigger:
+        trigger_labels = [TRIGGER_LABELS[trigger] for trigger in args.trigger]
         return (
             "promotion-audit",
             args.primary_home or "existing page or new page from audit",
-            "Promotion trigger present: " + ", ".join(args.trigger) + ".",
+            "Promotion trigger present: " + ", ".join(trigger_labels) + ".",
         )
 
     return (
@@ -139,6 +153,60 @@ def classify(args: argparse.Namespace) -> tuple[str, str, str]:
         "none",
         "Does not meet analysis-capture criteria and has no promotion trigger.",
     )
+
+
+def touched_files(args: argparse.Namespace, home: str) -> str:
+    return args.pages_touched or home
+
+
+def approval_reply(route: str, home: str, files: str) -> str:
+    return f"APPROVE {route} | {home} | {files}"
+
+
+def print_summary(args: argparse.Namespace, route: str, home: str, reason: str) -> str:
+    files = touched_files(args, home)
+    print("CAPTURE GATE")
+    print(f"Artifact: {args.artifact}")
+    print(f"Machine mode: {route}")
+    if route in ACTION_LABELS:
+        print(f"Proposed action: {ACTION_LABELS[route]}")
+    print(f"Primary home: {home}")
+    print(f"Reason: {reason}")
+    print(f"Pages touched: {files}")
+    return files
+
+
+def print_approval_request(args: argparse.Namespace, route: str, home: str, files: str) -> None:
+    action = ACTION_LABELS[route]
+    print()
+    print("APPROVAL REQUIRED")
+    print("No files have been changed yet.")
+    print()
+    print("What you are approving:")
+    print(f"- Durable action: {action}")
+    print(f"- Artifact: {args.artifact}")
+    print(f"- Primary destination: {home}")
+    print(f"- Files the agent may edit: {files}")
+    print()
+    print("Approve only if these are correct:")
+    print("- This artifact should be saved to the wiki, not left in chat.")
+    print("- The primary destination is the right durable home.")
+    print("- The file list is the full intended edit scope.")
+    print()
+    print("To approve, reply exactly:")
+    print(approval_reply(route, home, files))
+    print()
+    print('To deny or redirect, say what should change or reply "do not save."')
+    print("Re-run with --approved only after approval.")
+
+
+def print_approval_confirmed(route: str, home: str, files: str) -> None:
+    print()
+    print("APPROVAL CONFIRMED")
+    print(f"Approved action: {ACTION_LABELS[route]}")
+    print(f"Approved primary destination: {home}")
+    print(f"Approved file scope: {files}")
+    print("Proceed only within this approved scope.")
 
 
 def main() -> int:
@@ -151,12 +219,7 @@ def main() -> int:
         print(f"Reason: {reason}")
         return 3
 
-    print("CAPTURE GATE")
-    print(f"Artifact: {args.artifact}")
-    print(f"Mode: {route}")
-    print(f"Primary home: {home}")
-    print(f"Reason: {reason}")
-    print(f"Pages touched: {args.pages_touched or home}")
+    files = print_summary(args, route, home, reason)
 
     if route == "chat-only":
         print("Approval: not required; do not edit files.")
@@ -170,12 +233,10 @@ def main() -> int:
 
     if args.approved:
         print("Approval: confirmed for this exact route.")
+        print_approval_confirmed(route, home, files)
         return 0
 
-    print()
-    print("APPROVAL REQUIRED")
-    print("Ask the user to approve this exact mode, primary home, and touched files.")
-    print("Re-run with --approved only after approval.")
+    print_approval_request(args, route, home, files)
     return 2
 
 

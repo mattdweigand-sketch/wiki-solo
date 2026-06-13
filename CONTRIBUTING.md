@@ -23,7 +23,7 @@ Thanks for improving wiki-solo. This is a template repo — contributions that m
 
 1. **Fork** the repo and create a branch from `main`.
 2. Make your changes. Keep commits focused — one logical change per commit.
-3. **Test the pipeline end-to-end** if you've touched ingest, research, or maintenance workflows: drop a sample file into `raw/`, run `/ingest`, ask a question, run `/lint`, and confirm the output looks right.
+3. **Test the workflow end-to-end** if you've touched ingest, research, or maintenance workflows: drop a sample file into `raw/`, run `/wiki-ingest`, ask a question, run `/wiki-lint`, and confirm the output looks right.
 4. If you've touched `rebuild_referenced_by.py`, run it against a populated wiki and confirm `## Referenced by` sections update correctly.
 5. Open a pull request with a clear description of what changed and why.
 

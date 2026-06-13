@@ -1,19 +1,42 @@
 #!/usr/bin/env python3
 """
 Rebuild "## Referenced by" sections across all wiki entity pages.
-For each entity page, greps all other pages for [[slug]] mentions,
-groups by directory, and inserts/replaces the section before "## Related pages".
+
+For each entity page, scans every other entity page for [[slug]] mentions,
+groups the inbound links by directory, and inserts/replaces a
+"## Referenced by" section immediately before "## Related pages".
+
+Vendor-neutral: stdlib only, no dependencies. Run from the repo root:
+    python3 scripts/rebuild_referenced_by.py
+
+Idempotent: re-running rewrites the generated sections in place and converges
+on the first pass. Previously generated "## Referenced by" blocks are stripped
+before scanning, so only authored links (body prose and "## Related pages")
+count as references; generated output never feeds back into the graph. Meta
+pages (index, log, glossary, etc.) are never targets and are not counted as
+link sources, so the catalog/index does not create noise.
 """
 import re
+import sys
 from pathlib import Path
 from collections import defaultdict
 
 WIKI_ROOT = Path("wiki")
+
+if not WIKI_ROOT.exists():
+    print(
+        "Error: 'wiki/' directory not found. Run this script from the repo root.\n"
+        f"  Current directory: {Path.cwd()}",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 META_PAGES = {
-    "index", "log", "overview", "glossary", "primer", "domain", "SCHEMA",
-    "sourcing-queue", "contradictions", "design-notes", "schema",
+    "index", "log", "overview", "glossary", "primer",
+    "sourcing-queue", "contradictions", "design-notes", "SCHEMA", "synthesis",
+    "domain",
 }
-META_DIRS = {"style"}
+META_DIRS = set()  # all wiki/ subfolders are entity types, style/ included
 
 
 def get_entity_pages():
@@ -29,19 +52,35 @@ def get_entity_pages():
     return sorted(pages)
 
 
-def find_references(slug, all_pages, target_path):
-    """Return dict of {directory_label: [link_text, ...]} for pages mentioning [[slug]] or [[dir/slug]]."""
+# A generated "## Referenced by" section runs to the next ## heading or EOF.
+REFERENCED_BY_SECTION_RE = re.compile(r'## Referenced by\n.*?(?=\n## |\Z)', re.DOTALL)
+
+
+def strip_referenced_by(text):
+    """Remove generated "## Referenced by" sections so they never count as authored links."""
+    return REFERENCED_BY_SECTION_RE.sub("", text)
+
+
+def load_authored_texts(all_pages):
+    """Read every page once and return {path: text-with-generated-sections-stripped}."""
+    texts = {}
+    for p in all_pages:
+        try:
+            texts[p] = strip_referenced_by(p.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+    return texts
+
+
+def find_references(slug, authored_texts, target_path):
+    """Return {directory_label: [link_text, ...]} for pages whose authored text mentions [[slug]]."""
     # Match bare [[slug]], path-qualified [[dir/slug]], or aliased [[dir/slug|text]]
     pattern = re.compile(
         r'\[\[(?:[^/\]|]+/)?' + re.escape(slug) + r'(?:\|[^\]]+)?\]\]'
     )
     refs = defaultdict(list)
-    for p in all_pages:
+    for p, text in authored_texts.items():
         if p == target_path:
-            continue
-        try:
-            text = p.read_text(encoding="utf-8")
-        except Exception:
             continue
         if pattern.search(text):
             parts = p.relative_to(WIKI_ROOT).parts
@@ -63,15 +102,25 @@ def build_referenced_by_block(refs):
 def update_page(path, new_block):
     text = path.read_text(encoding="utf-8")
 
-    # Replace existing "## Referenced by" section (up to next ## heading or EOF)
-    referenced_by_re = re.compile(
-        r'## Referenced by\n.*?(?=\n## |\Z)', re.DOTALL
-    )
-    if referenced_by_re.search(text):
-        new_text = referenced_by_re.sub(new_block.rstrip('\n'), text, count=1)
+    # Replace the first "## Referenced by" section (up to next ## heading or
+    # EOF) and drop any duplicates a hand edit may have introduced.
+    if REFERENCED_BY_SECTION_RE.search(text):
+        replaced = [False]
+
+        def _sub(m):
+            if replaced[0]:
+                return ""
+            replaced[0] = True
+            return new_block.rstrip('\n')
+
+        new_text = REFERENCED_BY_SECTION_RE.sub(_sub, text)
+    elif text.startswith(("## Related pages", "## Related Pages")):
+        # Page begins with the Related section at byte 0: prepend, don't append.
+        # Single newline joint matches the replace path's fixed point above.
+        new_text = new_block.rstrip('\n') + '\n' + text
     else:
-        # Insert before "## Related pages" if it exists, else append
-        related_re = re.compile(r'(?=\n## Related pages)', re.MULTILINE)
+        # Insert before "## Related pages" / "## Related Pages" if present, else append
+        related_re = re.compile(r'(?=\n## Related [Pp]ages)', re.MULTILINE)
         if related_re.search(text):
             new_text = related_re.sub('\n\n' + new_block.rstrip('\n'), text, count=1)
         else:
@@ -83,9 +132,12 @@ def update_page(path, new_block):
 if __name__ == "__main__":
     all_pages = get_entity_pages()
     print(f"Found {len(all_pages)} entity pages.")
+    # Authored texts are snapshotted once up front; pages mutated during the
+    # loop can't feed their regenerated sections back into later scans.
+    authored_texts = load_authored_texts(all_pages)
     for page in all_pages:
         slug = page.stem
-        refs = find_references(slug, all_pages, page)
+        refs = find_references(slug, authored_texts, page)
         block = build_referenced_by_block(refs)
         update_page(page, block)
         inbound = sum(len(v) for v in refs.values())

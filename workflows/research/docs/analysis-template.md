@@ -57,7 +57,7 @@ agent_use_cases:
 - Related: [[<other-analysis-if-relevant>]]
 ```
 
-Use the relationship labels from [`../../ingest/docs/schema.md`](../../ingest/docs/schema.md) when the connection is clear. Plain `- [[page]]` links remain valid.
+Use the relationship labels from [`../../../wiki/SCHEMA.md`](../../../wiki/SCHEMA.md) when the connection is clear. Plain `- [[page]]` links remain valid.
 
 ---
 
