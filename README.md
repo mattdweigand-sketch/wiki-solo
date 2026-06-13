@@ -34,6 +34,22 @@ The repo has six common commands, available as slash commands in Claude Code and
 
 Ask questions in plain language. Research answers can stay in chat or become analyses when they should be durable.
 
+## Try It In 5 Minutes
+
+1. Use this repository as a GitHub template, then open the new repo with your coding agent.
+2. Let the agent follow `AGENTS.md`. Because `wiki/domain.md` starts as `status: unconfigured`, it should route to `SETUP.md`.
+3. Configure a small fake or real domain: organization name, one-line domain, active entity types, and 2-3 `raw/` buckets.
+4. Add one short source file under a configured bucket, for example `raw/customer-research/q2-onboarding-notes.md`.
+5. Ask the agent to ingest it. The ingest should create a `wiki/sources/` page, update or create any relevant entity pages, add Markdown-path rows in `wiki/index.md`, rebuild `## Referenced by`, and append `wiki/log.md`.
+6. Run the local checks:
+
+```bash
+python3 scripts/wiki_eval.py
+python3 scripts/lint.py --tier1
+```
+
+If both pass, the template is configured and ready for real sources.
+
 ---
 
 ## Repo Structure
