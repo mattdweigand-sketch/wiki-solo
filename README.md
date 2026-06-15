@@ -23,12 +23,12 @@ This wiki inverts that. The AI reads a source once, integrates it into a persist
 
 Sources live in `raw/`. Synthesized pages live in `wiki/`. Agents use `AGENTS.md`, `wiki/domain.md`, and `CONTEXT.md` to route each task into the right workflow.
 
-The repo has six common commands, available as slash commands in Claude Code and Codex. All share the `wiki-` prefix, so typing `/wiki` groups them in autocomplete. Other agents reach the same workflows in plain language through `CONTEXT.md` routing. Claude Code wrappers are tracked in `.claude/commands/`. Codex skill wrappers are tracked in `.codex/skills/` and can be installed to `~/.codex/skills/` with `python3 scripts/sync_codex_skills.py`.
+The repo has six common commands, available as slash commands in Claude Code and Codex. All share the `wiki-` prefix, so typing `/wiki` groups them in autocomplete. Other agents reach the same workflows in plain language through `CONTEXT.md` routing. Claude Code wrappers are tracked in `.claude/commands/`. Codex skill wrappers are tracked in `.codex/skills/`; current Codex discovers them repo-locally while working in this repo.
 
 - `/wiki-ingest` turns a raw source into durable wiki pages.
 - `/wiki-capture` records first-person context, usually a decision or lived experience.
 - `/wiki-promote` routes useful artifacts from chats, drafts, scripts, prompts, or work outputs into the right durable home, or decides not to save them. Approved analysis/promotion routes are recorded in `scripts/capture-runs.jsonl`.
-- `/wiki-lint` runs deterministic Tier-1 checks plus Tier-2 judgment candidates.
+- `/wiki-lint` runs the full lint workflow: deterministic Tier-1 checks, Tier-2 judgment candidates, and the verifier-agent evidence check unless the user asks for deterministic-only lint, no subagents, or skipping the evidence check.
 - `/wiki-synthesize` drafts corpus distillations at draft/low confidence for review, then uses `scripts/synthesis_gate.py` before approved promotions are recorded in `scripts/synthesis-runs.jsonl`.
 - `/wiki-export` builds a zip backup of the corpus with `scripts/export_wiki.py`, including raw sources.
 
@@ -54,22 +54,22 @@ If both pass, the template is configured and ready for real sources.
 
 Claude Code reads the tracked wrappers in `.claude/commands/` directly from the repo.
 
-Codex uses installed skills for slash-command discovery. To install this template's wiki commands into Codex, run:
-
-```bash
-python3 scripts/sync_codex_skills.py
-```
-
-To check whether the installed Codex skills match the tracked repo wrappers:
+Codex discovers the tracked repo-local skills under `.codex/skills/` while working in the repo. If duplicate `wiki-*` commands appear, check for identical global copies:
 
 ```bash
 python3 scripts/sync_codex_skills.py --check
 ```
 
-If your Codex home is not `~/.codex`, set `CODEX_HOME`:
+To remove duplicate global copies after reviewing the report:
 
 ```bash
-CODEX_HOME=/path/to/codex-home python3 scripts/sync_codex_skills.py
+python3 scripts/sync_codex_skills.py --remove-global
+```
+
+If your Codex home is not `~/.codex`, set `CODEX_HOME`. For template validation, use a temporary `CODEX_HOME` so the user's real install is untouched:
+
+```bash
+CODEX_HOME=/path/to/codex-home python3 scripts/sync_codex_skills.py --check
 ```
 
 ---
@@ -92,7 +92,7 @@ CODEX_HOME=/path/to/codex-home python3 scripts/sync_codex_skills.py
 |   `-- maintenance/            #   hygiene, promotion, capture, synthesize, export
 |-- .claude/commands/           # Claude Code wrappers over workflows/
 |-- .codex/commands/            # Codex command mirrors over the same workflows
-|-- .codex/skills/              # Tracked Codex skill wrappers, synced to ~/.codex/skills/
+|-- .codex/skills/              # Tracked repo-local Codex skill wrappers
 |-- raw/                        # Source artifacts; existing files are immutable
 `-- wiki/                       # Knowledge layer
     |-- domain.md               # Organization configuration

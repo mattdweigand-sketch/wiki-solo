@@ -7,6 +7,8 @@ description: Router for wiki hygiene, artifact promotion, first-person capture, 
 
 Wiki hygiene, artifact promotion, first-person capture, corpus synthesis, and backup export. Load this router, then open only the one task file the work calls for. Do not pull every task file into context. `/wiki-capture` is a shortcut for decision capture or experience capture, not a separate workflow.
 
+Invoking `/wiki-lint` authorizes the full lint workflow, including its verifier-agent evidence check, unless the user asks for deterministic-only lint, no subagents, or skipping the evidence check.
+
 The wiki autonomy harness is archived as a paused experiment under `archive/wiki-harness/`. Do not run or extend it unless the project explicitly reopens the harness; [`wiki-harness.md`](wiki-harness.md) is a pointer stub.
 
 Artifact promotion uses the shared capture preflight. Before applying artifact promotion, run `python3 scripts/capture_gate.py` with the proposed route and stop if it requires approval. Approved reruns write or confirm `scripts/capture-runs.jsonl` and must be followed by `python3 scripts/validate_capture_runs.py`. Decision capture, experience capture, workflow updates, setup updates, and routine page updates do not require this approval gate unless they are part of a promotion or analysis-capture route. If the user directly says they made a decision or lived through something they want remembered, use `/wiki-capture`; use `/wiki-promote` only when evaluating a separate artifact.

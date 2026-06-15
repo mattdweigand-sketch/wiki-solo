@@ -93,6 +93,10 @@ Promotion audit auto-triggers after wiki research, ingest, or maintenance work w
 
 Auto-audit means classify the artifact and recommend a route. It does not mean editing files. Apply mode still requires explicit durable-write intent.
 
+Do not auto-audit mid-collaboration. If the user is still shaping the artifact conversationally, finish the drafting work first. The audit belongs at a natural stopping point, and only as a recommendation unless the user has asked for a durable wiki change.
+
+Context alone is never a trigger. Do not infer promotion intent from being in the wiki repo, from prior similar artifacts having been saved, from the existence of a matching page, or from the artifact passing a promotion test.
+
 ## Routing Spec
 
 Use this decision order:
@@ -122,8 +126,10 @@ Use these route labels in audit output and log entries:
 | `create-page` | No current page owns the durable concept, analysis, style rule, or similar artifact | This workflow plus `wiki/SCHEMA.md` |
 | `capture-decision` | The artifact records a choice and rationale | `workflows/maintenance/capture-decision.md` |
 | `capture-experience` | The artifact records observed or lived context | `workflows/maintenance/capture-experience.md` |
-| `workflow-update` | The artifact changes how future agents should behave | Update `AGENTS.md`, `CONTEXT.md`, or `workflows/` |
+| `workflow-update` | The artifact changes how future agents should behave | Update `AGENTS.md`, `CONTEXT.md`, `REFERENCES.md`, or `workflows/` |
 | `script` | The artifact is deterministic repeatable logic | Add or update `scripts/` with tests when appropriate |
+
+If `/wiki-promote` routes into another workflow, keep the route decision in the promotion audit and then follow that workflow's Load / Skip list. Do not keep both workflows fully loaded after routing; switch to the selected workflow.
 
 ## Audit-Only Output
 
@@ -139,7 +145,26 @@ Pages touched if applied: <short list>
 Do not promote because: <only if discarded>
 ```
 
-Stop after the audit unless the user has already asked to apply the promotion.
+If the best route is to update an existing page, name the exact section or kind of change. If the artifact is already covered with no meaningful new distinction, recommend discard or no-op instead of creating a duplicate. Stop after the audit unless the user has already asked to apply the promotion.
+
+## Page Requirements
+
+When creating a wiki page:
+
+1. Use `wiki/SCHEMA.md` frontmatter.
+2. Add `agent_use_cases` unless the page type is exempt.
+3. Include a one-line summary.
+4. Cite source pages with `(source: [[page]])` when stating specific facts.
+5. Use `## Related pages` with typed relationship labels when clear.
+6. Update `wiki/index.md`.
+7. Run `python3 scripts/rebuild_referenced_by.py`.
+
+When updating operating docs:
+
+1. Keep the canonical rule in `AGENTS.md`, root `CONTEXT.md`, `REFERENCES.md`, or `workflows/`.
+2. Avoid putting canonical behavior only in tool-specific wrappers.
+3. Keep the rule short enough for future agents to follow.
+4. Update route tables if the new workflow must be discoverable.
 
 ## Workflow Steps
 

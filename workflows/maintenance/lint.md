@@ -12,6 +12,8 @@ description: Use this workflow when the user says "lint the wiki". Reads all pag
 
 Lint is split by enforcement tier. Machine-checkable rules run as a deterministic script; only the rules that need genuine judgment are read by the agent.
 
+Invoking `/lint`, `/wiki-lint`, or `wiki-lint` is an explicit request to run this full workflow, including the verifier-agent evidence check in Step 3. Do not ask for separate confirmation before using those verifier agents. If the user says "deterministic lint only", "no subagents", or "skip evidence check", skip Step 3 and say so in the final report.
+
 1. Run the deterministic linter from the repo root:
 
    ```bash
@@ -29,21 +31,36 @@ Lint is split by enforcement tier. Machine-checkable rules run as a deterministi
    - Stale claims superseded by newer sources.
    - Concepts mentioned but lacking their own page.
    - Terms used inconsistently where the right canonical term is a judgment call.
-3. Propose fixes for Tier-2 candidates and judgment checks, and ask which ones to apply. Tier-1 failures are not optional.
-4. After applying fixes, update the contradiction and sourcing-queue records if present.
-5. Rebuild the auto-generated inbound-link sections:
+3. Run the **evidence check**: sampled verification that citations support the claims they are attached to. Tier 1 proves a `[[link]]` resolves and the `quote_mismatch` candidates prove quoted text is verbatim; this step checks the semantic rest: overextension, conflation, mismatch, and unsupported inference. The linting agent orchestrates but does not judge its own claims.
+   1. Build the sample with a seeded command so the agent cannot curate it:
+
+      ```bash
+      mkdir -p tmp
+      grep -rn 'source: \[\[' wiki/ --include='*.md' | grep -v 'Referenced by' > tmp/citations.txt
+      awk -v seed=$(date +%Y%m%d) 'BEGIN{srand(seed)} {print rand() "\t" $0}' tmp/citations.txt | sort -n | head -25 | cut -f2-
+      ```
+
+      Drop any claim already settled in `scripts/lint-adjudications.json` or logged as adjudicated in a prior lint entry.
+   2. Add one **plant**: pick one sampled claim and write a deliberately overstated paraphrase of it; include it in the batch as if it were real. If the verifiers fail to flag the plant, the run's clean verdicts do not count. Note it, retune the verifier prompt, and rerun before trusting the results.
+   3. Split the sample across 2-3 verifier agents in fresh contexts that have not seen this session. Contract: try to refute each claim against the cited page and its raw files where raw files exist; verdicts are VERIFIED / OVEREXTENDED / CONFLATED / MISMATCH / NOT-FOUND, each with the source text or absence of source text that decides it.
+   4. Adjudicate flags with the user when needed. Confirmed findings get fixed by softening, relabeling provenance per `wiki/SCHEMA.md`, or correcting the citation. Rejected findings count as false positives; durable false positives go to `scripts/lint-adjudications.json` so they stop resurfacing.
+4. Propose fixes for Tier-2 candidates, evidence-check findings, and judgment checks, and ask which ones to apply. Tier-1 failures are not optional. Residual Tier-2 candidates are acceptable when reviewed and judged too weak, duplicated, or under-sourced to change.
+5. After applying fixes, update the contradiction and sourcing-queue records if present.
+6. Rebuild the auto-generated inbound-link sections:
 
    ```bash
    python3 scripts/rebuild_referenced_by.py
    ```
 
-6. Re-run `python3 scripts/lint.py` and confirm Tier 1 is clean before finishing.
-7. Append to `wiki/log.md`:
+7. Re-run `python3 scripts/lint.py` and confirm Tier 1 is clean before finishing.
+8. Housekeeping: empty `tmp/` if it only contains lint scratch files. Contents of `tmp/` are disposable by rule; do not delete anything outside `tmp/`.
+9. Append to `wiki/log.md`:
 
 ```text
 ## [YYYY-MM-DD] lint
 Issues found: ...
 Fixes applied: ...
 Reviewed/no-change: ...
+Evidence check: N sampled, M flagged, K fixed, R rejected, plant caught: yes/no
 Contradictions opened/closed: ...
 ```

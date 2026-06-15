@@ -11,6 +11,14 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-15 — maintenance | command-surface refactor alignment
+
+Change: Aligned the template command surface with the current wiki operating model: repo-local Codex skills are canonical, duplicate global `wiki-*` skills are detected and removable, `/wiki-lint` authorizes the full lint workflow with verifier evidence checks by default, and artifact promotion now states the no-mid-draft/no-context-only write-intent safeguards.
+Reason: The template should preserve the recent workflow-control improvements without copying personal wiki content or personal entity assumptions.
+Validation: PASS — `py_compile`, Tier-1 lint, capture/synthesis ledger validators, export dry-run, temp `CODEX_HOME` duplicate-skill detect/remove check, full wiki eval, and `git diff --check`.
+
+---
+
 ## 2026-06-15 — maintenance | structured command guardrails
 
 Change: Ported structured approval ledgers, capture/synthesis ledger validators, the synthesis approval gate, export zip builder, and updated command workflow docs and wrappers.
