@@ -57,7 +57,7 @@ FOLDER_TYPE = {
 }
 ROOT_ALLOWED_FILES = {
     ".gitignore", "AGENTS.md", "CLAUDE.md", "CONTEXT.md", "README.md",
-    "REFERENCES.md", "SETUP.md", "CONTRIBUTING.md", "LICENSE",
+    "REFERENCES.md", "SETUP.md", "LICENSE",
 }
 ROOT_ALLOWED_DIRS = {
     ".claude", ".codex", ".github", ".git", "archive", "deliverables", "raw",

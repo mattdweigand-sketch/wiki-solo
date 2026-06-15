@@ -59,7 +59,7 @@ Ask questions in plain language. Research answers can stay in chat or become ana
 |-- AGENTS.md                  # Canonical operating map for agents
 |-- CONTEXT.md                 # Task router
 |-- SETUP.md                   # First-session configuration workflow
-|-- REFERENCES.md              # Stable conventions and layer model
+|-- REFERENCES.md              # Operating model, stable conventions, and layer model
 |-- CLAUDE.md                  # Thin Claude Code wrapper
 |
 |-- .claude/commands/          # Claude Code slash-command wrappers
@@ -69,7 +69,7 @@ Ask questions in plain language. Research answers can stay in chat or become ana
 |-- workflows/                 # Vendor-neutral workflow instructions
 |   |-- ingest/                # raw source -> wiki pages
 |   |-- research/              # question -> answer
-|   `-- maintenance/           # lint, promote, capture, synthesize, export
+|   `-- maintenance/           # lint, capture, promote, synthesize, sourcing, export
 |-- scripts/                   # Deterministic gates, lint, evals, export, link helpers
 |-- .github/workflows/         # CI for deterministic wiki checks
 |-- archive/wiki-harness/      # Archived no-write autonomy harness
@@ -88,6 +88,45 @@ Ask questions in plain language. Research answers can stay in chat or become ana
     |-- synthesis.md           # Synthesis ledger and run history
     `-- <entity folders>/      # sources, products, people, decisions, analyses, etc.
 ```
+
+---
+
+## How It Works
+
+The wiki separates source storage, maintained knowledge, workflow instructions, and deterministic checks:
+
+| Part | Purpose |
+|---|---|
+| `raw/` | Immutable source artifacts. New files can be placed here during ingest; existing raw files are not edited. |
+| `wiki/` | The maintained knowledge layer: source summaries, entity pages, decisions, analyses, glossary, overview, sourcing queue, synthesis ledger, and log. |
+| `workflows/` | Vendor-neutral workflow instructions. `CONTEXT.md` routes into ingest, research, or a specific maintenance task. |
+| `scripts/` | Deterministic tooling for lint, backlinks, approval ledgers, export, evals, and wrapper validation. |
+
+The workflow map is:
+
+| Workflow | Shortcut | What it does | Main safeguards |
+|---|---|---|---|
+| Setup | none | Configures `wiki/domain.md`, active entity types, raw taxonomy, and example questions for a fresh clone. | `status: unconfigured` forces agents to route to `SETUP.md` before normal wiki work. |
+| Ingest | `/wiki-ingest` | Turns raw source files into `wiki/sources/` summaries and updates affected entity pages. | Raw files stay immutable; facts cite source pages; backlinks are rebuilt; Tier-1 lint must pass. |
+| Research | none | Answers questions from the wiki by loading `wiki/index.md`, `wiki/primer.md`, and relevant pages. | Agents avoid re-reading unrelated raw files; substantial durable answers require `capture_gate.py` before becoming `wiki/analyses/`. |
+| Capture decision or experience | `/wiki-capture` | Records first-person context as a decision page or an update to the right entity page. | Uses schema, cross-links affected pages, rebuilds backlinks, runs Tier-1 lint, and logs the capture. |
+| Promote artifact | `/wiki-promote` | Routes a useful answer, draft, script, prompt, or other artifact to the right durable home, or decides not to save it. | Audit mode is read-only; apply mode runs `capture_gate.py` and validates `scripts/capture-runs.jsonl`. |
+| Lint | `/wiki-lint` | Finds structural failures, ranked quality candidates, contradictions, stale claims, and citation-support issues. | Tier 1 is deterministic; Tier 2 is adjudicated; evidence checks sample citations instead of trusting structure alone. |
+| Synthesize | `/wiki-synthesize` | Distills accumulated pages into refreshed overview sections, gap resolutions, cluster analyses, and primer updates. | Drafts start low-confidence; promotion runs `synthesis_gate.py`, validates `scripts/synthesis-runs.jsonl`, and updates `wiki/synthesis.md`. |
+| Track knowledge gaps | no shortcut | Updates `wiki/sourcing-queue.md`, the list of missing sources or open evidence gaps the wiki should fill next. | Reads only the existing queue and recent log context; records changes in `wiki/log.md`. |
+| Export | `/wiki-export` | Builds a local backup zip of the corpus, including gitignored raw sources. | Uses `export_wiki.py`; writes only to `tmp/`; does not upload or share without explicit approval. |
+
+Several mechanisms keep the wiki coherent as it grows:
+
+- `AGENTS.md` and root `CONTEXT.md` define route-first loading so agents do not read or edit the whole repo by default.
+- `wiki/SCHEMA.md` defines page types, frontmatter, confidence values, source types, and citation rules.
+- `REFERENCES.md` explains the operating model, cross-reference rules, key files, and load layers.
+- `## Related pages` is hand-authored; `## Referenced by` is generated from wikilinks by `rebuild_referenced_by.py`.
+- `wiki/log.md` records meaningful wiki work in chronological order.
+- `wiki/synthesis.md` tracks current corpus-level synthesis and approved synthesis run history.
+- `capture_gate.py` protects analysis capture and artifact-promotion apply routes; `synthesis_gate.py` protects synthesis promotion.
+- `wiki_eval.py` tests the operating machinery: lint, backlinks, gates, ledgers, export, and wrapper sync.
+- `.claude/` and `.codex/` are thin wrappers; canonical behavior lives in the root docs, workflows, schema, and scripts.
 
 ---
 

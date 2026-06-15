@@ -19,6 +19,51 @@ Own everything in `wiki/`. `raw/` holds source artifacts: do not edit existing r
 
 ---
 
+## Operating Model
+
+This repo is a durable context system, not a document dump. Raw sources are preserved, then distilled into structured pages that downstream agents can reuse without re-reading every source.
+
+The system has four layers of responsibility:
+
+| Layer | Owns |
+|---|---|
+| Sources | `raw/` stores source artifacts. Existing raw files are immutable. |
+| Knowledge | `wiki/` stores maintained, cited pages and wiki-wide records. |
+| Workflow | `AGENTS.md`, `CONTEXT.md`, and `workflows/` route tasks and define what to load, skip, edit, and verify. |
+| Mechanisms | `scripts/` performs deterministic checks, backlink rebuilds, approval-ledger validation, exports, and wrapper validation. |
+
+The workflow map is:
+
+| Workflow | Route | Owns |
+|---|---|---|
+| Setup | `SETUP.md` | First-session configuration: context owner, domain, active entity types, raw taxonomy, and example questions. |
+| Ingest | `workflows/ingest/CONTEXT.md` | Raw source handling, `wiki/sources/` summaries, affected entity-page updates, index rows, backlinks, Tier-1 lint, and ingest log entries. |
+| Research | `workflows/research/CONTEXT.md` | Wiki-grounded answers, selective page loading, optional analysis capture, and promotion-candidate audits. |
+| Capture decision | `workflows/maintenance/capture-decision.md` | Decision pages with rationale, alternatives, affected entities, cross-links, verification, and log entries. |
+| Capture experience | `workflows/maintenance/capture-experience.md` | Field notes or lived context stored in the most relevant entity folder with lessons and links. |
+| Artifact promotion | `workflows/maintenance/artifact-promotion.md` | Routing useful external or conversational artifacts to source, concept, analysis, decision, initiative, style, workflow, script, existing page update, or discard. |
+| Lint | `workflows/maintenance/lint.md` | Deterministic structure checks, Tier-2 quality candidates, judgment checks, and citation evidence review. |
+| Synthesis | `workflows/maintenance/synthesize.md` | Drafting and approving corpus-level distillations: overview refreshes, gap resolutions, cluster analyses, and primer updates. |
+| Track knowledge gaps | `workflows/maintenance/refresh-sourcing-queue.md` | Maintaining `wiki/sourcing-queue.md`, the list of missing sources or open evidence gaps the wiki should fill next. |
+| Export | `workflows/maintenance/export.md` | Local corpus backup, including gitignored raw sources, without reading wiki content or uploading anywhere. |
+
+The main control mechanisms are:
+
+| Mechanism | Purpose |
+|---|---|
+| Route-first loading | Start with `AGENTS.md`, check `wiki/domain.md`, route through `CONTEXT.md`, then open only the selected workflow and its Load / Skip list. |
+| Schema and citations | `wiki/SCHEMA.md` defines page types, frontmatter, source types, confidence values, and citation rules. Specific facts cite `wiki/sources/` pages. |
+| Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`. |
+| Deterministic lint | `scripts/lint.py --tier1` catches structural failures. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
+| Live evals | `scripts/wiki_eval.py` runs fixture-backed checks for lint, backlinks, gates, ledgers, export, and wrapper sync. |
+| Capture gate | `scripts/capture_gate.py` guards analysis capture and artifact-promotion apply routes, then records approved boundaries in `scripts/capture-runs.jsonl`. |
+| Synthesis gate | `scripts/synthesis_gate.py` guards promotion of synthesis drafts and records approved boundaries in `scripts/synthesis-runs.jsonl`. |
+| Synthesis ledger | `wiki/synthesis.md` orients future synthesis runs; cite source pages, not the ledger, when making claims. |
+| Export | `scripts/export_wiki.py` builds a local backup that includes gitignored `raw/` sources. |
+| Thin wrappers | `.claude/commands/`, `.codex/commands/`, and `.codex/skills/` expose shortcuts but do not own canonical behavior. |
+
+---
+
 ## Cross-Referencing Rules
 
 Use `[[filename-without-extension]]` for all internal links.

@@ -13,6 +13,7 @@ Start by reading `wiki/domain.md` only far enough to check `status:`. If `status
 - `AGENTS.md` - canonical operating map (this file). `CLAUDE.md` is a thin wrapper that imports it.
 - `CONTEXT.md` - task router; read after this file to find the right workflow.
 - `SETUP.md` - first-session configuration workflow for a fresh clone.
+- `REFERENCES.md` - stable operating model, cross-reference rules, key files, and load-layer guidance.
 - `.github/workflows/` - GitHub Actions CI for deterministic wiki checks.
 - `workflows/` - vendor-neutral prose workflows grouped into three workspaces, each with a `CONTEXT.md` entry point: `ingest/` (raw -> pages), `research/` (question -> answer), and `maintenance/` (lint, artifact-promotion, capture-decision, capture-experience, refresh-sourcing-queue, synthesize, export, plus the archived wiki-harness stub).
 - `.claude/commands/` - tracked Claude Code slash-command wrappers for `wiki-ingest`, `wiki-capture`, `wiki-lint`, `wiki-promote`, `wiki-synthesize`, and `wiki-export`. Keep these wrappers thin; canonical behavior lives in `workflows/` and is routed through `CONTEXT.md`.
