@@ -23,6 +23,22 @@ This wiki inverts that. The AI reads a source once, integrates it into a persist
 
 Sources live in `raw/`. Synthesized pages live in `wiki/`. Agents use `AGENTS.md`, `wiki/domain.md`, and `CONTEXT.md` to route each task into the right workflow.
 
+## Agent Setup Prompt
+
+Copy this into your coding agent to download and configure a local wiki from this template:
+
+```text
+Download https://github.com/mattdweigand-sketch/wiki-solo locally as a new wiki folder.
+
+Ask me what the local folder should be named and where to put it. Then clone or download the repo, enter the new folder, and read AGENTS.md. Because wiki/domain.md starts as status: unconfigured, follow SETUP.md to configure the wiki for my organization, project, or personal context.
+
+After setup, run the repo checks:
+- python3 scripts/wiki_eval.py
+- python3 scripts/lint.py --tier1
+
+Report the files you changed, whether the checks passed, and any follow-up choices I need to make.
+```
+
 The repo has six common commands. Claude Code and Codex expose them as slash commands; other agents reach the same workflows through `CONTEXT.md`.
 
 | Command | Use it to |
@@ -35,22 +51,6 @@ The repo has six common commands. Claude Code and Codex expose them as slash com
 | `/wiki-export` | Build a zip backup of the wiki, including raw sources. |
 
 Ask questions in plain language. Research answers can stay in chat or become analyses when they should be durable.
-
-## Try It In 5 Minutes
-
-1. Use this repository as a GitHub template, then open the new repo with your coding agent.
-2. Let the agent follow `AGENTS.md`. Because `wiki/domain.md` starts as `status: unconfigured`, it should route to `SETUP.md`.
-3. Configure a small fake or real domain: context owner, one-line domain, active entity types, and 2-3 `raw/` buckets.
-4. Add one short source file under a configured bucket, for example `raw/customer-research/q2-onboarding-notes.md`.
-5. Ask the agent to ingest it. The ingest should create a `wiki/sources/` page, update or create any relevant entity pages, add Markdown-path rows in `wiki/index.md`, rebuild `## Referenced by`, and append `wiki/log.md`.
-6. Run the local checks:
-
-```bash
-python3 scripts/wiki_eval.py
-python3 scripts/lint.py --tier1
-```
-
-If both pass, the template is configured and ready for real sources.
 
 ## Repo Structure
 
