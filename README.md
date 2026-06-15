@@ -52,30 +52,6 @@ python3 scripts/lint.py --tier1
 
 If both pass, the template is configured and ready for real sources.
 
-## Slash Commands
-
-Claude Code reads the tracked wrappers in `.claude/commands/` directly from the repo.
-
-Codex discovers the tracked repo-local skills under `.codex/skills/` while working in the repo. If duplicate `wiki-*` commands appear, check for identical global copies:
-
-```bash
-python3 scripts/sync_codex_skills.py --check
-```
-
-To remove duplicate global copies after reviewing the report:
-
-```bash
-python3 scripts/sync_codex_skills.py --remove-global
-```
-
-If your Codex home is not `~/.codex`, set `CODEX_HOME`. For template validation, use a temporary `CODEX_HOME` so the user's real install is untouched:
-
-```bash
-CODEX_HOME=/path/to/codex-home python3 scripts/sync_codex_skills.py --check
-```
-
----
-
 ## Repo Structure
 
 ```text
