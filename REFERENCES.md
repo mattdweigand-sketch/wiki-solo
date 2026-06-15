@@ -32,7 +32,7 @@ The system has four layers of responsibility:
 | Workflow | `AGENTS.md`, `CONTEXT.md`, and `workflows/` route tasks and define what to load, skip, edit, and verify. |
 | Mechanisms | `scripts/` performs deterministic checks, backlink rebuilds, approval-ledger validation, exports, and wrapper validation. |
 
-The workflow map is:
+Detailed workflow ownership:
 
 | Workflow | Route | Owns |
 |---|---|---|
@@ -42,9 +42,8 @@ The workflow map is:
 | Capture decision | `workflows/maintenance/capture-decision.md` | Decision pages with rationale, alternatives, affected entities, cross-links, verification, and log entries. |
 | Capture experience | `workflows/maintenance/capture-experience.md` | Field notes or lived context stored in the most relevant entity folder with lessons and links. |
 | Artifact promotion | `workflows/maintenance/artifact-promotion.md` | Routing useful external or conversational artifacts to source, concept, analysis, decision, initiative, style, workflow, script, existing page update, or discard. |
-| Lint | `workflows/maintenance/lint.md` | Deterministic structure checks, Tier-2 quality candidates, judgment checks, and citation evidence review. |
-| Synthesis | `workflows/maintenance/synthesize.md` | Drafting and approving corpus-level distillations: overview refreshes, gap resolutions, cluster analyses, and primer updates. |
-| Track knowledge gaps | `workflows/maintenance/refresh-sourcing-queue.md` | Maintaining `wiki/sourcing-queue.md`, the list of missing sources or open evidence gaps the wiki should fill next. |
+| Lint | `workflows/maintenance/lint.md` | Deterministic structure checks, Tier-2 quality candidates, judgment checks, citation evidence review, and updates to contradiction or sourcing-queue records when gaps open or close. |
+| Synthesis | `workflows/maintenance/synthesize.md` | Drafting and approving corpus-level distillations: overview refreshes, gap resolutions, cluster analyses, primer updates, and open questions. |
 | Export | `workflows/maintenance/export.md` | Local corpus backup, including gitignored raw sources, without reading wiki content or uploading anywhere. |
 
 The main control mechanisms are:
@@ -56,6 +55,7 @@ The main control mechanisms are:
 | Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`. |
 | Deterministic lint | `scripts/lint.py --tier1` catches structural failures. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
 | Live evals | `scripts/wiki_eval.py` runs fixture-backed checks for lint, backlinks, gates, ledgers, export, and wrapper sync. |
+| Sourcing queue | `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers. `workflows/maintenance/refresh-sourcing-queue.md` can reprioritize it when needed. |
 | Capture gate | `scripts/capture_gate.py` guards analysis capture and artifact-promotion apply routes, then records approved boundaries in `scripts/capture-runs.jsonl`. |
 | Synthesis gate | `scripts/synthesis_gate.py` guards promotion of synthesis drafts and records approved boundaries in `scripts/synthesis-runs.jsonl`. |
 | Synthesis ledger | `wiki/synthesis.md` orients future synthesis runs; cite source pages, not the ledger, when making claims. |

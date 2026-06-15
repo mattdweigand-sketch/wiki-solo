@@ -102,19 +102,18 @@ The wiki separates source storage, maintained knowledge, workflow instructions, 
 | `workflows/` | Vendor-neutral workflow instructions. `CONTEXT.md` routes into ingest, research, or a specific maintenance task. |
 | `scripts/` | Deterministic tooling for lint, backlinks, approval ledgers, export, evals, and wrapper validation. |
 
-The workflow map is:
+The main workflows are:
 
-| Workflow | Shortcut | What it does | Main safeguards |
-|---|---|---|---|
-| Setup | none | Configures `wiki/domain.md`, active entity types, raw taxonomy, and example questions for a fresh clone. | `status: unconfigured` forces agents to route to `SETUP.md` before normal wiki work. |
-| Ingest | `/wiki-ingest` | Turns raw source files into `wiki/sources/` summaries and updates affected entity pages. | Raw files stay immutable; facts cite source pages; backlinks are rebuilt; Tier-1 lint must pass. |
-| Research | none | Answers questions from the wiki by loading `wiki/index.md`, `wiki/primer.md`, and relevant pages. | Agents avoid re-reading unrelated raw files; substantial durable answers require `capture_gate.py` before becoming `wiki/analyses/`. |
-| Capture decision or experience | `/wiki-capture` | Records first-person context as a decision page or an update to the right entity page. | Uses schema, cross-links affected pages, rebuilds backlinks, runs Tier-1 lint, and logs the capture. |
-| Promote artifact | `/wiki-promote` | Routes a useful answer, draft, script, prompt, or other artifact to the right durable home, or decides not to save it. | Audit mode is read-only; apply mode runs `capture_gate.py` and validates `scripts/capture-runs.jsonl`. |
-| Lint | `/wiki-lint` | Finds structural failures, ranked quality candidates, contradictions, stale claims, and citation-support issues. | Tier 1 is deterministic; Tier 2 is adjudicated; evidence checks sample citations instead of trusting structure alone. |
-| Synthesize | `/wiki-synthesize` | Distills accumulated pages into refreshed overview sections, gap resolutions, cluster analyses, and primer updates. | Drafts start low-confidence; promotion runs `synthesis_gate.py`, validates `scripts/synthesis-runs.jsonl`, and updates `wiki/synthesis.md`. |
-| Track knowledge gaps | no shortcut | Updates `wiki/sourcing-queue.md`, the list of missing sources or open evidence gaps the wiki should fill next. | Reads only the existing queue and recent log context; records changes in `wiki/log.md`. |
-| Export | `/wiki-export` | Builds a local backup zip of the corpus, including gitignored raw sources. | Uses `export_wiki.py`; writes only to `tmp/`; does not upload or share without explicit approval. |
+| Workflow | Use it to |
+|---|---|
+| Setup | Configure a fresh clone for an organization, project, or personal context. |
+| Ingest | Turn raw sources into cited wiki pages. |
+| Research | Answer questions from the wiki and optionally save substantial analyses. |
+| Capture | Record decisions, observations, or lived context. |
+| Promote | Decide whether a useful artifact should become durable wiki memory. |
+| Lint | Find structural issues, stale claims, contradictions, weak citations, and source gaps. |
+| Synthesize | Distill accumulated pages into overview updates, open questions, cluster analyses, and primer updates. |
+| Export | Build a local backup, including gitignored raw sources. |
 
 Several mechanisms keep the wiki coherent as it grows:
 
@@ -123,6 +122,7 @@ Several mechanisms keep the wiki coherent as it grows:
 - `REFERENCES.md` explains the operating model, cross-reference rules, key files, and load layers.
 - `## Related pages` is hand-authored; `## Referenced by` is generated from wikilinks by `rebuild_referenced_by.py`.
 - `wiki/log.md` records meaningful wiki work in chronological order.
+- `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers.
 - `wiki/synthesis.md` tracks current corpus-level synthesis and approved synthesis run history.
 - `capture_gate.py` protects analysis capture and artifact-promotion apply routes; `synthesis_gate.py` protects synthesis promotion.
 - `wiki_eval.py` tests the operating machinery: lint, backlinks, gates, ledgers, export, and wrapper sync.
