@@ -23,14 +23,16 @@ This wiki inverts that. The AI reads a source once, integrates it into a persist
 
 Sources live in `raw/`. Synthesized pages live in `wiki/`. Agents use `AGENTS.md`, `wiki/domain.md`, and `CONTEXT.md` to route each task into the right workflow.
 
-The repo has six common commands, available as slash commands in Claude Code and Codex. All share the `wiki-` prefix, so typing `/wiki` groups them in autocomplete. Other agents reach the same workflows in plain language through `CONTEXT.md` routing. Claude Code wrappers are tracked in `.claude/commands/`. Codex skill wrappers are tracked in `.codex/skills/`; current Codex discovers them repo-locally while working in this repo.
+The repo has six common commands. Claude Code and Codex expose them as slash commands; other agents reach the same workflows through `CONTEXT.md`.
 
-- `/wiki-ingest` turns a raw source into durable wiki pages.
-- `/wiki-capture` records first-person context, usually a decision or lived experience.
-- `/wiki-promote` routes useful artifacts from chats, drafts, scripts, prompts, or work outputs into the right durable home, or decides not to save them. Approved analysis/promotion routes are recorded in `scripts/capture-runs.jsonl`.
-- `/wiki-lint` runs the full lint workflow: deterministic Tier-1 checks, Tier-2 judgment candidates, and the verifier-agent evidence check unless the user asks for deterministic-only lint, no subagents, or skipping the evidence check.
-- `/wiki-synthesize` drafts corpus distillations at draft/low confidence for review, then uses `scripts/synthesis_gate.py` before approved promotions are recorded in `scripts/synthesis-runs.jsonl`.
-- `/wiki-export` builds a zip backup of the corpus with `scripts/export_wiki.py`, including raw sources.
+| Command | Use it to |
+|---|---|
+| `/wiki-ingest` | Turn a raw source into durable wiki pages. |
+| `/wiki-capture` | Record first-person context, usually a decision or lived experience. |
+| `/wiki-promote` | Route a useful artifact into the wiki, or decide not to save it. |
+| `/wiki-lint` | Run deterministic checks, judgment candidates, and evidence review. |
+| `/wiki-synthesize` | Draft corpus distillations for review and approved promotion. |
+| `/wiki-export` | Build a zip backup of the wiki, including raw sources. |
 
 Ask questions in plain language. Research answers can stay in chat or become analyses when they should be durable.
 
