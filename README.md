@@ -93,26 +93,29 @@ Ask questions in plain language. Research answers can stay in chat or become ana
 
 ## How It Works
 
-Think of the wiki as a compounding context loop:
+The wiki is built to preserve provenance first, then let agents build on it safely.
 
-1. **Configure the domain.** A fresh clone starts unconfigured. `SETUP.md` fills in who or what the wiki is about, which entity types matter, and how raw sources should be organized.
-2. **Add sources.** Source artifacts live in `raw/`. They are treated as immutable evidence.
-3. **Ingest sources into pages.** The ingest workflow summarizes each source in `wiki/sources/`, then updates the relevant entity pages in `wiki/`.
-4. **Use the wiki to answer questions.** Research reads the maintained wiki pages first, not every raw source again. Substantial answers can be saved as analyses.
-5. **Capture what should persist.** Decisions, observations, reusable artifacts, and operating rules can be routed into the right durable home instead of staying buried in chat.
-6. **Maintain and synthesize.** Lint finds broken structure, stale claims, contradictions, citation issues, and source gaps. Synthesis turns accumulated pages into higher-level overview updates, open questions, and cluster analyses.
-7. **Back up the corpus.** Export builds a local zip that includes both the wiki and gitignored raw sources.
+**Provenance**
 
-The key safeguards are:
+Raw artifacts live in `raw/` and are treated as immutable evidence. Ingest creates a source page in `wiki/sources/` for each artifact, then entity pages cite those source pages instead of citing loose files or external URLs directly.
 
-- Agents route through `AGENTS.md` and `CONTEXT.md` so they load only the workflow they need.
-- Facts cite `wiki/sources/` pages; inferred claims are marked as inference or hypothesis.
-- Authored links live in `## Related pages`; generated backlinks live in `## Referenced by`.
-- `wiki/log.md`, `wiki/sourcing-queue.md`, and `wiki/synthesis.md` track what changed, what evidence is still missing, and what has been distilled.
-- Approval gates protect analysis capture, artifact promotion, and synthesis promotion.
-- Deterministic scripts rebuild backlinks, lint structure, validate approval ledgers, test the workflow machinery, and export backups.
+Specific factual claims use `(source: [[source-page]])`. Interpretive claims are marked as `Inference:` or `Hypothesis:`. Pages also carry `confidence:` metadata, so downstream agents can tell the difference between well-supported, thinly supported, and contested knowledge.
 
-Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md) and the files under [`workflows/`](workflows/).
+The wiki keeps operating records alongside the pages: `wiki/log.md` records meaningful changes, `wiki/sourcing-queue.md` tracks missing evidence, `wiki/contradictions.md` records unresolved conflicts, and `wiki/synthesis.md` tracks approved higher-level distillation.
+
+**Deterministic Controls**
+
+Agents do not decide where to start from scratch. `AGENTS.md` and `CONTEXT.md` route each task to a workflow with an explicit Load / Skip list, which keeps context focused and reduces accidental broad edits.
+
+`wiki/SCHEMA.md` defines valid page types, required frontmatter, confidence values, source types, and citation rules. `scripts/lint.py --tier1` checks the mechanical parts of that contract: structure, links, index coverage, raw-source references, folder hygiene, and other deterministic failures.
+
+Authored relationships and generated backlinks are separated. Humans or agents write `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`, so inbound links stay consistent without hand-maintained backlink drift.
+
+Durable judgment has approval boundaries. `capture_gate.py` protects analysis capture and artifact promotion. `synthesis_gate.py` protects promoted synthesis. Approved runs are written to structured JSONL ledgers and validated by ledger-check scripts.
+
+`scripts/wiki_eval.py` tests the machinery itself: lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync. Export builds a local backup that includes gitignored raw sources, so the evidence layer can be preserved with the wiki.
+
+Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
 ---
 
