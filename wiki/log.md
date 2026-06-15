@@ -11,6 +11,14 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-15 — maintenance | audit cleanup and operational coverage
+
+Change: Cleaned up root-accountability audit findings: research chat-only answers no longer require log writes, promotion apply intent excludes ordinary ingest/commit requests, capture workflows update the index for new pages, setup/domain docs use the correct 13 default entity types, export verification checks promised coverage and excludes `.agents/`, duplicate global Codex skill removal refuses divergent copies, and operational evals now cover export, promotion, sync, and approved ledger validators.
+Reason: The template should keep deterministic checks clean, avoid unintended writes, and preserve generic wrapper/export boundaries without relying on manual validation.
+Validation: PASS — Tier-1 lint, full wiki eval including operational helpers, export dry-run, ledger validators, py_compile, temporary `CODEX_HOME` duplicate-skill checks, and `git diff --check`.
+
+---
+
 ## 2026-06-15 — maintenance | command-surface refactor alignment
 
 Change: Aligned the template command surface with the current wiki operating model: repo-local Codex skills are canonical, duplicate global `wiki-*` skills are detected and removable, `/wiki-lint` authorizes the full lint workflow with verifier evidence checks by default, and artifact promotion now states the no-mid-draft/no-context-only write-intent safeguards.

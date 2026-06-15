@@ -11,7 +11,7 @@ How to answer a user question against the wiki. Read once to internalize.
 2. Pull       — load 3–8 entity pages
 3. Synthesize — answer with citations
 4. Capture     — file to wiki/analyses/ if meaningful and the capture gate allows it
-5. Log        — append to wiki/log.md, rebuild backlinks if filed
+5. Log        — append to wiki/log.md only when filed or explicitly requested; rebuild backlinks if filed
 ```
 
 ---
@@ -89,7 +89,7 @@ When filing:
 - Add cross-references back to the entity pages cited. In `## Related pages`, use typed relationship labels from [`../../../wiki/SCHEMA.md`](../../../wiki/SCHEMA.md) when the relationship is clear; plain `- [[page]]` links remain valid.
 - Update [`../../../wiki/index.md`](../../../wiki/index.md) with a one-line summary of the new analysis.
 
-If any criterion is not met, skip filing — the answer stays in chat. Deletion is cheaper than recall, so err on the side of filing only when the criteria and capture gate both allow it.
+If any criterion is not met, skip filing — the answer stays in chat and no `wiki/log.md` entry is written unless the user explicitly asked to record the research session. Deletion is cheaper than recall, so err on the side of filing only when the criteria and capture gate both allow it.
 
 If you noticed a wiki gap (step 2 ran out of pages, or a key claim had no cited source), flag it — either suggest filing a new entity page, or suggest adding to [`../../../wiki/sourcing-queue.md`](../../../wiki/sourcing-queue.md).
 
@@ -97,18 +97,16 @@ If you noticed a wiki gap (step 2 ran out of pages, or a key claim had no cited 
 
 ## 5. Log
 
-Append to [`../../../wiki/log.md`](../../../wiki/log.md):
+Append to [`../../../wiki/log.md`](../../../wiki/log.md) only when an analysis was filed or the user explicitly asked to record the research session:
 
 ```
 ## [YYYY-MM-DD] query | <one-line question>
 Pages consulted: ...
-Output filed: yes — analyses/<slug>.md   (or: no)
+Output filed: yes — analyses/<slug>.md
 Wiki gaps noticed: ... (if any)
 ```
 
 If a file was created, run `python3 scripts/rebuild_referenced_by.py` from the repo root to refresh backlinks across the wiki.
-
-Even if the answer wasn't filed, the log entry is useful — it shows what was asked and what existed at the time.
 
 ---
 

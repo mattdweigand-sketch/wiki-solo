@@ -88,8 +88,6 @@ When triage is done, confirm to the user:
 Files triaged:
   - raw/<old-path-or-new-file>  →  raw/<subfolder>/<kebab-name>.<ext>  (source_type: <type>)
   - …
-
-Proceed to extraction?
 ```
 
-Wait for the user's go before stage 02.
+Then continue with the canonical ingest workflow unless the user asked to pause. Ordinary ingest is one durable write route; it does not use the archived staged preflight.

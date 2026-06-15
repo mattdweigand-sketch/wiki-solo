@@ -6,7 +6,7 @@ rebuild_referenced_by.py link-graph guards, lint.py's checks and
 adjudication suppression (seeded-violation cases so no check can go
 vacuous), capture_gate.py's approval contract, structured capture approval
 ledger, synthesis_gate.py's approval contract, the structured synthesis-run
-ledger, and Tier-1 lint over the live corpus. The autonomy harness suites
+ledger, operational helper coverage, and Tier-1 lint over the live corpus. The autonomy harness suites
 (apply, ingest, pipeline, policy, provider, route, run, schemas, semantic)
 are archived with the harness under archive/wiki-harness/ per
 decisions/archive-wiki-autonomy-harness; restore them from there if the
@@ -27,6 +27,7 @@ SUITES = {
     "capture-runs": [sys.executable, "scripts/validate_capture_runs.py"],
     "synthesis-gate": [sys.executable, "scripts/wiki_eval_synthesis_gate.py"],
     "synthesis-runs": [sys.executable, "scripts/validate_synthesis_runs.py"],
+    "operational": [sys.executable, "scripts/wiki_eval_operational.py"],
     "tier1": [sys.executable, "scripts/lint.py", "--tier1"],
 }
 
@@ -58,6 +59,7 @@ def main() -> int:
         "capture-runs",
         "synthesis-gate",
         "synthesis-runs",
+        "operational",
         "tier1",
     ]
 

@@ -77,7 +77,7 @@ The wiki autonomy harness and its route preflight are archived under `archive/wi
 
 - Ordinary ingest proceeds directly through the ingest workflow; no preflight script runs.
 - If a piece of work genuinely seems to need staged review before durable edits, that is a judgment call for the prose workflows and the user.
-- The live guards that survived the archive are `scripts/wiki_eval.py`, `scripts/lint.py`, `scripts/rebuild_referenced_by.py`, `scripts/capture_gate.py`, and their fixtures.
+- The live guards that survived the archive are `scripts/wiki_eval.py`, `scripts/lint.py`, `scripts/rebuild_referenced_by.py`, `scripts/capture_gate.py`, `scripts/synthesis_gate.py`, the approval-ledger validators, `scripts/export_wiki.py`, `scripts/sync_codex_skills.py`, and their fixtures.
 
 ---
 

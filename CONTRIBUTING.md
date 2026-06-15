@@ -9,7 +9,7 @@ Thanks for improving wiki-solo. This is a template repo — contributions that m
 **Good fits:**
 - Bug fixes in `rebuild_referenced_by.py`
 - Corrections or clarifications to workspace docs (`CONTEXT.md` files, schema, citation rules)
-- New `source_type` entries in `schema.md` and `classification.md` that are broadly applicable
+- New `source_type` entries in `wiki/SCHEMA.md` and `workflows/ingest/docs/classification.md` that are broadly applicable
 - Improvements to the setup interview flow in `SETUP.md`
 - Agent-compatibility improvements (e.g., better `AGENTS.md` for a specific agent runtime)
 

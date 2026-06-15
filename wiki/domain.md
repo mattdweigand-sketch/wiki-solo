@@ -41,8 +41,8 @@ When `status: configured`, the wiki is ready to ingest sources and answer questi
 |---|---|
 | `org` | The organization (company, team, project) this wiki is about |
 | `domain` | One-line description of the subject area |
-| `entity_types_active` | Subset of the 14 entity types from [`SCHEMA.md`](SCHEMA.md) that this wiki uses. Drop any that don't fit your domain. |
-| `entity_types_custom` | Any new entity types this domain needs that aren't in the default 14 |
+| `entity_types_active` | Subset of the 13 entity types from [`SCHEMA.md`](SCHEMA.md) that this wiki uses. Drop any that don't fit your domain. |
+| `entity_types_custom` | Any new entity types this domain needs that aren't in the default 13 |
 | `raw_taxonomy` | Subfolder names that should exist under `raw/` for source-document organization |
 | `example_queries` | 3–5 questions the wiki should answer well — useful for sanity-checking coverage |
 

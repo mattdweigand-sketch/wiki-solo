@@ -4,7 +4,8 @@
 Codex discovers the repo copy under .codex/skills/wiki-* directly while working
 in the repo. Keeping identical global copies under ~/.codex/skills/wiki-* can
 create duplicate slash commands, so this helper detects and removes those old
-global installs.
+global installs. Divergent same-name global skills are reported but not removed
+by --remove-global.
 """
 
 from __future__ import annotations
@@ -74,13 +75,10 @@ def files_under(path: Path) -> set[Path]:
     }
 
 
-def duplicate_status(source: Path, target: Path) -> list[str]:
-    if not target.exists():
-        return []
-
+def tree_diff(source: Path, target: Path) -> list[str]:
+    messages: list[str] = []
     source_files = files_under(source)
     target_files = files_under(target)
-    messages = [f"duplicate global wiki skill: {target}"]
 
     for rel in sorted(source_files - target_files):
         messages.append(f"  missing global file compared with repo source: {target / rel}")
@@ -90,6 +88,23 @@ def duplicate_status(source: Path, target: Path) -> list[str]:
         if not filecmp.cmp(source / rel, target / rel, shallow=False):
             messages.append(f"  differs from repo source: {target / rel}")
     return messages
+
+
+def duplicate_status(source: Path, target: Path) -> list[str]:
+    if not target.exists():
+        return []
+
+    diff = tree_diff(source, target)
+    if not diff:
+        return [f"duplicate global wiki skill: {target}"]
+
+    messages = [f"same-name global wiki skill differs from repo source: {target}"]
+    messages.extend(diff)
+    return messages
+
+
+def is_identical_duplicate(source: Path, target: Path) -> bool:
+    return target.exists() and not tree_diff(source, target)
 
 
 def remove_tree(path: Path) -> None:
@@ -126,10 +141,24 @@ def main() -> int:
         print("No duplicate global wiki Codex skills found.")
         return 0
 
+    blocked = []
     for source in sources:
         target = target_root / source.name
-        if target.exists():
+        if not target.exists():
+            continue
+        if is_identical_duplicate(source, target):
             remove_tree(target)
+            continue
+        blocked.append((source, target, tree_diff(source, target)))
+
+    if blocked:
+        print("Refusing to remove non-identical global wiki skill(s):", file=sys.stderr)
+        for _source, target, diff in blocked:
+            print(f"  - {target}", file=sys.stderr)
+            for message in diff:
+                print(message, file=sys.stderr)
+        print("Remove or reconcile those directories manually if they are intentional.", file=sys.stderr)
+        return 1
     return 0
 
 

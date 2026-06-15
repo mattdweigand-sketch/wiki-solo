@@ -17,6 +17,7 @@ from pathlib import Path
 
 DEFAULT_EXCLUDES = (
     ".git/",
+    ".agents/",
     "tmp/",
     "deliverables/",
     ".claude/worktrees/",
@@ -25,6 +26,24 @@ DEFAULT_EXCLUDE_FILES = {
     ".claude/settings.local.json",
     ".env",
 }
+REQUIRED_FILES = {
+    "AGENTS.md",
+    "CONTEXT.md",
+    "README.md",
+    "REFERENCES.md",
+    "SETUP.md",
+}
+REQUIRED_PREFIXES = (
+    "wiki/",
+    "raw/",
+    "workflows/",
+    "scripts/",
+    "archive/",
+    ".claude/commands/",
+    ".codex/commands/",
+    ".codex/skills/",
+    ".github/workflows/",
+)
 
 
 def parser() -> argparse.ArgumentParser:
@@ -72,6 +91,21 @@ def build_zip(repo_root: Path, output: Path, files: list[Path]) -> None:
             zf.write(path, path.relative_to(repo_root).as_posix())
 
 
+def validate_names(names: list[str]) -> list[str]:
+    errors: list[str] = []
+    name_set = set(names)
+    for required in sorted(REQUIRED_FILES):
+        if required not in name_set:
+            errors.append(f"archive does not contain {required}")
+    for prefix in REQUIRED_PREFIXES:
+        if not any(name.startswith(prefix) for name in names):
+            errors.append(f"archive does not contain {prefix}")
+    for name in names:
+        if should_exclude(name):
+            errors.append(f"archive contains excluded path {name}")
+    return errors
+
+
 def verify_zip(output: Path, expected_count: int) -> tuple[bool, list[str]]:
     errors: list[str] = []
     if not output.exists():
@@ -81,10 +115,7 @@ def verify_zip(output: Path, expected_count: int) -> tuple[bool, list[str]]:
         corrupt = zf.testzip()
     if corrupt:
         errors.append(f"corrupt zip member: {corrupt}")
-    if not any(name.startswith("wiki/") for name in names):
-        errors.append("archive does not contain wiki/")
-    if not any(name.startswith("raw/") for name in names):
-        errors.append("archive does not contain raw/")
+    errors.extend(validate_names(names))
     if len(names) != expected_count:
         errors.append(f"archive file count {len(names)} did not match expected {expected_count}")
     return not errors, errors
@@ -97,12 +128,13 @@ def main() -> int:
     output = zip_path(repo_root, args.output_dir, args.date)
 
     if args.dry_run:
+        names = [path.relative_to(repo_root).as_posix() for path in files]
+        errors = validate_names(names)
         print(f"Export dry run: {len(files)} file(s) would be written to {output}")
-        has_wiki = any(path.relative_to(repo_root).as_posix().startswith("wiki/") for path in files)
-        has_raw = any(path.relative_to(repo_root).as_posix().startswith("raw/") for path in files)
-        print(f"Includes wiki/: {'yes' if has_wiki else 'no'}")
-        print(f"Includes raw/: {'yes' if has_raw else 'no'}")
-        return 0 if has_wiki and has_raw else 1
+        print("Required export coverage: " + ("yes" if not errors else "no"))
+        for error in errors:
+            print(f"- {error}")
+        return 0 if not errors else 1
 
     build_zip(repo_root, output, files)
     ok, errors = verify_zip(output, len(files))

@@ -47,6 +47,11 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Pass through only after the user approves the exact apply route.",
     )
+    p.add_argument(
+        "--approval-ledger",
+        default="",
+        help="Optional capture approval ledger path to pass through to capture_gate.py.",
+    )
     return p
 
 
@@ -84,6 +89,8 @@ def run_apply_gate(args: argparse.Namespace) -> int:
         command.extend(["--trigger", trigger])
     if args.approved:
         command.append("--approved")
+    if args.approval_ledger:
+        command.extend(["--approval-ledger", args.approval_ledger])
 
     result = subprocess.run(command, check=False)
     return result.returncode

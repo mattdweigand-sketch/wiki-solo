@@ -14,7 +14,8 @@ Use this task only when the user asks about the archived harness, wants to inspe
 The live wiki keeps the parts that proved useful in normal work:
 
 - `scripts/capture_gate.py` for approval on analysis capture and artifact promotion apply routes.
+- `scripts/synthesis_gate.py` for approval before synthesis promotion.
 - `scripts/rebuild_referenced_by.py` for generated inbound links.
-- `scripts/lint.py` and `scripts/wiki_eval.py` for deterministic maintenance checks.
+- `scripts/lint.py`, the ledger validators, `scripts/export_wiki.py`, `scripts/sync_codex_skills.py`, and `scripts/wiki_eval.py` for deterministic maintenance checks.
 
 If staged review seems warranted for a specific ingest, raise it as a workflow judgment call instead of running the archived harness by default.
