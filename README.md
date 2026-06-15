@@ -93,40 +93,26 @@ Ask questions in plain language. Research answers can stay in chat or become ana
 
 ## How It Works
 
-The wiki separates source storage, maintained knowledge, workflow instructions, and deterministic checks:
+Think of the wiki as a compounding context loop:
 
-| Part | Purpose |
-|---|---|
-| `raw/` | Immutable source artifacts. New files can be placed here during ingest; existing raw files are not edited. |
-| `wiki/` | The maintained knowledge layer: source summaries, entity pages, decisions, analyses, glossary, overview, sourcing queue, synthesis ledger, and log. |
-| `workflows/` | Vendor-neutral workflow instructions. `CONTEXT.md` routes into ingest, research, or a specific maintenance task. |
-| `scripts/` | Deterministic tooling for lint, backlinks, approval ledgers, export, evals, and wrapper validation. |
+1. **Configure the domain.** A fresh clone starts unconfigured. `SETUP.md` fills in who or what the wiki is about, which entity types matter, and how raw sources should be organized.
+2. **Add sources.** Source artifacts live in `raw/`. They are treated as immutable evidence.
+3. **Ingest sources into pages.** The ingest workflow summarizes each source in `wiki/sources/`, then updates the relevant entity pages in `wiki/`.
+4. **Use the wiki to answer questions.** Research reads the maintained wiki pages first, not every raw source again. Substantial answers can be saved as analyses.
+5. **Capture what should persist.** Decisions, observations, reusable artifacts, and operating rules can be routed into the right durable home instead of staying buried in chat.
+6. **Maintain and synthesize.** Lint finds broken structure, stale claims, contradictions, citation issues, and source gaps. Synthesis turns accumulated pages into higher-level overview updates, open questions, and cluster analyses.
+7. **Back up the corpus.** Export builds a local zip that includes both the wiki and gitignored raw sources.
 
-The main workflows are:
+The key safeguards are:
 
-| Workflow | Use it to |
-|---|---|
-| Setup | Configure a fresh clone for an organization, project, or personal context. |
-| Ingest | Turn raw sources into cited wiki pages. |
-| Research | Answer questions from the wiki and optionally save substantial analyses. |
-| Capture | Record decisions, observations, or lived context. |
-| Promote | Decide whether a useful artifact should become durable wiki memory. |
-| Lint | Find structural issues, stale claims, contradictions, weak citations, and source gaps. |
-| Synthesize | Distill accumulated pages into overview updates, open questions, cluster analyses, and primer updates. |
-| Export | Build a local backup, including gitignored raw sources. |
+- Agents route through `AGENTS.md` and `CONTEXT.md` so they load only the workflow they need.
+- Facts cite `wiki/sources/` pages; inferred claims are marked as inference or hypothesis.
+- Authored links live in `## Related pages`; generated backlinks live in `## Referenced by`.
+- `wiki/log.md`, `wiki/sourcing-queue.md`, and `wiki/synthesis.md` track what changed, what evidence is still missing, and what has been distilled.
+- Approval gates protect analysis capture, artifact promotion, and synthesis promotion.
+- Deterministic scripts rebuild backlinks, lint structure, validate approval ledgers, test the workflow machinery, and export backups.
 
-Several mechanisms keep the wiki coherent as it grows:
-
-- `AGENTS.md` and root `CONTEXT.md` define route-first loading so agents do not read or edit the whole repo by default.
-- `wiki/SCHEMA.md` defines page types, frontmatter, confidence values, source types, and citation rules.
-- `REFERENCES.md` explains the operating model, cross-reference rules, key files, and load layers.
-- `## Related pages` is hand-authored; `## Referenced by` is generated from wikilinks by `rebuild_referenced_by.py`.
-- `wiki/log.md` records meaningful wiki work in chronological order.
-- `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers.
-- `wiki/synthesis.md` tracks current corpus-level synthesis and approved synthesis run history.
-- `capture_gate.py` protects analysis capture and artifact-promotion apply routes; `synthesis_gate.py` protects synthesis promotion.
-- `wiki_eval.py` tests the operating machinery: lint, backlinks, gates, ledgers, export, and wrapper sync.
-- `.claude/` and `.codex/` are thin wrappers; canonical behavior lives in the root docs, workflows, schema, and scripts.
+Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md) and the files under [`workflows/`](workflows/).
 
 ---
 
