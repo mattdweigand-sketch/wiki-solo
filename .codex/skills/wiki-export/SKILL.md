@@ -15,5 +15,6 @@ Run the export workflow for the current wiki repo.
 4. Read `CONTEXT.md`.
 5. Open `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/export.md`.
 6. Follow the export workflow's Load / Skip list exactly.
+7. Build or dry-run the archive with `python3 scripts/export_wiki.py --date YYYY-MM-DD`.
 
 This is a tracked Codex skill wrapper. Canonical behavior lives in the repo workflow files.

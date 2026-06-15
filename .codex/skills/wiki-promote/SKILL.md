@@ -17,6 +17,7 @@ Run the artifact-promotion router for the current wiki repo.
 6. Classify the artifact before editing into exactly one primary route: discard, ingest, analysis-capture, update-existing-page, create-page, capture-decision, capture-experience, workflow-update, or script.
 7. Return an audit unless durable-write intent is already clear.
 8. Before applying artifact promotion or analysis capture, run `python3 scripts/capture_gate.py` with the proposed route and stop if approval is required.
-9. If approved and applied, run `python3 scripts/rebuild_referenced_by.py` and `python3 scripts/lint.py --tier1`.
+9. After an approved capture-gate rerun, run `python3 scripts/validate_capture_runs.py`.
+10. If approved and applied, run `python3 scripts/rebuild_referenced_by.py` and `python3 scripts/lint.py --tier1`.
 
 This is a tracked Codex skill wrapper. Canonical behavior lives in the repo workflow files.

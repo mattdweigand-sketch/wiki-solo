@@ -1,0 +1,1 @@
+{"description":"Append-only operational records written by scripts/synthesis_gate.py after the user approves an exact synthesis draft and file scope. Draft findings remain in wiki pages and wiki/synthesis.md; this file records approved approval boundaries only.","record_type":"schema","schema_version":1}

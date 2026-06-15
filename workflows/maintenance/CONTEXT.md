@@ -9,7 +9,9 @@ Wiki hygiene, artifact promotion, first-person capture, corpus synthesis, and ba
 
 The wiki autonomy harness is archived as a paused experiment under `archive/wiki-harness/`. Do not run or extend it unless the project explicitly reopens the harness; [`wiki-harness.md`](wiki-harness.md) is a pointer stub.
 
-Artifact promotion uses the shared capture preflight. Before applying artifact promotion, run `python3 scripts/capture_gate.py` with the proposed route and stop if it requires approval. Decision capture, experience capture, workflow updates, setup updates, and routine page updates do not require this approval gate unless they are part of a promotion or analysis-capture route. If the user directly says they made a decision or lived through something they want remembered, use `/wiki-capture`; use `/wiki-promote` only when evaluating a separate artifact.
+Artifact promotion uses the shared capture preflight. Before applying artifact promotion, run `python3 scripts/capture_gate.py` with the proposed route and stop if it requires approval. Approved reruns write or confirm `scripts/capture-runs.jsonl` and must be followed by `python3 scripts/validate_capture_runs.py`. Decision capture, experience capture, workflow updates, setup updates, and routine page updates do not require this approval gate unless they are part of a promotion or analysis-capture route. If the user directly says they made a decision or lived through something they want remembered, use `/wiki-capture`; use `/wiki-promote` only when evaluating a separate artifact.
+
+Synthesis promotion uses `python3 scripts/synthesis_gate.py` before updating `wiki/synthesis.md`, flipping draft confidence/status, or logging a synthesis promotion. Approved reruns write or confirm `scripts/synthesis-runs.jsonl` and must be followed by `python3 scripts/validate_synthesis_runs.py`.
 
 ## Load / Skip
 

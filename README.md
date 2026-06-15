@@ -27,10 +27,10 @@ The repo has six common commands, available as slash commands in Claude Code and
 
 - `/wiki-ingest` turns a raw source into durable wiki pages.
 - `/wiki-capture` records first-person context, usually a decision or lived experience.
-- `/wiki-promote` routes useful artifacts from chats, drafts, scripts, prompts, or work outputs into the right durable home, or decides not to save them.
+- `/wiki-promote` routes useful artifacts from chats, drafts, scripts, prompts, or work outputs into the right durable home, or decides not to save them. Approved analysis/promotion routes are recorded in `scripts/capture-runs.jsonl`.
 - `/wiki-lint` runs deterministic Tier-1 checks plus Tier-2 judgment candidates.
-- `/wiki-synthesize` drafts corpus distillations at draft/low confidence for review.
-- `/wiki-export` builds a zip backup of the corpus, including raw sources.
+- `/wiki-synthesize` drafts corpus distillations at draft/low confidence for review, then uses `scripts/synthesis_gate.py` before approved promotions are recorded in `scripts/synthesis-runs.jsonl`.
+- `/wiki-export` builds a zip backup of the corpus with `scripts/export_wiki.py`, including raw sources.
 
 Ask questions in plain language. Research answers can stay in chat or become analyses when they should be durable.
 

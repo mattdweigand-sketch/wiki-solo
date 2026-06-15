@@ -16,6 +16,8 @@ Run the synthesis workflow for the current wiki repo.
 5. Open `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/synthesize.md`.
 6. Follow the synthesize workflow's Load / Skip list exactly.
 7. Draft or apply synthesis output only as the workflow and the user's instructions allow.
-8. Run `python3 scripts/rebuild_referenced_by.py` and `python3 scripts/lint.py --tier1` after durable edits.
+8. Before promoting synthesis output, follow the workflow's `python3 scripts/synthesis_gate.py` approval step.
+9. After an approved synthesis-gate rerun, run `python3 scripts/validate_synthesis_runs.py`.
+10. Run `python3 scripts/rebuild_referenced_by.py` and `python3 scripts/lint.py --tier1` after durable edits.
 
 This is a tracked Codex skill wrapper. Canonical behavior lives in the repo workflow files.

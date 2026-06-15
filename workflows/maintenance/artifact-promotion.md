@@ -20,7 +20,7 @@ Agents may use `python3 scripts/wiki_promote.py "<artifact>"` as an agent-neutra
 
 At the end of wiki-related work, if a useful reusable insight appears, run an audit automatically and show the recommended route. Apply the promotion only if the user has explicitly asked to promote, apply, save, file, update the wiki, ingest, commit, or otherwise make a durable repo change. Otherwise stop at the audit and ask for confirmation.
 
-Before applying any promotion or filing any analysis capture, run `python3 scripts/capture_gate.py` with the proposed artifact, phase, primary home, touched pages, and analysis criteria or promotion triggers. Ordinary ingest, decision capture, experience capture, workflow updates, setup updates, and routine page updates do not require this approval gate unless they are part of an artifact-promotion or analysis-capture route. If it prints `APPROVAL REQUIRED`, show the full block and do not edit files until the user approves the displayed durable action, primary destination, and allowed file scope. Re-run with `--approved` only after that approval.
+Before applying any promotion or filing any analysis capture, run `python3 scripts/capture_gate.py` with the proposed artifact, phase, primary home, touched pages, and analysis criteria or promotion triggers. Ordinary ingest, decision capture, experience capture, workflow updates, setup updates, and routine page updates do not require this approval gate unless they are part of an artifact-promotion or analysis-capture route. If it prints `APPROVAL REQUIRED`, show the full block and do not edit files until the user approves the displayed durable action, primary destination, and allowed file scope. Re-run with `--approved` only after that approval, then run `python3 scripts/validate_capture_runs.py`.
 
 The executable preflight contract is:
 
@@ -37,7 +37,7 @@ python3 scripts/capture_gate.py \
   [--trigger reusable_distinction|ranking_or_framework|open_question_resolution|future_agent_behavior|existing_page_update]
 ```
 
-The script prints the derived mode: `chat-only`, `ingest`, `analysis-capture`, `promotion-audit`, `capture-decision`, `capture-experience`, or `workflow-update`. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope.
+The script prints the derived mode: `chat-only`, `ingest`, `analysis-capture`, `promotion-audit`, `capture-decision`, `capture-experience`, or `workflow-update`. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope. Approved reruns append or confirm an idempotent structured record in `scripts/capture-runs.jsonl`; validate it with `python3 scripts/validate_capture_runs.py`.
 
 Collaborative drafting is chat-only by default. Requests like "work with me," "let's discuss," "let's define," "refine this," "make this sharper," or "help me think through" are not promotion intent, even when the topic already has a wiki page, the repo is the current working directory, or the result might be reusable. If the draft becomes clearly durable, ask whether to save it; do not edit files first.
 
@@ -147,7 +147,7 @@ Stop after the audit unless the user has already asked to apply the promotion.
 2. Search `wiki/index.md` and relevant folders for existing pages.
 3. Choose one primary home from the promotion ladder.
 4. If the user asked for audit only, return the audit output and stop.
-5. Run `python3 scripts/capture_gate.py` for the proposed apply route. If it requires approval, show the exact output and stop. Continue only after approval and re-run with `--approved`.
+5. Run `python3 scripts/capture_gate.py` for the proposed apply route. If it requires approval, show the exact output and stop. Continue only after approval, re-run with `--approved`, and run `python3 scripts/validate_capture_runs.py`.
 6. Update the existing page or create the new page, workflow file, or script.
 7. Add or update meaningful `[[wikilinks]]`.
 8. Update `wiki/index.md` for new or materially changed wiki pages.

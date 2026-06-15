@@ -11,6 +11,14 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-15 — maintenance | structured command guardrails
+
+Change: Ported structured approval ledgers, capture/synthesis ledger validators, the synthesis approval gate, export zip builder, and updated command workflow docs and wrappers.
+Reason: The template should keep deterministic approval and export boundaries in scripts while preserving generic, repo-local workflow judgment.
+Validation: PASS — capture/synthesis ledger validators, gate evals, export dry-run, full wiki eval, lint, temp `CODEX_HOME` Codex skill sync check, `py_compile`, and `git diff --check`.
+
+---
+
 ## 2026-06-13 — maintenance | tracked Codex skill wrappers
 
 Change: Added tracked `.codex/skills/wiki-*` Codex skill wrappers, documented the Claude/Codex wrapper split, and added `scripts/sync_codex_skills.py` for installing the tracked Codex wrappers into a user's local Codex skill directory.

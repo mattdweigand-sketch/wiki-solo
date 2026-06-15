@@ -8,7 +8,9 @@ Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw 
 
 Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; the former route preflight is archived with the autonomy harness.
 
-Analysis capture and artifact promotion share one executable approval gate: `python3 scripts/capture_gate.py`. Its job is approval rather than routing: it derives a mode and primary home from its inputs, then blocks durable analysis/promotion edits until the user approves them. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the full output and wait for approval before editing files.
+Analysis capture and artifact promotion share one executable approval gate: `python3 scripts/capture_gate.py`. Its job is approval rather than routing: it derives a mode and primary home from its inputs, then blocks durable analysis/promotion edits until the user approves them. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the full output and wait for approval before editing files. Approved reruns write or confirm `scripts/capture-runs.jsonl`.
+
+Synthesis promotion has a separate executable approval gate: `python3 scripts/synthesis_gate.py`. Run it before updating `wiki/synthesis.md`, flipping synthesis draft status/confidence, or logging a synthesis promotion. Approved reruns write or confirm `scripts/synthesis-runs.jsonl`.
 
 ---
 

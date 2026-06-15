@@ -2,8 +2,7 @@
 """Deterministic approval gate for analysis capture and promotion.
 
 The script does not edit files. It classifies a proposed durable write and
-prints the exact approval block an agent should show before applying analysis
-or promotion changes.
+prints a human approval request before applying analysis or promotion changes.
 
 Exit codes:
   0: approved route is allowed to proceed
@@ -14,7 +13,14 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import hashlib
+import json
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+
+DEFAULT_APPROVAL_LEDGER = "scripts/capture-runs.jsonl"
 
 
 PROMOTION_TRIGGERS = (
@@ -89,6 +95,11 @@ def parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Set only after the user explicitly approves this exact route.",
     )
+    p.add_argument(
+        "--approval-ledger",
+        default=DEFAULT_APPROVAL_LEDGER,
+        help="JSONL file for approved analysis-capture and promotion records.",
+    )
     return p
 
 
@@ -159,8 +170,80 @@ def touched_files(args: argparse.Namespace, home: str) -> str:
     return args.pages_touched or home
 
 
-def approval_reply(route: str, home: str, files: str) -> str:
-    return f"APPROVE {route} | {home} | {files}"
+def split_scope(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def stable_run_id(args: argparse.Namespace, route: str, home: str, files: str) -> str:
+    payload = {
+        "artifact": args.artifact.strip(),
+        "route": route,
+        "phase": args.phase,
+        "primary_home": home.strip(),
+        "pages_touched": split_scope(files),
+        "source_path": args.source_path.strip(),
+        "synthesized_pages": args.synthesized_pages,
+        "word_count": args.word_count,
+        "domain_context": args.domain_context,
+        "triggers": sorted(args.trigger),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()[:16]
+
+
+def existing_approved_run_ids(path: Path) -> set[str]:
+    if not path.exists():
+        return set()
+
+    run_ids: set[str] = set()
+    for line in path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if record.get("record_type") == "capture_approval" and record.get("approval_status") == "approved":
+            run_id = record.get("run_id")
+            if isinstance(run_id, str):
+                run_ids.add(run_id)
+    return run_ids
+
+
+def approval_record(args: argparse.Namespace, route: str, home: str, files: str) -> dict[str, object]:
+    approved_at = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    pages_touched = split_scope(files)
+    return {
+        "record_type": "capture_approval",
+        "schema_version": 1,
+        "run_id": stable_run_id(args, route, home, files),
+        "approval_status": "approved",
+        "approved_at": approved_at,
+        "artifact": args.artifact.strip(),
+        "route": route,
+        "phase": args.phase,
+        "primary_home": home.strip(),
+        "pages_touched": pages_touched,
+        "source_path": args.source_path.strip(),
+        "synthesized_pages": args.synthesized_pages,
+        "word_count": args.word_count,
+        "domain_context": args.domain_context,
+        "triggers": sorted(args.trigger),
+    }
+
+
+def write_approval_record(args: argparse.Namespace, route: str, home: str, files: str) -> tuple[bool, Path, str]:
+    ledger_path = Path(args.approval_ledger)
+    record = approval_record(args, route, home, files)
+    run_id = str(record["run_id"])
+    approved_ids = existing_approved_run_ids(ledger_path)
+    if run_id in approved_ids:
+        return False, ledger_path, run_id
+
+    ledger_path.parent.mkdir(parents=True, exist_ok=True)
+    with ledger_path.open("a", encoding="utf-8") as f:
+        f.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
+    return True, ledger_path, run_id
 
 
 def print_summary(args: argparse.Namespace, route: str, home: str, reason: str) -> str:
@@ -193,19 +276,18 @@ def print_approval_request(args: argparse.Namespace, route: str, home: str, file
     print("- The primary destination is the right durable home.")
     print("- The file list is the full intended edit scope.")
     print()
-    print("To approve, reply exactly:")
-    print(approval_reply(route, home, files))
+    print('Reply with plain-language approval, such as "approve" or "yes", or say what should change.')
     print()
-    print('To deny or redirect, say what should change or reply "do not save."')
-    print("Re-run with --approved only after approval.")
+    print("Agents: re-run with --approved only after the user clearly approves the displayed action, destination, and file scope.")
 
 
-def print_approval_confirmed(route: str, home: str, files: str) -> None:
+def print_approval_confirmed(args: argparse.Namespace, route: str, home: str, files: str) -> None:
     print()
     print("APPROVAL CONFIRMED")
     print(f"Approved action: {ACTION_LABELS[route]}")
     print(f"Approved primary destination: {home}")
     print(f"Approved file scope: {files}")
+    print(f"Approval record: {args.approval_ledger}")
     print("Proceed only within this approved scope.")
 
 
@@ -233,7 +315,12 @@ def main() -> int:
 
     if args.approved:
         print("Approval: confirmed for this exact route.")
-        print_approval_confirmed(route, home, files)
+        wrote, ledger_path, run_id = write_approval_record(args, route, home, files)
+        if wrote:
+            print(f"Structured approval record: appended run_id {run_id} to {ledger_path}")
+        else:
+            print(f"Structured approval record: already present for run_id {run_id} in {ledger_path}")
+        print_approval_confirmed(args, route, home, files)
         return 0
 
     print_approval_request(args, route, home, files)

@@ -16,23 +16,19 @@ description: Use this workflow when the user says "export the wiki" or wants a l
 
 ## Steps
 
-1. From the repo root, build the zip into `tmp/` (gitignored), stamped with today's date:
+1. From the repo root, build and verify the zip into `tmp/` (gitignored), stamped with today's date:
 
    ```bash
-   mkdir -p tmp
-   zip -r tmp/wiki-export-YYYY-MM-DD.zip . \
-     -x ".git/*" -x "tmp/*" -x "deliverables/*" \
-     -x ".claude/worktrees/*" -x ".claude/settings.local.json" \
-     -x "*.DS_Store" -x ".env" -x "*.zip"
+   python3 scripts/export_wiki.py --date YYYY-MM-DD
    ```
 
-2. Verify the archive:
-   - `unzip -l tmp/wiki-export-YYYY-MM-DD.zip` and confirm it contains files under both `wiki/` and `raw/`.
-   - Spot-check the file count against:
+   This includes everything except git internals, `tmp/`, `deliverables/`, Claude worktrees, local Claude settings, Finder metadata, `.env`, and zip files. It includes `wiki/`, `raw/`, `workflows/`, `scripts/` with fixtures and operational ledgers, `archive/`, both command folders, and the top-level docs.
 
-     ```bash
-     find . -type f -not -path "./.git/*" -not -path "./tmp/*" -not -path "./deliverables/*" | wc -l
-     ```
+2. If you need to inspect before building, run:
+
+   ```bash
+   python3 scripts/export_wiki.py --dry-run --date YYYY-MM-DD
+   ```
 
 3. Report the absolute path to the zip. Do not upload it anywhere unless the user explicitly gives a destination.
 4. No `wiki/log.md` entry. The export changes no wiki content; the zip in `tmp/` is a disposable artifact until the user moves it.

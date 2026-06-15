@@ -18,7 +18,7 @@ Start by reading `wiki/domain.md` only far enough to check `status:`. If `status
 - `.claude/commands/` - tracked Claude Code slash-command wrappers for `wiki-ingest`, `wiki-capture`, `wiki-lint`, `wiki-promote`, `wiki-synthesize`, and `wiki-export`. Keep these wrappers thin; canonical behavior lives in `workflows/` and is routed through `CONTEXT.md`.
 - `.codex/commands/` - tracked Codex command mirrors for the same six workflows. Current Codex shortcut discovery uses skills rather than this repo-local command folder, but these mirrors document the command shape.
 - `.codex/skills/` - tracked Codex skill wrappers for the six active wiki shortcuts. Sync them into the local Codex install directory with `python3 scripts/sync_codex_skills.py`. Treat `~/.codex/skills/` or `$CODEX_HOME/skills/` as installed runtime output, not the source of truth.
-- `scripts/` - vendor-neutral deterministic tooling, self-contained. `capture_gate.py` is the deterministic approval preflight for analysis capture and artifact promotion; `rebuild_referenced_by.py` regenerates `## Referenced by` inbound-link sections; `lint.py --tier1` is the deterministic validation gate; `wiki_eval.py` runs the live guard suites; `sync_codex_skills.py` copies tracked `.codex/skills/wiki-*` wrappers into the local Codex install directory.
+- `scripts/` - vendor-neutral deterministic tooling, self-contained. `capture_gate.py` is the deterministic approval preflight for analysis capture and artifact promotion; `capture-runs.jsonl` is the structured approval ledger written only by approved capture-gate reruns; `validate_capture_runs.py` checks that ledger's schema, hashes, and approval scope; `synthesis_gate.py` is the deterministic approval preflight before synthesis drafts are promoted, ledgered in `wiki/synthesis.md`, or have draft status/confidence flipped; `synthesis-runs.jsonl` is the structured approval ledger written only by approved synthesis-gate reruns; `validate_synthesis_runs.py` checks that ledger's schema, hashes, and approval scope; `export_wiki.py` builds and verifies complete corpus export zips; `rebuild_referenced_by.py` regenerates `## Referenced by` inbound-link sections; `lint.py --tier1` is the deterministic validation gate; `wiki_eval.py` runs the live guard suites, including both ledger validations; `sync_codex_skills.py` copies tracked `.codex/skills/wiki-*` wrappers into the local Codex install directory.
 - `scripts/fixtures/` - eval mini-wikis for live tooling: `wiki-rebuild` guards link-graph invariants and `wiki-lint` proves lint checks can fire.
 - `scripts/lint-adjudications.json` - settled Tier-2 lint judgments with reasons and dates, so lint stops re-surfacing what has been adjudicated.
 - `archive/wiki-harness/` - archived autonomy harness: route policy, no-write pipeline, schemas, provider manifest, fixtures, and original workflow. Do not run or extend it unless the project deliberately reopens the harness.
@@ -44,9 +44,19 @@ Routine command surface only: `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/w
 
 Run `python3 scripts/capture_gate.py` before exactly two routes: filing a research answer as `wiki/analyses/`, and applying an artifact promotion. Every other route skips the gate, including ordinary source ingest, routine page updates, decision capture, experience capture, workflow updates, and setup updates, unless the work is part of an analysis-capture or artifact-promotion route.
 
-If the script prints `APPROVAL REQUIRED`, show the full block and stop until the user approves the displayed durable action, primary destination, and allowed file scope. Re-run with `--approved` only after that approval.
+If the script prints `APPROVAL REQUIRED`, show the full block and stop until the user approves the displayed durable action, primary destination, and allowed file scope. Plain-language approval such as "approve" or "yes" is enough when it clearly approves the displayed action, destination, and file scope. Re-run with `--approved` only after that approval.
 
 The script owns the checkable approval boundary. The prose workflows own judgment about what to write, how to cite it, where to link it, and how to log it.
+
+The approved rerun writes or confirms the idempotent structured approval record in `scripts/capture-runs.jsonl`. The non-approved gate call is display-only: it must not update `wiki/analyses/`, promoted pages, `scripts/capture-runs.jsonl`, or `wiki/log.md`.
+
+## Synthesis Approval Gate
+
+Run `python3 scripts/synthesis_gate.py` before promoting synthesis output: updating `wiki/synthesis.md`, flipping draft confidence/status because the user reviewed a synthesis draft, or logging a synthesis promotion. The gate must display the draft being approved, primary destination, and full editable file scope. If it prints `APPROVAL REQUIRED`, show the approval request and stop. Re-run with `--approved` only after the user clearly approves the displayed synthesis draft and file scope.
+
+The approved rerun writes or confirms the idempotent structured approval record in `scripts/synthesis-runs.jsonl`. The non-approved gate call is display-only: it must not update `wiki/synthesis.md`, `scripts/synthesis-runs.jsonl`, draft confidence/status, or `wiki/log.md`.
+
+The synthesis gate is separate from `capture_gate.py` because synthesis drafts are routine maintenance until they become approved durable conclusions.
 
 ## Archived Autonomy Harness
 
