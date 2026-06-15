@@ -93,27 +93,33 @@ Ask questions in plain language. Research answers can stay in chat or become ana
 
 ## How It Works
 
-The wiki is built to preserve provenance first, then let agents build on it safely.
+The wiki is designed around a simple contract: every durable claim should be traceable, structured, checkable, and recoverable.
 
-**Provenance**
+**Evidence Chain**
 
-Raw artifacts live in `raw/` and are treated as immutable evidence. Ingest creates a source page in `wiki/sources/` for each artifact, then entity pages cite those source pages instead of citing loose files or external URLs directly.
+Raw artifacts live in `raw/` and are treated as immutable evidence. Ingest turns each artifact into a source page in `wiki/sources/`; other wiki pages cite those source pages, not loose files or external URLs.
 
-Specific factual claims use `(source: [[source-page]])`. Interpretive claims are marked as `Inference:` or `Hypothesis:`. Pages also carry `confidence:` metadata, so downstream agents can tell the difference between well-supported, thinly supported, and contested knowledge.
+Factual claims use `(source: [[source-page]])`. Interpretive claims are marked as `Inference:` or `Hypothesis:`. If sources disagree, the conflict is recorded instead of overwritten.
 
-The wiki keeps operating records alongside the pages: `wiki/log.md` records meaningful changes, `wiki/sourcing-queue.md` tracks missing evidence, `wiki/contradictions.md` records unresolved conflicts, and `wiki/synthesis.md` tracks approved higher-level distillation.
+**Page Contract**
 
-**Deterministic Controls**
+`wiki/SCHEMA.md` defines page types, required frontmatter, source types, confidence values, and citation rules. Pages carry `confidence:` metadata so agents can distinguish well-supported, thinly supported, and contested knowledge.
 
-Agents do not decide where to start from scratch. `AGENTS.md` and `CONTEXT.md` route each task to a workflow with an explicit Load / Skip list, which keeps context focused and reduces accidental broad edits.
+The wiki also keeps operating records: `wiki/log.md` for changes, `wiki/sourcing-queue.md` for missing evidence, `wiki/contradictions.md` for unresolved conflicts, and `wiki/synthesis.md` for approved higher-level distillation.
 
-`wiki/SCHEMA.md` defines valid page types, required frontmatter, confidence values, source types, and citation rules. `scripts/lint.py --tier1` checks the mechanical parts of that contract: structure, links, index coverage, raw-source references, folder hygiene, and other deterministic failures.
+**Maintenance Checks**
 
-Authored relationships and generated backlinks are separated. Humans or agents write `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`, so inbound links stay consistent without hand-maintained backlink drift.
+Agents route through `AGENTS.md` and `CONTEXT.md` into workflows with explicit Load / Skip lists. That keeps context focused and reduces accidental broad edits.
 
-Durable judgment has approval boundaries. `capture_gate.py` protects analysis capture and artifact promotion. `synthesis_gate.py` protects promoted synthesis. Approved runs are written to structured JSONL ledgers and validated by ledger-check scripts.
+`scripts/lint.py --tier1` checks deterministic failures such as broken links, invalid frontmatter, index coverage, raw-source references, and folder hygiene. Full lint also surfaces judgment work: stale claims, contradictions, thin sourcing, and citation-support checks.
 
-`scripts/wiki_eval.py` tests the machinery itself: lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync. Export builds a local backup that includes gitignored raw sources, so the evidence layer can be preserved with the wiki.
+Authored relationships and generated backlinks are separate. Agents write `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`, preventing hand-maintained backlink drift.
+
+**Approval and Recovery**
+
+Durable judgment has approval boundaries. `capture_gate.py` protects analysis capture and artifact promotion; `synthesis_gate.py` protects promoted synthesis. Approved runs are written to structured JSONL ledgers and validated by ledger-check scripts.
+
+`scripts/wiki_eval.py` tests the machinery itself: lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync. `scripts/export_wiki.py` builds a local backup that includes gitignored raw sources, so the evidence layer can be recovered with the wiki.
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
