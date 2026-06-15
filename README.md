@@ -80,36 +80,37 @@ CODEX_HOME=/path/to/codex-home python3 scripts/sync_codex_skills.py --check
 
 ```text
 <wiki-root>/
-|-- AGENTS.md                   # Canonical operating map for agents
-|-- CLAUDE.md                   # Thin Claude Code wrapper that imports AGENTS.md
-|-- CONTEXT.md                  # Task router
-|-- REFERENCES.md               # Stable conventions and layer model
-|-- SETUP.md                    # First-session configuration workflow
-|-- .github/workflows/          # CI for deterministic wiki checks
-|-- archive/wiki-harness/       # Archived no-write autonomy harness
-|-- scripts/                    # Deterministic gates, lint, link helpers, eval fixtures
-|-- workflows/                  # Vendor-neutral workflows, grouped into 3 workspaces
-|   |-- ingest/CONTEXT.md       #   raw source -> wiki pages
-|   |-- research/CONTEXT.md     #   question -> answer, filed as analysis when substantial
-|   `-- maintenance/            #   hygiene, promotion, capture, synthesize, export
-|-- .claude/commands/           # Claude Code wrappers over workflows/
-|-- .codex/commands/            # Codex command mirrors over the same workflows
-|-- .codex/skills/              # Tracked repo-local Codex skill wrappers
-|-- raw/                        # Source artifacts; existing files are immutable
-`-- wiki/                       # Knowledge layer
-    |-- domain.md               # Organization configuration
-    |-- SCHEMA.md               # Entity types, frontmatter spec, templates
-    |-- index.md                # Master catalog
-    |-- overview.md             # Big-picture synthesis
-    |-- glossary.md             # Canonical terminology
-    |-- primer.md               # Agent entry points by question type
-    |-- log.md                  # Chronological activity log
-    |-- sourcing-queue.md       # Knowledge gaps and how to fill them
-    |-- contradictions.md       # Open and resolved contradictions
-    |-- synthesis.md            # Synthesis ledger and run history
-    |-- sources/    products/   features/    personas/
-    |-- customers/  competitors/ concepts/   initiatives/
-    `-- decisions/  metrics/    people/      analyses/    style/
+|-- AGENTS.md                  # Canonical operating map for agents
+|-- CONTEXT.md                 # Task router
+|-- SETUP.md                   # First-session configuration workflow
+|-- REFERENCES.md              # Stable conventions and layer model
+|-- CLAUDE.md                  # Thin Claude Code wrapper
+|
+|-- .claude/commands/          # Claude Code slash-command wrappers
+|-- .codex/commands/           # Codex command mirrors
+|-- .codex/skills/             # Repo-local Codex skill wrappers
+|
+|-- workflows/                 # Vendor-neutral workflow instructions
+|   |-- ingest/                # raw source -> wiki pages
+|   |-- research/              # question -> answer
+|   `-- maintenance/           # lint, promote, capture, synthesize, export
+|-- scripts/                   # Deterministic gates, lint, evals, export, link helpers
+|-- .github/workflows/         # CI for deterministic wiki checks
+|-- archive/wiki-harness/      # Archived no-write autonomy harness
+|
+|-- raw/                       # Immutable source artifacts
+`-- wiki/                      # Maintained knowledge layer
+    |-- domain.md              # Context-owner configuration
+    |-- SCHEMA.md              # Entity types and page templates
+    |-- index.md               # Master catalog
+    |-- overview.md            # Big-picture synthesis
+    |-- primer.md              # Agent entry points by question type
+    |-- glossary.md            # Canonical terminology
+    |-- log.md                 # Chronological activity log
+    |-- sourcing-queue.md      # Knowledge gaps
+    |-- contradictions.md      # Open and resolved contradictions
+    |-- synthesis.md           # Synthesis ledger and run history
+    `-- <entity folders>/      # sources, products, people, decisions, analyses, etc.
 ```
 
 ---
