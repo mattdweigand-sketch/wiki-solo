@@ -8,7 +8,7 @@ Source documents go into `raw/`. The AI reads them once and incrementally builds
 
 ## Why this exists
 
-Most AI stacks re-retrieve raw context on every query. The context never compounds.
+Most AI stacks re-retrieve context on every query (RAG). Context never compounds.
 
 This wiki inverts that. The AI reads a source once, integrates it into a persistent structure, and throws the retrieval cost away. Future queries hit maintained pages with citations, cross-references, contradictions, and synthesis already in place.
 
