@@ -123,7 +123,6 @@ The result is a memory system that compounds: new work starts from preserved evi
 | Approval gates and ledgers | Approval gates make the agent ask before saving important conclusions; ledgers record what was approved afterward. |
 | Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test backlinks, lint fixtures, approval gates, ledgers, exports, and command-wrapper assumptions so the guardrails themselves do not drift. |
 | Thin command wrappers | Claude, Codex, and other shortcuts point back to the same vendor-neutral workflows, so the wiki does not depend on one agent surface. |
-| Export tooling | `scripts/export_wiki.py` builds a portable backup that includes gitignored raw sources. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
