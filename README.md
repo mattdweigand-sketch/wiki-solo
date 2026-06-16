@@ -115,7 +115,7 @@ The result is a memory system that compounds: new work starts from preserved evi
 | Route-first workflows | Point agents from `AGENTS.md` to `CONTEXT.md` to the right workflow, so they read the instructions that match the task. |
 | Related pages and backlinks | Agents write meaningful outgoing links; `scripts/rebuild_referenced_by.py` maintains the incoming links. |
 | Sourcing queue | `wiki/sourcing-queue.md` keeps track of evidence gaps so weak claims become future work instead of disappearing. |
-| Three-tier lint | Tier 1 catches deterministic failures; Tier 2 surfaces ranked review candidates; Tier 3 is human/agent judgment for contradictions, stale claims, terminology drift, and confidence changes. |
+| Three-tier lint | Tier 1 catches broken structure and does not need review; Tier 2 surfaces suspicious patterns for review; Tier 3 handles meaning and judgment. |
 | Evidence review | Full `/wiki-lint` includes sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Live evals | `scripts/wiki_eval.py` tests backlinks, lint fixtures, approval gates, ledgers, exports, and wrapper sync so the guardrails themselves do not drift. |
