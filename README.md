@@ -94,53 +94,55 @@ Research answers can stay in chat or become durable analyses when they are worth
 
 ## How It Works
 
-The operating contract is simple: durable claims should be traceable, structured, checkable, and recoverable.
+The wiki has four jobs:
 
-**Evidence Chain**
+- preserve evidence
+- organize knowledge
+- check for mistakes
+- protect durable judgments
 
-Raw evidence is source material that should not be edited after it is added. It lives in `raw/`.
+**1. Preserve Evidence**
 
-A source page is a wiki summary of one raw artifact. Source pages live in `wiki/sources/`. Other wiki pages cite source pages instead of citing loose files or uncaptured URLs.
+| Plain idea | What it means | Where it lives |
+|---|---|---|
+| Raw evidence | Original source material. Add it once, then treat it as read-only. | `raw/` |
+| Source page | A wiki summary of one raw artifact. Other pages cite source pages instead of loose files or uncaptured URLs. | `wiki/sources/` |
+| Citation | A link that shows where a claim came from. | `(source: [[source-page]])` |
+| Interpretation | Reasoning drawn from evidence, not a direct fact. | `Inference:` or `Hypothesis:` |
+| Contradiction | A place to record source conflicts instead of silently overwriting one claim with another. | `wiki/contradictions.md` |
 
-A citation is the link that shows where a claim came from. Factual claims use `(source: [[source-page]])`.
+**2. Organize Knowledge**
 
-An interpretation is a conclusion drawn from the evidence. Interpretive claims are labeled `Inference:` or `Hypothesis:` so future readers can tell the difference between sourced facts and reasoning.
+| Plain idea | What it means | Where it lives |
+|---|---|---|
+| Page contract | The rule set for what each wiki page must contain. | `wiki/SCHEMA.md` |
+| Confidence | A support label that tells agents whether a page is well-supported, thinly supported, or contested. | `confidence:` metadata |
+| Change log | The audit trail for important wiki edits. | `wiki/log.md` |
+| Evidence queue | A list of claims or questions that still need better sourcing. | `wiki/sourcing-queue.md` |
+| Synthesis ledger | The record of approved higher-level conclusions. | `wiki/synthesis.md` |
 
-A contradiction is a source conflict. Contradictions are recorded instead of silently overwritten.
+**3. Keep It Checkable**
 
-**Page Contract**
+| Plain idea | What it means | Where it lives |
+|---|---|---|
+| Agent operating map | The repo rules every agent starts from. | `AGENTS.md` |
+| Task router | The file that points each task to the right workflow. | `CONTEXT.md` |
+| Workflow instructions | Step-by-step task instructions with Load / Skip lists so agents read only what they need. | `workflows/` |
+| Quick checker | A deterministic check for broken links, invalid page metadata, missing index entries, raw-source reference problems, and folder hygiene issues. | `scripts/lint.py --tier1` |
+| Full lint workflow | The broader review for stale claims, contradictions, thin sourcing, and citation-support problems. | `/wiki-lint` |
+| Related pages | Handpicked outgoing links written by agents. | `## Related pages` |
+| Backlinks | Generated incoming links rebuilt from the wiki link graph. | `scripts/rebuild_referenced_by.py` writes `## Referenced by` |
 
-A page contract is the rule set for what each wiki page must contain. The schema file, `wiki/SCHEMA.md`, defines page types, required frontmatter, source types, confidence values, and citation rules.
+**4. Protect and Recover**
 
-Confidence is a support label. Pages use `confidence:` metadata so agents can distinguish well-supported, thinly supported, and contested knowledge.
-
-Operating records are the wiki's audit trail. The change log, `wiki/log.md`, records important edits. The evidence queue, `wiki/sourcing-queue.md`, tracks missing support. The conflict register, `wiki/contradictions.md`, tracks unresolved disagreements. The synthesis ledger, `wiki/synthesis.md`, records approved higher-level conclusions.
-
-**Maintenance Checks**
-
-The agent operating map, `AGENTS.md`, explains the repo rules. The task router, `CONTEXT.md`, points each task to the right workflow. Workflows have Load / Skip lists so agents read only the context they need.
-
-The quick deterministic checker, `scripts/lint.py --tier1`, catches mechanical problems: broken links, invalid frontmatter, missing index entries, raw-source reference problems, and folder hygiene issues.
-
-The full lint workflow also surfaces judgment work: stale claims, contradictions, thin sourcing, and citation-support checks.
-
-Related pages are handpicked outgoing links. Agents write them in `## Related pages`.
-
-Backlinks are generated incoming links. The backlink builder, `scripts/rebuild_referenced_by.py`, regenerates `## Referenced by`.
-
-**Approval and Recovery**
-
-An approval boundary is a point where an agent must stop and ask before saving a durable judgment.
-
-The analysis and promotion approval checker, `scripts/capture_gate.py`, protects two actions: saving a research answer as a durable analysis, and promoting a useful artifact into the wiki.
-
-The synthesis approval checker, `scripts/synthesis_gate.py`, protects promoted synthesis: higher-level conclusions that become part of the wiki's durable memory.
-
-A ledger is a structured audit log. Approved runs are written to JSONL ledgers and checked by ledger-validation scripts.
-
-The repo self-test, `scripts/wiki_eval.py`, tests the machinery: lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync.
-
-The backup builder, `scripts/export_wiki.py`, creates a local zip backup that includes gitignored raw sources.
+| Plain idea | What it means | Where it lives |
+|---|---|---|
+| Approval boundary | A point where an agent must stop and ask before saving a durable judgment. | approval gates |
+| Analysis and promotion approval checker | Protects two actions: saving a research answer as a durable analysis, and promoting a useful artifact into the wiki. | `scripts/capture_gate.py` |
+| Synthesis approval checker | Protects promoted synthesis: higher-level conclusions that become part of durable wiki memory. | `scripts/synthesis_gate.py` |
+| Ledger | A structured audit log of approved runs. | JSONL ledgers checked by validation scripts |
+| Repo self-test | Tests the machinery: lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync. | `scripts/wiki_eval.py` |
+| Backup builder | Creates a local zip backup that includes gitignored raw sources. | `scripts/export_wiki.py` |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
