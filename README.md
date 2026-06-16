@@ -115,11 +115,11 @@ The result is a memory system that compounds: new work starts from preserved evi
 | Citations and confidence labels | Separate supported facts from inference, hypothesis, thin evidence, or contested claims. |
 | Sourcing queue | `wiki/sourcing-queue.md` keeps track of evidence gaps so weak claims become future work instead of disappearing. |
 | Contradiction tracking | Records conflicts in `wiki/contradictions.md` instead of overwriting inconvenient claims. |
-| Related pages and backlinks | Agents write meaningful outgoing links; `scripts/rebuild_referenced_by.py` maintains the incoming links. |
+| Related pages and backlinks | Agents choose which pages should link out to related context; `scripts/rebuild_referenced_by.py` automatically updates each linked page's `## Referenced by` list. |
 | Three-tier lint | Tier 1 catches broken structure and does not need review; Tier 2 surfaces suspicious patterns for review; Tier 3 handles meaning and judgment. |
 | Evidence review | Full `/wiki-lint` includes sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
-| Approval gates and ledgers | `capture_gate.py`, `synthesis_gate.py`, and JSONL ledgers protect durable judgments, promoted artifacts, and approved synthesis. |
+| Approval gates and ledgers | Approval gates make the agent ask before saving important conclusions; ledgers record what was approved afterward. |
 | Live evals | `scripts/wiki_eval.py` tests backlinks, lint fixtures, approval gates, ledgers, exports, and wrapper sync so the guardrails themselves do not drift. |
 | Wrapper sync | `scripts/sync_codex_skills.py` keeps repo-local Codex shortcuts from conflicting with duplicate global installs. |
 | Export tooling | `scripts/export_wiki.py` builds a portable backup that includes gitignored raw sources. |
