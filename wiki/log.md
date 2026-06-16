@@ -11,6 +11,14 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-16 — maintenance | promotion apply phase clarity
+
+Change: `workflows/maintenance/artifact-promotion.md` now states that an apply route uses `--phase accepted` (in the mode-description paragraph and in step 5), matching what `scripts/wiki_promote.py --apply` already passes. The direct `capture_gate.py` path no longer leaves the approval-triggering phase unspecified.
+Reason: Ported from the personal wiki audit. `--phase drafting` derives `chat-only` and exits 0, so an agent that picked the wrong phase for an apply could skip the promotion approval gate. No other audit finding transferred: the operational eval suite already covers wrapper sync, the Codex synthesize skill already names the synthesis gate, the log is correctly newest-on-top, and the content-level fixes have no template content to touch.
+Validation: PASS — Tier-1 lint, full `wiki_eval.py`, and `git diff --check`.
+
+---
+
 ## 2026-06-15 — maintenance | audit cleanup and operational coverage
 
 Change: Cleaned up root-accountability audit findings: research chat-only answers no longer require log writes, promotion apply intent excludes ordinary ingest/commit requests, capture workflows update the index for new pages, setup/domain docs use the correct 13 default entity types, export verification checks promised coverage and excludes `.agents/`, duplicate global Codex skill removal refuses divergent copies, and operational evals now cover export, promotion, sync, and approved ledger validators.
