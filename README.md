@@ -98,7 +98,7 @@ The wiki turns raw context into durable knowledge through four layers: evidence,
 
 **1. Evidence**
 
-| Concept | Explanation |
+| Wiki element | Explanation |
 |---|---|
 | Raw evidence | Original source material. Add it once to `raw/`, then treat it as read-only. |
 | Source page | A wiki summary of one raw artifact. Source pages live in `wiki/sources/`. Other pages cite them instead of loose files or uncaptured URLs. |
@@ -108,7 +108,7 @@ The wiki turns raw context into durable knowledge through four layers: evidence,
 
 **2. Structure**
 
-| Concept | Explanation |
+| Wiki element | Explanation |
 |---|---|
 | Page contract | The rule set for what each wiki page must contain, defined in `wiki/SCHEMA.md`. |
 | Confidence | A support label in `confidence:` metadata that tells agents whether a page is well-supported, thinly supported, or contested. |
@@ -118,7 +118,7 @@ The wiki turns raw context into durable knowledge through four layers: evidence,
 
 **3. Checks**
 
-| Concept | Explanation |
+| Wiki element | Explanation |
 |---|---|
 | Agent operating map | The repo rules every agent starts from, kept in `AGENTS.md`. |
 | Task router | The file that points each task to the right workflow, kept in `CONTEXT.md`. |
@@ -130,7 +130,7 @@ The wiki turns raw context into durable knowledge through four layers: evidence,
 
 **4. Guardrails**
 
-| Concept | Explanation |
+| Wiki element | Explanation |
 |---|---|
 | Approval boundary | A point where an agent must stop and ask before saving a durable judgment. |
 | Analysis and promotion approval checker | `scripts/capture_gate.py` protects two actions: saving a research answer as a durable analysis, and promoting a useful artifact into the wiki. |
