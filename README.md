@@ -94,14 +94,9 @@ Research answers can stay in chat or become durable analyses when they are worth
 
 ## How It Works
 
-The wiki has four jobs:
+The wiki turns raw context into durable knowledge through four layers: evidence, structure, checks, and guardrails.
 
-- preserve evidence
-- organize knowledge
-- check for mistakes
-- protect durable judgments
-
-**1. Preserve Evidence**
+**1. Evidence**
 
 | Concept | Explanation |
 |---|---|
@@ -111,7 +106,7 @@ The wiki has four jobs:
 | Interpretation | Reasoning drawn from evidence, not a direct fact. Mark it as `Inference:` or `Hypothesis:`. |
 | Contradiction | A source conflict recorded in `wiki/contradictions.md` instead of silently overwriting one claim with another. |
 
-**2. Organize Knowledge**
+**2. Structure**
 
 | Concept | Explanation |
 |---|---|
@@ -121,7 +116,7 @@ The wiki has four jobs:
 | Evidence queue | A list of claims or questions that still need better sourcing, kept in `wiki/sourcing-queue.md`. |
 | Synthesis ledger | The record of approved higher-level conclusions, kept in `wiki/synthesis.md`. |
 
-**3. Keep It Checkable**
+**3. Checks**
 
 | Concept | Explanation |
 |---|---|
@@ -133,7 +128,7 @@ The wiki has four jobs:
 | Related pages | Handpicked outgoing links written by agents in `## Related pages`. |
 | Backlinks | Generated incoming links. `scripts/rebuild_referenced_by.py` rebuilds the `## Referenced by` sections. |
 
-**4. Protect and Recover**
+**4. Guardrails**
 
 | Concept | Explanation |
 |---|---|
