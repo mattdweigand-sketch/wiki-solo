@@ -98,29 +98,49 @@ The operating contract is simple: durable claims should be traceable, structured
 
 **Evidence Chain**
 
-Raw artifacts live in `raw/` and are treated as immutable evidence. Ingest turns them into source pages in `wiki/sources/`. Other wiki pages cite those source pages, not loose files or uncaptured URLs.
+Raw evidence is source material that should not be edited after it is added. It lives in `raw/`.
 
-Factual claims use `(source: [[source-page]])`. Interpretive claims are marked as `Inference:` or `Hypothesis:`. Source conflicts are recorded instead of overwritten.
+A source page is a wiki summary of one raw artifact. Source pages live in `wiki/sources/`. Other wiki pages cite source pages instead of citing loose files or uncaptured URLs.
+
+A citation is the link that shows where a claim came from. Factual claims use `(source: [[source-page]])`.
+
+An interpretation is a conclusion drawn from the evidence. Interpretive claims are labeled `Inference:` or `Hypothesis:` so future readers can tell the difference between sourced facts and reasoning.
+
+A contradiction is a source conflict. Contradictions are recorded instead of silently overwritten.
 
 **Page Contract**
 
-`wiki/SCHEMA.md` defines page types, required frontmatter, source types, confidence values, and citation rules. Pages carry `confidence:` metadata so agents can distinguish well-supported, thinly supported, and contested knowledge.
+A page contract is the rule set for what each wiki page must contain. The schema file, `wiki/SCHEMA.md`, defines page types, required frontmatter, source types, confidence values, and citation rules.
 
-The wiki also keeps operating records: `wiki/log.md` for changes, `wiki/sourcing-queue.md` for missing evidence, `wiki/contradictions.md` for conflicts, and `wiki/synthesis.md` for approved higher-level distillation.
+Confidence is a support label. Pages use `confidence:` metadata so agents can distinguish well-supported, thinly supported, and contested knowledge.
+
+Operating records are the wiki's audit trail. The change log, `wiki/log.md`, records important edits. The evidence queue, `wiki/sourcing-queue.md`, tracks missing support. The conflict register, `wiki/contradictions.md`, tracks unresolved disagreements. The synthesis ledger, `wiki/synthesis.md`, records approved higher-level conclusions.
 
 **Maintenance Checks**
 
-Agents route through `AGENTS.md` and `CONTEXT.md` into workflows with explicit Load / Skip lists. That keeps context focused and reduces accidental broad edits.
+The agent operating map, `AGENTS.md`, explains the repo rules. The task router, `CONTEXT.md`, points each task to the right workflow. Workflows have Load / Skip lists so agents read only the context they need.
 
-`scripts/lint.py --tier1` checks deterministic failures: broken links, invalid frontmatter, index coverage, raw-source references, and folder hygiene. Full lint also surfaces judgment work such as stale claims, contradictions, thin sourcing, and citation-support checks.
+The quick deterministic checker, `scripts/lint.py --tier1`, catches mechanical problems: broken links, invalid frontmatter, missing index entries, raw-source reference problems, and folder hygiene issues.
 
-Authored relationships and generated backlinks are separate. Agents write `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`.
+The full lint workflow also surfaces judgment work: stale claims, contradictions, thin sourcing, and citation-support checks.
+
+Related pages are handpicked outgoing links. Agents write them in `## Related pages`.
+
+Backlinks are generated incoming links. The backlink builder, `scripts/rebuild_referenced_by.py`, regenerates `## Referenced by`.
 
 **Approval and Recovery**
 
-Durable judgment has approval boundaries. `capture_gate.py` protects analysis capture and artifact promotion. `synthesis_gate.py` protects promoted synthesis. Approved runs are written to structured JSONL ledgers and validated by ledger-check scripts.
+An approval boundary is a point where an agent must stop and ask before saving a durable judgment.
 
-`scripts/wiki_eval.py` tests the machinery: lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync. `scripts/export_wiki.py` builds a local backup that includes gitignored raw sources.
+The analysis and promotion approval checker, `scripts/capture_gate.py`, protects two actions: saving a research answer as a durable analysis, and promoting a useful artifact into the wiki.
+
+The synthesis approval checker, `scripts/synthesis_gate.py`, protects promoted synthesis: higher-level conclusions that become part of the wiki's durable memory.
+
+A ledger is a structured audit log. Approved runs are written to JSONL ledgers and checked by ledger-validation scripts.
+
+The repo self-test, `scripts/wiki_eval.py`, tests the machinery: lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync.
+
+The backup builder, `scripts/export_wiki.py`, creates a local zip backup that includes gitignored raw sources.
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
@@ -128,9 +148,11 @@ Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task inst
 
 ## Configuration
 
-A fresh clone starts unconfigured. `SETUP.md` interviews the user for the context owner, domain, active entity types, custom entity types, `raw/` taxonomy, and example questions. The active entity set lives in [`wiki/domain.md`](wiki/domain.md). The full schema lives in [`wiki/SCHEMA.md`](wiki/SCHEMA.md).
+A fresh clone starts unconfigured. The setup guide, [`SETUP.md`](SETUP.md), interviews the user for the context owner, domain, active entity types, custom entity types, `raw/` taxonomy, and example questions.
 
-The old no-write harness is archived under `archive/wiki-harness/`. Ordinary ingest does not run a harness preflight.
+The domain config, [`wiki/domain.md`](wiki/domain.md), records what this wiki is about and which entity types are active. The full schema, [`wiki/SCHEMA.md`](wiki/SCHEMA.md), defines the available page types and page rules.
+
+The archived no-write experiment, `archive/wiki-harness/`, is kept for reference. Ordinary ingest does not run a harness preflight.
 
 ---
 
