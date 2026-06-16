@@ -104,7 +104,6 @@ Show a one-paragraph summary of what changed and what's next: "Configured. Drop 
 Hands off:
 
 - [`scripts/`](scripts/) — deterministic helpers and live eval fixtures
-- [`archive/wiki-harness/`](archive/wiki-harness/) — archived no-write harness
 - [`.claude/commands/`](.claude/commands/) and [`.codex/commands/`](.codex/commands/) — optional wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`
 - [`workflows/*/CONTEXT.md`](workflows/) — workflow routers
 - [`workflows/maintenance/*.md`](workflows/maintenance/) — maintenance task workflows

@@ -1,9 +1,0 @@
-{
-  "id": "source-page-exists-review",
-  "expected_status": "review",
-  "packet": {
-    "writes_files": false,
-    "risk_flags": ["source_page_exists"],
-    "expected_touched_files": []
-  }
-}

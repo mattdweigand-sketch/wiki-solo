@@ -108,7 +108,6 @@ Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task inst
 |   `-- maintenance/           # lint, eval, capture, promote, sourcing, synthesize, export
 |-- scripts/                   # Deterministic gates, lint, evals, export, link helpers
 |-- .github/workflows/         # CI for deterministic wiki checks
-|-- archive/wiki-harness/      # Archived no-write autonomy harness
 |
 |-- raw/                       # Immutable source artifacts
 |-- deliverables/              # Gitignored one-off outputs built from wiki content
@@ -135,10 +134,6 @@ Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task inst
 A fresh clone starts unconfigured. The setup guide, [`SETUP.md`](SETUP.md), interviews the user for the context owner, domain, active entity types, custom entity types, `raw/` taxonomy, and example questions.
 
 The domain config, [`wiki/domain.md`](wiki/domain.md), records what this wiki is about and which entity types are active. The full schema, [`wiki/SCHEMA.md`](wiki/SCHEMA.md), defines the available page types and page rules.
-
-The archived no-write experiment, `archive/wiki-harness/`, is kept for reference. Ordinary ingest does not run a harness preflight.
-
----
 
 ## Credits
 

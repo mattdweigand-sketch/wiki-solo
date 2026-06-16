@@ -6,11 +6,7 @@ rebuild_referenced_by.py link-graph guards, lint.py's checks and
 adjudication suppression (seeded-violation cases so no check can go
 vacuous), capture_gate.py's approval contract, structured capture approval
 ledger, synthesis_gate.py's approval contract, the structured synthesis-run
-ledger, operational helper coverage, and Tier-1 lint over the live corpus. The autonomy harness suites
-(apply, ingest, pipeline, policy, provider, route, run, schemas, semantic)
-are archived with the harness under archive/wiki-harness/ per
-decisions/archive-wiki-autonomy-harness; restore them from there if the
-harness is reopened.
+ledger, operational helper coverage, and Tier-1 lint over the live corpus.
 """
 
 from __future__ import annotations

@@ -1,9 +1,0 @@
-{
-  "id": "protected-path-reject",
-  "expected_status": "reject",
-  "packet": {
-    "writes_files": false,
-    "risk_flags": [],
-    "expected_touched_files": ["scripts/lint.py"]
-  }
-}

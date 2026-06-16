@@ -7,7 +7,7 @@ description: Use this workflow when the user drops a file in raw/ and says "inge
 
 Turns a raw source into structured wiki pages. Single task: read the source, file it, update the pages and indexes it touches. This `CONTEXT.md` is the whole workflow.
 
-Ingest is a normal durable write. It does not require `scripts/capture_gate.py` approval. Use the capture gate only if the ingest turns into an analysis-capture or artifact-promotion apply route. The former route preflight is archived with the autonomy harness; if an ingest genuinely seems to need staged review before durable edits, raise it with the user instead of running a script.
+Ingest is a normal durable write. It does not require `scripts/capture_gate.py` approval. Use the capture gate only if the ingest turns into an analysis-capture or artifact-promotion apply route. If an ingest genuinely seems to need staged review before durable edits, raise it with the user instead of running a script.
 
 ## Load / Skip
 

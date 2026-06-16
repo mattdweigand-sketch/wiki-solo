@@ -1,9 +1,0 @@
-{
-  "id": "missing-source-reject",
-  "expected_status": "reject",
-  "packet": {
-    "writes_files": false,
-    "risk_flags": ["source_path_missing"],
-    "expected_touched_files": []
-  }
-}

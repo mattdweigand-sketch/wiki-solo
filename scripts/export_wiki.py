@@ -38,7 +38,6 @@ REQUIRED_PREFIXES = (
     "raw/",
     "workflows/",
     "scripts/",
-    "archive/",
     ".claude/commands/",
     ".codex/commands/",
     ".codex/skills/",

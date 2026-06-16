@@ -1,7 +1,0 @@
-{
-  "id": "visual-source-no-evidence-ok",
-  "run_id": "eval-provider-visual-source-no-evidence-ok",
-  "source_path": "raw/social/2026-06-08-deep-agents-rubrics-sydney-runkle.jpg",
-  "mutations": [],
-  "expected_errors": []
-}

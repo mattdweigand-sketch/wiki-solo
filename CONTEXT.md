@@ -6,7 +6,7 @@ Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness 
 
 Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer), and **maintenance** (lint, eval, artifact promotion, captures, sourcing queue, synthesize, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
 
-Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; the former route preflight is archived with the autonomy harness.
+Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; no separate route preflight runs.
 
 Analysis capture and artifact promotion share one executable approval gate: `python3 scripts/capture_gate.py`. Its job is approval rather than routing: it derives a mode and primary home from its inputs, then blocks durable analysis/promotion edits until the user approves them. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the full output and wait for approval before editing files. Approved reruns write or confirm `scripts/capture-runs.jsonl`.
 
@@ -24,7 +24,6 @@ Synthesis promotion has a separate executable approval gate: `python3 scripts/sy
 | Compare entities | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
 | Lint the wiki | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |
 | Run the wiki tooling evals | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`eval.md`](workflows/maintenance/eval.md) |
-| Anything about the archived wiki autonomy harness | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`wiki-harness.md`](workflows/maintenance/wiki-harness.md) |
 | Promote a useful artifact into durable wiki memory | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`artifact-promotion.md`](workflows/maintenance/artifact-promotion.md) |
 | Capture a decision | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`capture-decision.md`](workflows/maintenance/capture-decision.md) |
 | Capture an observation, field note, or lived context | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`capture-experience.md`](workflows/maintenance/capture-experience.md) |

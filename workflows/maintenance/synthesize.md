@@ -12,7 +12,7 @@ The core contract is the draft-then-grade loop. Synthesis is judgment that futur
 ## Load / Skip
 
 - **Load:** `wiki/synthesis.md` (the human-readable ledger: read Current state and the last few run entries first, so the run builds on prior conclusions instead of re-deriving them), recent `scripts/synthesis-runs.jsonl` approval records when checking whether a prior synthesis scope was approved, full `python3 scripts/lint.py` output, `wiki/log.md` entries since the last `synthesis` entry, `wiki/index.md`, `wiki/overview.md`, and only the candidate pages the signals point to. At drafting time: `wiki/SCHEMA.md` and `REFERENCES.md`.
-- **Skip:** `raw/` sources, archived harness scripts, and entity folders the candidates do not touch.
+- **Skip:** `raw/` sources and entity folders the candidates do not touch.
 
 ## Synthesis Targets
 

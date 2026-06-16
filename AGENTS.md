@@ -15,14 +15,13 @@ Start by reading `wiki/domain.md` only far enough to check `status:`. If `status
 - `SETUP.md` - first-session configuration workflow for a fresh clone.
 - `REFERENCES.md` - stable operating model, cross-reference rules, key files, and load-layer guidance.
 - `.github/workflows/` - GitHub Actions CI for deterministic wiki checks.
-- `workflows/` - vendor-neutral prose workflows grouped into three workspaces, each with a `CONTEXT.md` entry point: `ingest/` (raw -> pages), `research/` (question -> answer), and `maintenance/` (lint, eval, artifact-promotion, capture-decision, capture-experience, refresh-sourcing-queue, synthesize, export, plus the archived wiki-harness stub).
+- `workflows/` - vendor-neutral prose workflows grouped into three workspaces, each with a `CONTEXT.md` entry point: `ingest/` (raw -> pages), `research/` (question -> answer), and `maintenance/` (lint, eval, artifact-promotion, capture-decision, capture-experience, refresh-sourcing-queue, synthesize, export).
 - `.claude/commands/` - tracked Claude Code slash-command wrappers for `wiki-ingest`, `wiki-capture`, `wiki-lint`, `wiki-eval`, `wiki-promote`, `wiki-synthesize`, and `wiki-export`. Keep these wrappers thin; canonical behavior lives in `workflows/` and is routed through `CONTEXT.md`.
 - `.codex/commands/` - tracked Codex command mirrors for the same seven workflows. Current Codex shortcut discovery uses skills rather than this repo-local command folder, but these mirrors document the command shape.
 - `.codex/skills/` - tracked repo-local Codex skill wrappers for the seven active wiki shortcuts. Current Codex discovers this directory while working in the repo; do not also install identical `wiki-*` wrappers under `~/.codex/skills/`, or slash-command autocomplete may show duplicate repo and Personal entries. Use `python3 scripts/sync_codex_skills.py --check` to detect duplicate global wiki skills and `python3 scripts/sync_codex_skills.py --remove-global` to remove them.
 - `scripts/` - vendor-neutral deterministic tooling, self-contained. `capture_gate.py` is the deterministic approval preflight for analysis capture and artifact promotion; `capture-runs.jsonl` is the structured approval ledger written only by approved capture-gate reruns; `validate_capture_runs.py` checks that ledger's schema, hashes, and approval scope; `synthesis_gate.py` is the deterministic approval preflight before synthesis drafts are promoted, ledgered in `wiki/synthesis.md`, or have draft status/confidence flipped; `synthesis-runs.jsonl` is the structured approval ledger written only by approved synthesis-gate reruns; `validate_synthesis_runs.py` checks that ledger's schema, hashes, and approval scope; `export_wiki.py` builds and verifies complete corpus export zips; `rebuild_referenced_by.py` regenerates `## Referenced by` inbound-link sections; `lint.py --tier1` is the deterministic validation gate; `wiki_eval.py` runs the live guard suites, including both ledger validations; `sync_codex_skills.py` prevents duplicate global `wiki-*` Codex skill installs now that repo-local `.codex/skills/` is discovered directly.
 - `scripts/fixtures/` - eval mini-wikis for live tooling: `wiki-rebuild` guards link-graph invariants and `wiki-lint` proves lint checks can fire.
 - `scripts/lint-adjudications.json` - settled Tier-2 lint judgments with reasons and dates, so lint stops re-surfacing what has been adjudicated.
-- `archive/wiki-harness/` - archived autonomy harness: route policy, no-write pipeline, schemas, provider manifest, fixtures, and original workflow. Do not run or extend it unless the project deliberately reopens the harness.
 - `tmp/` - gitignored scratch space. Everything in it is disposable at all times.
 - `deliverables/` - optional gitignored one-off outputs built from wiki content. Contents are not wiki content. Keep outputs inside clearly labeled kebab-case subfolders; do not leave loose files directly under `deliverables/`.
 - `raw/` - source artifacts. Existing files are immutable, and new user-provided sources may be placed once during ingest before becoming immutable.
@@ -58,12 +57,6 @@ Run `python3 scripts/synthesis_gate.py` before promoting synthesis output: updat
 The approved rerun writes or confirms the idempotent structured approval record in `scripts/synthesis-runs.jsonl`. The non-approved gate call is display-only: it must not update `wiki/synthesis.md`, `scripts/synthesis-runs.jsonl`, draft confidence/status, or `wiki/log.md`.
 
 The synthesis gate is separate from `capture_gate.py` because synthesis drafts are routine maintenance until they become approved durable conclusions.
-
-## Archived Autonomy Harness
-
-The route preflight and no-write harness are archived under `archive/wiki-harness/`. Ordinary source ingest proceeds directly through the ingest workflow; no preflight script runs. If an ingest genuinely seems to need staged review before durable edits, that is a judgment call for the prose workflows and the user, not a script.
-
----
 
 ## Session Start
 
