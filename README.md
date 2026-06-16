@@ -121,8 +121,8 @@ The result is a memory system that compounds: new work starts from preserved evi
 | Evidence review | Full `/wiki-lint` includes sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Approval gates and ledgers | Approval gates make the agent ask before saving important conclusions; ledgers record what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test backlinks, lint fixtures, approval gates, ledgers, exports, and wrapper sync so the guardrails themselves do not drift. |
-| Wrapper sync | `scripts/sync_codex_skills.py` keeps repo-local Codex shortcuts from conflicting with duplicate global installs. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test backlinks, lint fixtures, approval gates, ledgers, exports, and command-wrapper assumptions so the guardrails themselves do not drift. |
+| Thin command wrappers | Claude, Codex, and other shortcuts point back to the same vendor-neutral workflows, so the wiki does not depend on one agent surface. |
 | Export tooling | `scripts/export_wiki.py` builds a portable backup that includes gitignored raw sources. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
