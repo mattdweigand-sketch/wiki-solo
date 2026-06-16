@@ -94,50 +94,29 @@ Research answers can stay in chat or become durable analyses when they are worth
 
 ## How It Works
 
-The wiki turns raw context into durable knowledge through four layers: evidence, structure, checks, and guardrails.
+The wiki has one loop: preserve the evidence, summarize it into pages, connect the pages, then check the result.
 
-**1. Evidence**
+1. **Preserve the evidence.** Original files, notes, transcripts, and exports live in `raw/`. Once added, they are treated as read-only so later conclusions can always be traced back to the source.
+2. **Turn sources into wiki pages.** Each important source gets a page in `wiki/sources/`. Other pages cite those source pages instead of relying on loose files, memory, or uncaptured links.
+3. **Build durable knowledge.** Wiki pages capture the configured domain: products, people, decisions, analyses, projects, concepts, or other entity types. Pages use a shared schema, confidence labels, and citations so agents know what is solid, thin, inferred, or contested.
+4. **Connect related context.** Pages link to each other with `[[wiki-links]]`. Agents choose meaningful outgoing links; the repo can rebuild the incoming `## Referenced by` lists automatically.
+5. **Check and protect the corpus.** Lint scripts, evals, approval gates, and ledgers catch broken structure, weak sourcing, unsupported conclusions, and high-impact edits that need explicit approval.
 
-| Wiki element | Explanation |
+The result is a memory system that compounds: new work starts from preserved evidence and existing context instead of being re-derived from scratch.
+
+### What Keeps It Reliable
+
+| Mechanism | Purpose |
 |---|---|
-| Raw evidence | Original source material. Add it once to `raw/`, then treat it as read-only. |
-| Source page | A wiki summary of one raw artifact. Source pages live in `wiki/sources/`. Other pages cite them instead of loose files or uncaptured URLs. |
-| Citation | A link that shows where a claim came from, written as `(source: [[source-page]])`. |
-| Interpretation | Reasoning drawn from evidence, not a direct fact. Mark it as `Inference:` or `Hypothesis:`. |
-| Contradiction | A source conflict recorded in `wiki/contradictions.md` instead of silently overwriting one claim with another. |
-
-**2. Structure**
-
-| Wiki element | Explanation |
-|---|---|
-| Page contract | The rule set for what each wiki page must contain, defined in `wiki/SCHEMA.md`. |
-| Confidence | A support label in `confidence:` metadata that tells agents whether a page is well-supported, thinly supported, or contested. |
-| Change log | The audit trail for important wiki edits, kept in `wiki/log.md`. |
-| Evidence queue | A list of claims or questions that still need better sourcing, kept in `wiki/sourcing-queue.md`. |
-| Synthesis ledger | The record of approved higher-level conclusions, kept in `wiki/synthesis.md`. |
-
-**3. Checks**
-
-| Wiki element | Explanation |
-|---|---|
-| Agent operating map | The repo rules every agent starts from, kept in `AGENTS.md`. |
-| Task router | The file that points each task to the right workflow, kept in `CONTEXT.md`. |
-| Workflow instructions | Step-by-step task instructions in `workflows/`, with Load / Skip lists so agents read only what they need. |
-| Quick checker | `scripts/lint.py --tier1` catches broken links, invalid page metadata, missing index entries, raw-source reference problems, and folder hygiene issues. |
-| Full lint workflow | `/wiki-lint` runs the broader review for stale claims, contradictions, thin sourcing, and citation-support problems. |
-| Related pages | Handpicked outgoing links written by agents in `## Related pages`. |
-| Backlinks | Generated incoming links. `scripts/rebuild_referenced_by.py` rebuilds the `## Referenced by` sections. |
-
-**4. Guardrails**
-
-| Wiki element | Explanation |
-|---|---|
-| Approval boundary | A point where an agent must stop and ask before saving a durable judgment. |
-| Analysis and promotion approval checker | `scripts/capture_gate.py` protects two actions: saving a research answer as a durable analysis, and promoting a useful artifact into the wiki. |
-| Synthesis approval checker | `scripts/synthesis_gate.py` protects promoted synthesis: higher-level conclusions that become part of durable wiki memory. |
-| Ledger | A structured audit log of approved runs, written as JSONL and checked by validation scripts. |
-| Repo self-test | `scripts/wiki_eval.py` tests lint fixtures, backlink rebuilds, approval gates, ledger validation, export behavior, and command-wrapper sync. |
-| Backup builder | `scripts/export_wiki.py` creates a local zip backup that includes gitignored raw sources. |
+| Immutable raw evidence | Keeps original source material available for later review. |
+| Source pages | Give agents a stable, citable summary of each source. |
+| Citations and confidence labels | Separate supported facts from inference, hypothesis, thin evidence, or contested claims. |
+| Contradiction tracking | Records conflicts in `wiki/contradictions.md` instead of overwriting inconvenient claims. |
+| Route-first workflows | Point agents from `AGENTS.md` to `CONTEXT.md` to the right workflow, so they read the instructions that match the task. |
+| Related pages and backlinks | Agents write meaningful outgoing links; `scripts/rebuild_referenced_by.py` maintains the incoming links. |
+| Lint and evals | `scripts/lint.py --tier1`, `/wiki-lint`, and `scripts/wiki_eval.py` catch structural drift, broken links, weak sourcing, and workflow regressions. |
+| Approval gates and ledgers | `capture_gate.py`, `synthesis_gate.py`, and JSONL ledgers protect durable judgments, promoted artifacts, and approved synthesis. |
+| Export tooling | `scripts/export_wiki.py` builds a portable backup that includes gitignored raw sources. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
