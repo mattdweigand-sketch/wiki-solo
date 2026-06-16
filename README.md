@@ -97,11 +97,11 @@ Research answers can stay in chat or become durable analyses when they are worth
 
 The wiki has one loop: preserve the evidence, summarize it into pages, connect the pages, then check the result.
 
-1. **Preserve the evidence.** Original files, notes, transcripts, and exports live in `raw/`. Once added, they are treated as read-only so later conclusions can always be traced back to the source.
+1. **Preserve the evidence.** Original files, notes, transcripts, and exported source files live in `raw/`. Once added, they are treated as read-only so later conclusions can always be traced back to the source.
 2. **Turn sources into wiki pages.** Each important source gets a page in `wiki/sources/`. Other pages cite those source pages instead of relying on loose files, memory, or uncaptured links.
 3. **Build durable knowledge.** Wiki pages capture the configured domain: products, people, decisions, analyses, projects, concepts, or other entity types. Pages use a shared schema, confidence labels, and citations so agents know what is solid, thin, inferred, or contested.
 4. **Connect related context.** Pages link to each other with `[[wiki-links]]`. Agents choose meaningful outgoing links; the repo can rebuild the incoming `## Referenced by` lists automatically.
-5. **Check and protect the corpus.** Lint scripts, evals, approval gates, and ledgers catch broken structure, weak sourcing, unsupported conclusions, and high-impact edits that need explicit approval.
+5. **Check and protect the corpus.** Lint scripts, evals, approval gates, and ledgers catch broken structure, weak sourcing, unsupported conclusions, promoted artifacts, and approved synthesis.
 
 The result is a memory system that compounds: new work starts from preserved evidence and existing context instead of being re-derived from scratch.
 
@@ -121,8 +121,7 @@ The result is a memory system that compounds: new work starts from preserved evi
 | Evidence review | Full `/wiki-lint` includes sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Approval gates and ledgers | Approval gates make the agent ask before saving important conclusions; ledgers record what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test backlinks, lint fixtures, approval gates, ledgers, exports, and command-wrapper assumptions so the guardrails themselves do not drift. |
-| Thin command wrappers | Claude, Codex, and other shortcuts point back to the same vendor-neutral workflows, so the wiki does not depend on one agent surface. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test the wiki's guardrails: backlinks, lint fixtures, approval gates, ledgers, exports, and command shortcuts. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
