@@ -40,7 +40,7 @@ After setup, run the repo checks:
 Report changed files, check results, and any remaining setup choices.
 ```
 
-The repo has six common workflow shortcuts. Claude Code and Codex expose them as slash commands; other agents use the same routes through `CONTEXT.md`.
+The repo has seven common workflow shortcuts. Claude Code and Codex expose them as slash commands; other agents use the same routes through `CONTEXT.md`.
 
 | Command | Use it to |
 |---|---|
@@ -48,6 +48,7 @@ The repo has six common workflow shortcuts. Claude Code and Codex expose them as
 | `/wiki-capture` | Record first-person context, usually a decision or lived experience. |
 | `/wiki-promote` | Route a useful artifact into the wiki, or decide not to save it. |
 | `/wiki-lint` | Run deterministic checks, judgment candidates, and evidence review. |
+| `/wiki-eval` | Verify that the wiki tools and guardrails still work. |
 | `/wiki-synthesize` | Draft corpus distillations for review and approved promotion. |
 | `/wiki-export` | Build a zip backup of the wiki, including raw sources. |
 
@@ -120,7 +121,7 @@ The result is a memory system that compounds: new work starts from preserved evi
 | Evidence review | Full `/wiki-lint` includes sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Approval gates and ledgers | Approval gates make the agent ask before saving important conclusions; ledgers record what was approved afterward. |
-| Live evals | `scripts/wiki_eval.py` tests backlinks, lint fixtures, approval gates, ledgers, exports, and wrapper sync so the guardrails themselves do not drift. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test backlinks, lint fixtures, approval gates, ledgers, exports, and wrapper sync so the guardrails themselves do not drift. |
 | Wrapper sync | `scripts/sync_codex_skills.py` keeps repo-local Codex shortcuts from conflicting with duplicate global installs. |
 | Export tooling | `scripts/export_wiki.py` builds a portable backup that includes gitignored raw sources. |
 

@@ -2,9 +2,9 @@
 
 `AGENTS.md` is canonical: it holds the folder map, conventions, and hard rules. This file routes a task to the right workspace. Do not read everything; find the task, open the workflow entry, and load only what it says to load.
 
-Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. `.codex/commands/` is kept as a repo-local mirror. Nothing here depends on any wrapper surface.
+Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. `.codex/commands/` is kept as a repo-local mirror. Nothing here depends on any wrapper surface.
 
-Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer), and **maintenance** (lint, artifact promotion, captures, sourcing queue, synthesize, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
+Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer), and **maintenance** (lint, eval, artifact promotion, captures, sourcing queue, synthesize, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
 
 Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; the former route preflight is archived with the autonomy harness.
 
@@ -23,6 +23,7 @@ Synthesis promotion has a separate executable approval gate: `python3 scripts/sy
 | Answer a question from the wiki | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
 | Compare entities | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
 | Lint the wiki | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |
+| Run the wiki tooling evals | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`eval.md`](workflows/maintenance/eval.md) |
 | Anything about the archived wiki autonomy harness | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`wiki-harness.md`](workflows/maintenance/wiki-harness.md) |
 | Promote a useful artifact into durable wiki memory | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`artifact-promotion.md`](workflows/maintenance/artifact-promotion.md) |
 | Capture a decision | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`capture-decision.md`](workflows/maintenance/capture-decision.md) |

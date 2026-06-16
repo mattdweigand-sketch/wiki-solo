@@ -54,7 +54,7 @@ The main control mechanisms are:
 | Schema and citations | `wiki/SCHEMA.md` defines page types, frontmatter, source types, confidence values, and citation rules. Specific facts cite `wiki/sources/` pages. |
 | Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`. |
 | Deterministic lint | `scripts/lint.py --tier1` catches structural failures. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
-| Live evals | `scripts/wiki_eval.py` runs fixture-backed checks for lint, backlinks, gates, ledgers, export, and wrapper sync. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, and wrapper sync. |
 | Sourcing queue | `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers. `workflows/maintenance/refresh-sourcing-queue.md` can reprioritize it when needed. |
 | Capture gate | `scripts/capture_gate.py` guards analysis capture and artifact-promotion apply routes, then records approved boundaries in `scripts/capture-runs.jsonl`. |
 | Synthesis gate | `scripts/synthesis_gate.py` guards promotion of synthesis drafts and records approved boundaries in `scripts/synthesis-runs.jsonl`. |
@@ -122,7 +122,7 @@ The wiki autonomy harness and its route preflight are archived under `archive/wi
 
 - Ordinary ingest proceeds directly through the ingest workflow; no preflight script runs.
 - If a piece of work genuinely seems to need staged review before durable edits, that is a judgment call for the prose workflows and the user.
-- The live guards that survived the archive are `scripts/wiki_eval.py`, `scripts/lint.py`, `scripts/rebuild_referenced_by.py`, `scripts/capture_gate.py`, `scripts/synthesis_gate.py`, the approval-ledger validators, `scripts/export_wiki.py`, `scripts/sync_codex_skills.py`, and their fixtures.
+- The live guards that survived the archive are exposed through `/wiki-eval` and implemented by `scripts/wiki_eval.py`, `scripts/lint.py`, `scripts/rebuild_referenced_by.py`, `scripts/capture_gate.py`, `scripts/synthesis_gate.py`, the approval-ledger validators, `scripts/export_wiki.py`, `scripts/sync_codex_skills.py`, and their fixtures.
 
 ---
 

@@ -105,7 +105,7 @@ Hands off:
 
 - [`scripts/`](scripts/) — deterministic helpers and live eval fixtures
 - [`archive/wiki-harness/`](archive/wiki-harness/) — archived no-write harness
-- [`.claude/commands/`](.claude/commands/) and [`.codex/commands/`](.codex/commands/) — optional wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`
+- [`.claude/commands/`](.claude/commands/) and [`.codex/commands/`](.codex/commands/) — optional wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`
 - [`workflows/*/CONTEXT.md`](workflows/) — workflow routers
 - [`workflows/maintenance/*.md`](workflows/maintenance/) — maintenance task workflows
 - The schema's "Page Format," "Source-Type Summary Templates," and "Confidence Values" sections in [`wiki/SCHEMA.md`](wiki/SCHEMA.md) — domain-agnostic infrastructure

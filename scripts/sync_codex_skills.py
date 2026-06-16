@@ -21,6 +21,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPO_ROOT / ".codex" / "skills"
 EXPECTED_SKILLS = (
     "wiki-capture",
+    "wiki-eval",
     "wiki-export",
     "wiki-ingest",
     "wiki-lint",

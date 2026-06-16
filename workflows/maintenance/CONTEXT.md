@@ -1,11 +1,11 @@
 ---
 name: wiki-maintenance
-description: Router for wiki hygiene, artifact promotion, first-person capture, corpus synthesis, export, and the archived harness pointer. Open the one task file you need.
+description: Router for wiki hygiene, tooling evals, artifact promotion, first-person capture, corpus synthesis, export, and the archived harness pointer. Open the one task file you need.
 ---
 
 # Maintenance Workspace
 
-Wiki hygiene, artifact promotion, first-person capture, corpus synthesis, and backup export. Load this router, then open only the one task file the work calls for. Do not pull every task file into context. `/wiki-capture` is a shortcut for decision capture or experience capture, not a separate workflow.
+Wiki hygiene, tooling evals, artifact promotion, first-person capture, corpus synthesis, and backup export. Load this router, then open only the one task file the work calls for. Do not pull every task file into context. `/wiki-capture` is a shortcut for decision capture or experience capture, not a separate workflow.
 
 Invoking `/wiki-lint` authorizes the full lint workflow, including its verifier-agent evidence check, unless the user asks for deterministic-only lint, no subagents, or skipping the evidence check.
 
@@ -20,6 +20,7 @@ Synthesis promotion uses `python3 scripts/synthesis_gate.py` before updating `wi
 | Task | Open | Also load | Skip |
 |---|---|---|---|
 | Lint the wiki | [`lint.md`](lint.md) | all wiki pages, `wiki/contradictions.md`, `wiki/sourcing-queue.md` | `raw/`, the other task files |
+| Run the wiki tooling evals | [`eval.md`](eval.md) | `scripts/wiki_eval.py`; failing suite output only if a run fails | wiki entity pages, raw sources, Tier-2/Tier-3 content review |
 | Anything about the archived wiki autonomy harness | [`wiki-harness.md`](wiki-harness.md) | `archive/wiki-harness/README.md`, `archive/wiki-harness/wiki-harness-workflow.md` | archived scripts and fixtures unless explicitly reopening/debugging the harness |
 | Promote an artifact | [`artifact-promotion.md`](artifact-promotion.md) | `wiki/SCHEMA.md`, `REFERENCES.md` (cross-referencing rules), `wiki/index.md`, `scripts/capture_gate.py`, artifact being evaluated | unrelated entity folders, raw sources not cited by the artifact |
 | Capture a decision | [`capture-decision.md`](capture-decision.md) | `wiki/SCHEMA.md`, `REFERENCES.md` (cross-referencing rules), affected entity pages | the full index, raw sources, other task files |
