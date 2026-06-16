@@ -6,7 +6,7 @@ Put source documents in `raw/`. Agents turn them into structured, cited, interli
 
 ---
 
-## Why this exists
+## Why This Exists
 
 Most AI workflows retrieve context on every query. The work does not compound.
 
@@ -22,7 +22,7 @@ This repo turns context into maintained memory. A source is read once, integrate
 4. Add source files under `raw/`, then ask the agent to ingest them.
 5. Ask questions in plain language.
 
-Sources live in `raw/`. Synthesized pages live in `wiki/`. Agents use `AGENTS.md`, `wiki/domain.md`, and `CONTEXT.md` to route each task into the right workflow.
+After setup, agents use `AGENTS.md`, `wiki/domain.md`, and `CONTEXT.md` to route each task into the right workflow.
 
 ## Agent Setup Prompt
 
@@ -54,6 +54,40 @@ The repo has seven common workflow shortcuts. Claude Code and Codex expose them 
 
 Research answers can stay in chat or become durable analyses when they are worth saving.
 
+---
+
+## How It Works
+
+The wiki runs one loop: preserve the evidence, turn it into pages, build durable knowledge on those pages, connect them, then check the result.
+
+1. **Preserve the evidence.** Original files, notes, transcripts, and exported source files live in `raw/`. Once added, they are treated as read-only so later conclusions can always be traced back to the source.
+2. **Turn sources into wiki pages.** Each important source gets a page in `wiki/sources/`. Other pages cite those source pages instead of relying on loose files, memory, or uncaptured links.
+3. **Build durable knowledge.** Wiki pages capture the configured domain: products, features, personas, customers, competitors, concepts, initiatives, decisions, metrics, people, analyses, style rules, or custom entity types. Pages use a shared schema, citations, and a `confidence` value of `high`, `medium`, `low`, or `contested`, so agents know how far to trust each claim.
+4. **Connect related context.** Pages link to each other with `[[wiki-links]]`. Agents choose meaningful outgoing links; the repo can rebuild the incoming `## Referenced by` lists automatically.
+5. **Check and protect the corpus.** A layer of automated checks and approval gates guards the result. The next section lists them.
+
+---
+
+## What Keeps It Reliable
+
+The checks and guardrails that protect the corpus:
+
+| Mechanism | Purpose |
+|---|---|
+| Setup and CI checks | `SETUP.md`, `wiki/domain.md`, and GitHub Actions keep fresh clones configured and run deterministic checks on pushes and pull requests. |
+| Route-first workflows | Point agents from `AGENTS.md` to `CONTEXT.md` to the right workflow, so they read the instructions that match the task. |
+| Sourcing queue | `wiki/sourcing-queue.md` tracks evidence gaps so weak claims become future work instead of disappearing. |
+| Contradiction tracking | Records conflicts in `wiki/contradictions.md` instead of overwriting inconvenient claims. |
+| Three-tier lint | `scripts/lint.py` reports two deterministic tiers: Tier 1 fails on broken structure; Tier 2 ranks suspicious patterns for review. Tier 3, genuine judgment, is left to the `/wiki-lint` prose workflow, not the script. |
+| Evidence review | Full `/wiki-lint` adds sampled citation checks so claims are tested against their cited source pages and raw evidence. |
+| Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
+| Approval gates and ledgers | Approval gates make the agent ask before filing analyses, applying artifact promotions, or approving synthesis; ledgers record what was approved afterward. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test backlinks, lint fixtures, approval and synthesis gates, capture and synthesis ledgers, operational helpers such as export and shortcut sync, and Tier-1 lint over the live corpus. |
+
+Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
+
+---
+
 ## Repo Structure
 
 ```text
@@ -61,7 +95,7 @@ Research answers can stay in chat or become durable analyses when they are worth
 |-- AGENTS.md                  # Canonical operating map for agents
 |-- CONTEXT.md                 # Task router
 |-- SETUP.md                   # First-session configuration workflow
-|-- REFERENCES.md              # Operating model, stable conventions, and layer model
+|-- REFERENCES.md              # Maintainer reference: operating model, layer model, boundaries
 |-- CLAUDE.md                  # Thin Claude Code wrapper
 |
 |-- .claude/commands/          # Claude Code slash-command wrappers
@@ -71,12 +105,14 @@ Research answers can stay in chat or become durable analyses when they are worth
 |-- workflows/                 # Vendor-neutral workflow instructions
 |   |-- ingest/                # raw source -> wiki pages
 |   |-- research/              # question -> answer
-|   `-- maintenance/           # lint, capture, promote, synthesize, sourcing, export
+|   `-- maintenance/           # lint, eval, capture, promote, sourcing, synthesize, export
 |-- scripts/                   # Deterministic gates, lint, evals, export, link helpers
 |-- .github/workflows/         # CI for deterministic wiki checks
 |-- archive/wiki-harness/      # Archived no-write autonomy harness
 |
 |-- raw/                       # Immutable source artifacts
+|-- deliverables/              # Gitignored one-off outputs built from wiki content
+|-- tmp/                       # Gitignored scratch space
 `-- wiki/                      # Maintained knowledge layer
     |-- domain.md              # Context-owner configuration
     |-- SCHEMA.md              # Entity types and page templates
@@ -84,46 +120,13 @@ Research answers can stay in chat or become durable analyses when they are worth
     |-- overview.md            # Big-picture synthesis
     |-- primer.md              # Agent entry points by question type
     |-- glossary.md            # Canonical terminology
+    |-- design-notes.md        # Rationale for structural choices
     |-- log.md                 # Chronological activity log
     |-- sourcing-queue.md      # Knowledge gaps
     |-- contradictions.md      # Open and resolved contradictions
     |-- synthesis.md           # Synthesis ledger and run history
     `-- <entity folders>/      # sources, products, people, decisions, analyses, etc.
 ```
-
----
-
-## How It Works
-
-The wiki has one loop: preserve the evidence, summarize it into pages, connect the pages, then check the result.
-
-1. **Preserve the evidence.** Original files, notes, transcripts, and exported source files live in `raw/`. Once added, they are treated as read-only so later conclusions can always be traced back to the source.
-2. **Turn sources into wiki pages.** Each important source gets a page in `wiki/sources/`. Other pages cite those source pages instead of relying on loose files, memory, or uncaptured links.
-3. **Build durable knowledge.** Wiki pages capture the configured domain: products, people, decisions, analyses, projects, concepts, or other entity types. Pages use a shared schema, confidence labels, and citations so agents know what is solid, thin, inferred, or contested.
-4. **Connect related context.** Pages link to each other with `[[wiki-links]]`. Agents choose meaningful outgoing links; the repo can rebuild the incoming `## Referenced by` lists automatically.
-5. **Check and protect the corpus.** Lint scripts, evals, approval gates, and ledgers catch broken structure, weak sourcing, unsupported conclusions, promoted artifacts, and approved synthesis.
-
-The result is a memory system that compounds: new work starts from preserved evidence and existing context instead of being re-derived from scratch.
-
-### What Keeps It Reliable
-
-| Mechanism | Purpose |
-|---|---|
-| Setup and CI checks | `SETUP.md`, `wiki/domain.md`, and GitHub Actions keep fresh clones configured and run deterministic checks on pushes and pull requests. |
-| Route-first workflows | Point agents from `AGENTS.md` to `CONTEXT.md` to the right workflow, so they read the instructions that match the task. |
-| Immutable raw evidence | Keeps original source material available for later review. |
-| Source pages | Give agents a stable, citable summary of each source. |
-| Citations and confidence labels | Separate supported facts from inference, hypothesis, thin evidence, or contested claims. |
-| Sourcing queue | `wiki/sourcing-queue.md` keeps track of evidence gaps so weak claims become future work instead of disappearing. |
-| Contradiction tracking | Records conflicts in `wiki/contradictions.md` instead of overwriting inconvenient claims. |
-| Related pages and backlinks | Agents choose which pages should link out to related context; `scripts/rebuild_referenced_by.py` automatically updates each linked page's `## Referenced by` list. |
-| Three-tier lint | Tier 1 catches broken structure and does not need review; Tier 2 surfaces suspicious patterns for review; Tier 3 handles meaning and judgment. |
-| Evidence review | Full `/wiki-lint` includes sampled citation checks so claims are tested against their cited source pages and raw evidence. |
-| Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
-| Approval gates and ledgers | Approval gates make the agent ask before saving important conclusions; ledgers record what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test the wiki's guardrails: backlinks, lint fixtures, approval gates, ledgers, exports, and command shortcuts. |
-
-Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
 ---
 
