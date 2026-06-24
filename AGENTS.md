@@ -79,7 +79,7 @@ Repo structure is linted. `scripts/lint.py --tier1` fails on unknown repo-root e
 | Source page | kebab-case from source title | `q3-board-deck.md` |
 | Person/team page | kebab-case role, team, or name | `enterprise-sales.md` |
 | Decision page | kebab-case from decision topic | `pricing-packaging.md` |
-| Product / feature / persona / customer / competitor / concept / initiative / metric / analysis / style | kebab-case from canonical term | `workflow-automation.md` |
+| Product / feature / persona / customer / competitor / concept / initiative / metric / analysis | kebab-case from canonical term | `workflow-automation.md` |
 | Workspace entry | `workflows/<workspace>/CONTEXT.md` | `workflows/ingest/CONTEXT.md` |
 | Maintenance task file | kebab-case verb or noun | `workflows/maintenance/artifact-promotion.md` |
 

@@ -111,7 +111,7 @@ When stating a specific fact, append `(source: [[source-filename]])`. When stati
 
 The wiki separates deterministic capture approval from prose judgment:
 
-- `scripts/capture_gate.py` guards analysis capture and artifact promotion approval.
+- `scripts/capture_gate.py` guards analysis capture, artifact promotion approval, and reviewed synthesis promotion (`--kind=synthesis`).
 - Workflow prose decides quality: what belongs in the page, which evidence matters, how links should be written, and how contradictions should be handled.
 - Do not replace route-specific workflows with scripts unless the behavior is objectively checkable.
 
