@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Run the live wiki evaluation suites.
 
-Entrypoint for the deterministic checks that guard live tooling: the
-rebuild_referenced_by.py link-graph guards, lint.py's checks and
-adjudication suppression (seeded-violation cases so no check can go
-vacuous), capture_gate.py's approval contract, structured capture approval
-ledger, synthesis_gate.py's approval contract, the structured synthesis-run
-ledger, operational helper coverage, and Tier-1 lint over the live corpus.
+Entrypoint for the deterministic checks that guard live tooling: shared parser
+coverage, backlink rebuild guards, lint seeded-violation cases, capture_gate.py's
+approval contract across capture and synthesis kinds, the single approval
+ledger, export include/exclude boundaries, review_due surfacing, duplicate global
+Codex skill detection/removal safety, wrapper parity, and Tier-1 lint over the
+live corpus.
 """
 
 from __future__ import annotations
@@ -17,19 +17,23 @@ import sys
 
 
 SUITES = {
+    "parse": [sys.executable, "scripts/wiki_eval_parse.py"],
     "rebuild": [sys.executable, "scripts/wiki_eval_rebuild.py"],
     "lint": [sys.executable, "scripts/wiki_eval_lint.py"],
     "gate": [sys.executable, "scripts/wiki_eval_gate.py"],
     "capture-runs": [sys.executable, "scripts/validate_capture_runs.py"],
-    "synthesis-gate": [sys.executable, "scripts/wiki_eval_synthesis_gate.py"],
-    "synthesis-runs": [sys.executable, "scripts/validate_synthesis_runs.py"],
-    "operational": [sys.executable, "scripts/wiki_eval_operational.py"],
+    "ledger-validators": [sys.executable, "scripts/wiki_eval_ledgers.py"],
+    "export": [sys.executable, "scripts/wiki_eval_export.py"],
+    "review-due": [sys.executable, "scripts/wiki_eval_review.py"],
+    "codex-global-dupes": [sys.executable, "scripts/sync_codex_skills.py", "--check"],
+    "codex-remove-safety": [sys.executable, "scripts/wiki_eval_codex_remove.py"],
+    "wrapper-parity": [sys.executable, "scripts/sync_codex_skills.py", "--wrapper-parity"],
     "tier1": [sys.executable, "scripts/lint.py", "--tier1"],
 }
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Run wiki dry-run harness evals.")
+    p = argparse.ArgumentParser(description="Run live wiki tooling evals.")
     p.add_argument(
         "--suite",
         action="append",
@@ -48,16 +52,7 @@ def run_suite(name: str, command: list[str]) -> int:
 
 def main() -> int:
     args = parser().parse_args()
-    suite_names = args.suite or [
-        "rebuild",
-        "lint",
-        "gate",
-        "capture-runs",
-        "synthesis-gate",
-        "synthesis-runs",
-        "operational",
-        "tier1",
-    ]
+    suite_names = args.suite or list(SUITES)
 
     failures: list[str] = []
     for name in suite_names:

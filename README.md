@@ -50,7 +50,7 @@ The repo has seven common workflow shortcuts. Claude Code and Codex expose them 
 | `/wiki-lint` | Run deterministic checks, judgment candidates, and evidence review. |
 | `/wiki-eval` | Verify that the wiki tools and guardrails still work. |
 | `/wiki-synthesize` | Draft corpus distillations for review and approved promotion. |
-| `/wiki-export` | Build a zip backup of the wiki, including raw sources. |
+| `/wiki-export` | Build a local zip export of the wiki, including raw sources. |
 
 Research answers can stay in chat or become durable analyses when they are worth saving.
 
@@ -62,7 +62,7 @@ The wiki runs one loop: preserve the evidence, turn it into pages, build durable
 
 1. **Preserve the evidence.** Original files, notes, transcripts, and exported source files live in `raw/`. Once added, they are treated as read-only so later conclusions can always be traced back to the source.
 2. **Turn sources into wiki pages.** Each important source gets a page in `wiki/sources/`. Other pages cite those source pages instead of relying on loose files, memory, or uncaptured links.
-3. **Build durable knowledge.** Wiki pages capture the configured domain: products, features, personas, customers, competitors, concepts, initiatives, decisions, metrics, people, analyses, style rules, or custom entity types. Pages use a shared schema, citations, and a `confidence` value of `high`, `medium`, `low`, or `contested`, so agents know how far to trust each claim.
+3. **Build durable knowledge.** Wiki pages capture the configured domain: products, features, personas, customers, competitors, concepts, initiatives, decisions, metrics, people, analyses, or custom entity types. Pages use a shared schema, citations, and a `confidence` value of `high`, `medium`, `low`, or `contested`, so agents know how far to trust each claim. Writing and naming rules live in operating docs rather than a default entity folder.
 4. **Connect related context.** Pages link to each other with `[[wiki-links]]`. Agents choose meaningful outgoing links; the repo can rebuild the incoming `## Referenced by` lists automatically.
 5. **Check and protect the corpus.** A layer of automated checks and approval gates guards the result. The next section lists them.
 
@@ -81,8 +81,8 @@ The checks and guardrails that protect the corpus:
 | Three-tier lint | `scripts/lint.py` reports two deterministic tiers: Tier 1 fails on broken structure; Tier 2 ranks suspicious patterns for review. Tier 3, genuine judgment, is left to the `/wiki-lint` prose workflow, not the script. |
 | Evidence review | Full `/wiki-lint` adds sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
-| Approval gates and ledgers | Approval gates make the agent ask before filing analyses, applying artifact promotions, or approving synthesis; ledgers record what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test backlinks, lint fixtures, approval and synthesis gates, capture and synthesis ledgers, operational helpers such as export and shortcut sync, and Tier-1 lint over the live corpus. |
+| Approval gate and ledger | `scripts/capture_gate.py` makes the agent ask before filing analyses, applying artifact promotions, or approving synthesis; `scripts/capture-runs.jsonl` records what was approved afterward. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, the unified approval gate, ledger validation, export, review due checks, wrapper sync, and Tier-1 lint over the live corpus. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
@@ -99,7 +99,6 @@ Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task inst
 |-- CLAUDE.md                  # Thin Claude Code wrapper
 |
 |-- .claude/commands/          # Claude Code slash-command wrappers
-|-- .codex/commands/           # Codex command mirrors
 |-- .codex/skills/             # Repo-local Codex skill wrappers
 |
 |-- workflows/                 # Vendor-neutral workflow instructions

@@ -8,7 +8,7 @@ This folder is gitignored by default since source documents can be sensitive. On
 
 ## Subfolders
 
-This template starts unconfigured. During `SETUP.md`, fill `wiki/domain.md` `raw_taxonomy`, create matching `raw/<bucket>/` folders, and replace or extend the placeholder rows below with the configured buckets. The table must list every actual top-level `raw/` bucket, because `scripts/lint.py --tier1` treats unlisted buckets as structural drift.
+This template starts unconfigured. During `SETUP.md`, fill `wiki/domain.md` `raw_taxonomy`, create matching `raw/<bucket>/` folders, and replace or extend the placeholder rows below with the configured buckets. Keep this table, `wiki/domain.md`, and `scripts/raw-buckets.json` aligned. The JSON file is the tracked taxonomy source that `scripts/lint.py --tier1` reads for structural checks.
 
 | Folder | Holds |
 |---|---|

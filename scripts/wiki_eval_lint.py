@@ -71,9 +71,14 @@ def edit(root, rel, old, new):
 
 def write_adjudications(root, **kwargs):
     base = {"accepted_orphans": [], "hub_pages": [], "skipped_crossref_pairs": [],
-            "reviewed_confidence_low": [], "reviewed_near_duplicates": []}
+            "reviewed_confidence_low": [], "reviewed_near_duplicates": [],
+            "reviewed_quotes": []}
     base.update(kwargs)
     (root / "scripts" / "lint-adjudications.json").write_text(json.dumps(base))
+
+
+def write_raw_buckets(root, buckets):
+    (root / "scripts" / "raw-buckets.json").write_text(json.dumps({"buckets": buckets}))
 
 
 # ---- Tier 1: clean fixture is the control ----
@@ -138,7 +143,7 @@ run_case(
     "duplicate-stem-fires",
     lambda r: (
         shutil.copy(r / "wiki/concepts/delta-three.md", r / "wiki/sources/delta-three.md"),
-        edit(r, "wiki/sources/delta-three.md", "type: concept", "type: source\nsource_type: notes"),
+        edit(r, "wiki/sources/delta-three.md", "type: concept", "type: source\nsource_type: other"),
         append(r, "wiki/index.md", "| [delta-three.md](sources/delta-three.md) | dup stem |\n"),
     ),
     expect_code=1, expect=("duplicate-stem",),
@@ -154,7 +159,7 @@ run_case(
     "resolving-raw-source-ref-passes",
     lambda r: (
         (r / "raw" / "notes").mkdir(parents=True),
-        (r / "raw" / "README.md").write_text("| Folder | Holds |\n|---|---|\n| `notes/` | fixture notes |\n"),
+        write_raw_buckets(r, {"notes": "fixture notes"}),
         (r / "raw" / "notes" / "real.md").write_text("raw fixture"),
         edit(r, "wiki/concepts/alpha.md",
              'sources: ["experience: lint eval fixture"]',
@@ -183,9 +188,38 @@ run_case(
     "unknown-raw-bucket-fires",
     lambda r: (
         (r / "raw" / "misc").mkdir(parents=True),
-        (r / "raw" / "README.md").write_text("| Folder | Holds |\n|---|---|\n| `notes/` | fixture notes |\n"),
+        write_raw_buckets(r, {"notes": "fixture notes"}),
     ),
-    expect_code=1, expect=("raw-structure", "missing from raw/README.md"),
+    expect_code=1, expect=("raw-structure", "missing from scripts/raw-buckets.json"),
+)
+run_case(
+    "missing-raw-buckets-file-fires",
+    lambda r: (r / "raw" / "notes").mkdir(parents=True),
+    expect_code=1, expect=("raw-buckets", "raw bucket taxonomy file is missing"),
+)
+run_case(
+    "markdown-md-link-fires",
+    lambda r: append(r, "wiki/index.md", "[Missing](missing.md)\n"),
+    expect_code=1, expect=("markdown-link", "missing.md"),
+)
+run_case(
+    "meta-dangling-link-fires",
+    lambda r: append(r, "wiki/index.md", "[[no-such-meta-target]]\n"),
+    expect_code=1, expect=("meta-dangling-link", "no-such-meta-target"),
+)
+run_case(
+    "empty-agent-use-cases-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   "agent_use_cases:\n  - lint eval fixture",
+                   "agent_use_cases:"),
+    expect_code=1, expect=("frontmatter", "agent_use_cases has no list items"),
+)
+run_case(
+    "bad-review-by-date-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   "confidence: medium",
+                   "confidence: medium\nreview_by: 2026-13-99"),
+    expect_code=1, expect=("date", "not a real calendar date"),
 )
 run_case(
     "loose-deliverable-fires",

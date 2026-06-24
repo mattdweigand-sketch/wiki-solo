@@ -28,8 +28,8 @@ Ask these in order. Keep it conversational; one question at a time unless the us
 
 1. **Organization name.** "What's the name of the organization, team, or project this wiki is about?"
 2. **Domain.** "One line — what subject area does this wiki cover? (Examples: 'private-markets fintech,' 'developer tools for payments,' 'biotech research at a Series B startup.')"
-3. **Entity types.** Show the user the 13 default types from [`wiki/SCHEMA.md`](wiki/SCHEMA.md) and ask which to keep. Default is all 13. Common drops: a B2C product may not need `customer` as named accounts; a research lab may not need `competitor`.
-4. **Custom entity types.** "Any entity types specific to your domain that aren't in the default 13? (Examples: 'integrations' for a SaaS product, 'experiments' for a research lab, 'regulations' for a compliance team.)"
+3. **Entity types.** Show the user the 12 default types from [`wiki/SCHEMA.md`](wiki/SCHEMA.md) and ask which to keep. Default is all 12. Common drops: a B2C product may not need `customer` as named accounts; a research lab may not need `competitor`.
+4. **Custom entity types.** "Any entity types specific to your domain that aren't in the default set? (Examples: 'integrations' for a SaaS product, 'experiments' for a research lab, 'regulations' for a compliance team.)"
 5. **Source taxonomy.** "What subfolders should exist under `raw/`? Pick categories that match where your source documents come from. (Examples: `competitive-intel`, `customer-research`, `internal-memos`, `release-notes`, `press`.)"
 6. **Example queries.** "3–5 questions you want this wiki to answer well. These guide what to ingest first and what `agent_use_cases` to write into entity pages."
 
@@ -61,7 +61,7 @@ Do not rewrite [`CLAUDE.md`](CLAUDE.md) during setup or future operating-map upd
 
 For each entry in `raw_taxonomy`, create `raw/<name>/` with a `.gitkeep` file inside.
 
-Update [`raw/README.md`](raw/README.md) so it contains a concrete subfolder table for the configured wiki:
+Update [`raw/README.md`](raw/README.md) and [`scripts/raw-buckets.json`](scripts/raw-buckets.json) so they contain the same concrete bucket list for the configured wiki:
 
 ```markdown
 ## Subfolders
@@ -71,11 +71,11 @@ Update [`raw/README.md`](raw/README.md) so it contains a concrete subfolder tabl
 | `customer-research/` | <what goes here> |
 ```
 
-The exact descriptions can be brief. The important part is that `raw/README.md` and `wiki/domain.md` agree, because `scripts/lint.py --tier1` treats unlisted raw buckets as structural drift once setup is configured.
+The exact descriptions can be brief. The important part is that `raw/README.md`, `scripts/raw-buckets.json`, and `wiki/domain.md` agree, because `scripts/lint.py --tier1` treats raw buckets missing from `scripts/raw-buckets.json` as structural drift.
 
 ### 4. Drop unused entity folders
 
-For each of the 13 default entity types **not** in `entity_types_active`, delete the corresponding `wiki/<type>/` folder. For each entry in `entity_types_custom`, create a new `wiki/<type>/` folder with a `.gitkeep`.
+For each of the 12 default entity types **not** in `entity_types_active`, delete the corresponding `wiki/<type>/` folder. For each entry in `entity_types_custom`, create a new `wiki/<type>/` folder with a `.gitkeep`.
 
 If you add custom entity types, also append a row for each to the "Entity Types" table in [`wiki/SCHEMA.md`](wiki/SCHEMA.md) so the ingest workflow knows about them.
 
@@ -104,7 +104,7 @@ Show a one-paragraph summary of what changed and what's next: "Configured. Drop 
 Hands off:
 
 - [`scripts/`](scripts/) — deterministic helpers and live eval fixtures
-- [`.claude/commands/`](.claude/commands/) and [`.codex/commands/`](.codex/commands/) — optional wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`
+- [`.claude/commands/`](.claude/commands/) and [`.codex/skills/`](.codex/skills/) — optional wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`
 - [`workflows/*/CONTEXT.md`](workflows/) — workflow routers
 - [`workflows/maintenance/*.md`](workflows/maintenance/) — maintenance task workflows
 - The schema's "Page Format," "Source-Type Summary Templates," and "Confidence Values" sections in [`wiki/SCHEMA.md`](wiki/SCHEMA.md) — domain-agnostic infrastructure

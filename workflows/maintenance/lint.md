@@ -20,9 +20,9 @@ Invoking `/lint`, `/wiki-lint`, or `wiki-lint` is an explicit request to run thi
    python3 scripts/lint.py
    ```
 
-   It reports two tiers. **Tier 1** is machine-checkable and exits non-zero on any failure: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, index coverage, duplicate link stems, raw source references, repo folder-structure hygiene, raw/deliverables hygiene, and `.DS_Store` files. These are not judgment calls, so fix them rather than debating them.
+   It reports two tiers. **Tier 1** is machine-checkable and exits non-zero on any failure: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates including `review_by`, dangling `[[links]]`, stale Markdown `.md` links, index coverage, duplicate link stems, empty required block lists, raw source references, raw bucket taxonomy drift against `scripts/raw-buckets.json`, tracked raw artifacts, repo folder-structure hygiene, raw/deliverables hygiene, stray tool-call artifacts, and `.DS_Store` files. These are not judgment calls, so fix them rather than debating them.
 
-   **Tier 2** is ranked candidates the script surfaces but cannot decide: near-duplicate pages, orphans, uncited pages, thin stubs, `confidence: low` pages with enough inbound links to upgrade, missing cross-references, and quote/source mismatches that need review. Treat Tier 2 as a worklist to adjudicate, not as failures.
+   **Tier 2** is ranked candidates the script surfaces but cannot decide: near-duplicate pages, orphans, uncited pages, thin stubs, `confidence: low` pages with enough inbound links to upgrade, missing cross-references, quote/source mismatches that need review, and decisions missing `review_by` outcome checkpoints. Treat Tier 2 as a worklist to adjudicate, not as failures.
 
    Do not chase Tier 2 to zero. Add links only when the relationship is editorially meaningful. Leave weak candidates unresolved and record settled judgments in `scripts/lint-adjudications.json` so lint stops re-surfacing them.
 

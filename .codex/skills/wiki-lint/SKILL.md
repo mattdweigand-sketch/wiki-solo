@@ -5,19 +5,10 @@ description: Run the wiki lint workflow. Use when the user says /wiki-lint, wiki
 
 # Wiki Lint
 
-Run the lint workflow for the current wiki repo.
+Run the lint workflow for the current wiki repo. Read `AGENTS.md`, check `wiki/domain.md`, then route through `CONTEXT.md` to `workflows/maintenance/lint.md`.
 
 Invoking `/lint`, `/wiki-lint`, or `wiki-lint` is an explicit request to run the full lint workflow, including the verifier-agent evidence check described in `workflows/maintenance/lint.md`. Do not ask for separate confirmation before using verifier agents unless the user asks for deterministic-only lint, no subagents, or skipping the evidence check.
 
-## Procedure
-
-1. Work from the repo root that contains `AGENTS.md`.
-2. Read `AGENTS.md`.
-3. Check `wiki/domain.md` for setup status; if `status: unconfigured`, route to `SETUP.md` first.
-4. Read `CONTEXT.md`.
-5. Open `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/lint.md`.
-6. Follow the lint workflow's Load / Skip list exactly.
-7. Run the deterministic and judgment checks requested by the workflow.
-8. Finish with `python3 scripts/lint.py --tier1` clean unless the workflow explicitly identifies a non-local blocker.
+Use `python3 scripts/lint.py --tier1` as the deterministic gate.
 
 This is a tracked Codex skill wrapper. Canonical behavior lives in the repo workflow files.

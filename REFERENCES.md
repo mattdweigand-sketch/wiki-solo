@@ -11,7 +11,7 @@ The wiki maintainer:
 - Ingests sources and extracts knowledge into structured wiki pages.
 - Keeps pages consistent, cross-referenced, and up to date.
 - Answers queries by reading the wiki, not by re-deriving from raw sources.
-- Files substantial answers back into the wiki when the research workflow criteria are met, using `scripts/capture_gate.py` before analysis capture and artifact promotion.
+- Files substantial answers back into the wiki when the research workflow criteria are met, using `scripts/capture_gate.py` before analysis capture, artifact promotion, and synthesis promotion.
 - Audits reusable artifacts for promotion when they should compound elsewhere.
 - Periodically lints for contradictions, stale content, and orphan pages.
 
@@ -41,7 +41,7 @@ Detailed workflow ownership:
 | Research | `workflows/research/CONTEXT.md` | Wiki-grounded answers, selective page loading, optional analysis capture, and promotion-candidate audits. |
 | Capture decision | `workflows/maintenance/capture-decision.md` | Decision pages with rationale, alternatives, affected entities, cross-links, verification, and log entries. |
 | Capture experience | `workflows/maintenance/capture-experience.md` | Field notes or lived context stored in the most relevant entity folder with lessons and links. |
-| Artifact promotion | `workflows/maintenance/artifact-promotion.md` | Routing useful external or conversational artifacts to source, concept, analysis, decision, initiative, style, workflow, script, existing page update, or discard. |
+| Artifact promotion | `workflows/maintenance/artifact-promotion.md` | Routing useful external or conversational artifacts to source, concept, analysis, decision, initiative, workflow, script, existing page update, or discard. |
 | Lint | `workflows/maintenance/lint.md` | Deterministic structure checks, Tier-2 quality candidates, judgment checks, citation evidence review, and updates to contradiction or sourcing-queue records when gaps open or close. |
 | Synthesis | `workflows/maintenance/synthesize.md` | Drafting and approving corpus-level distillations: overview refreshes, gap resolutions, cluster analyses, primer updates, and open questions. |
 | Export | `workflows/maintenance/export.md` | Local corpus backup, including gitignored raw sources, without reading wiki content or uploading anywhere. |
@@ -56,11 +56,10 @@ The main control mechanisms are:
 | Deterministic lint | `scripts/lint.py --tier1` catches structural failures. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
 | Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, and wrapper sync. |
 | Sourcing queue | `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers. `workflows/maintenance/refresh-sourcing-queue.md` can reprioritize it when needed. |
-| Capture gate | `scripts/capture_gate.py` guards analysis capture and artifact-promotion apply routes, then records approved boundaries in `scripts/capture-runs.jsonl`. |
-| Synthesis gate | `scripts/synthesis_gate.py` guards promotion of synthesis drafts and records approved boundaries in `scripts/synthesis-runs.jsonl`. |
+| Approval gate | `scripts/capture_gate.py` guards analysis capture, artifact-promotion apply routes, and reviewed synthesis promotion (`--kind=synthesis`), then records approved boundaries in `scripts/capture-runs.jsonl`. |
 | Synthesis ledger | `wiki/synthesis.md` orients future synthesis runs; cite source pages, not the ledger, when making claims. |
 | Export | `scripts/export_wiki.py` builds a local backup that includes gitignored `raw/` sources. |
-| Thin wrappers | `.claude/commands/`, `.codex/commands/`, and `.codex/skills/` expose shortcuts but do not own canonical behavior. |
+| Thin wrappers | `.claude/commands/` and `.codex/skills/` expose shortcuts but do not own canonical behavior. |
 
 ---
 
@@ -104,6 +103,7 @@ When stating a specific fact, append `(source: [[source-filename]])`. When stati
 | File or folder | Purpose |
 |---|---|
 | `raw/README.md` | Source-artifact handling note for the ignored `raw/` corpus |
+| `scripts/raw-buckets.json` | Tracked raw bucket taxonomy read by Tier-1 lint |
 | `scripts/lint-adjudications.json` | Settled Tier-2 lint judgments with reasons and dates; lint suppresses what it lists |
 | `scripts/fixtures/` | Fixture data for live tooling evals |
 

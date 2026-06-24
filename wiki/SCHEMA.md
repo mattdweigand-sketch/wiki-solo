@@ -20,7 +20,6 @@ Reference spec for entity types, page format, and source-type summary templates.
 | **Metric** | `wiki/metrics/` | A KPI or North Star: definition, formula, current value, target, owner |
 | **Person/Team** | `wiki/people/` | A role, team, or stakeholder (focus on role and responsibility, not biography) |
 | **Analysis** | `wiki/analyses/` | A synthesized output: comparison, gap analysis, brief, outline |
-| **Style Rule** | `wiki/style/` | A writing or naming convention for agent-generated content built on this wiki |
 
 ---
 
@@ -31,9 +30,10 @@ Every wiki page must have this YAML frontmatter:
 ```yaml
 ---
 title: <page title>
-type: source | product | feature | persona | customer | competitor | concept | initiative | decision | metric | person | analysis | style
+type: source | product | feature | persona | customer | competitor | concept | initiative | decision | metric | person | analysis
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
+review_by: YYYY-MM-DD         # OPTIONAL — outcome-review checkpoint, especially for decisions
 sources: [list of raw source filenames that informed this page]
 source_type: help-doc | slack-thread | call-transcript | exec-memo | deck | crm-export | strategy-doc | release-note | press | analyst-report | competitor-collateral | sales-battlecard | product-spec | board-doc | synthesis | other  # SOURCE PAGES ONLY — describes the underlying raw artifact
 tags: [relevant tags]
@@ -44,7 +44,9 @@ agent_use_cases:                  # which downstream-agent questions this page i
 ---
 ```
 
-`source_type` is required on pages in `wiki/sources/` and omitted elsewhere. `agent_use_cases` is required on every page except `sources/`, `index.md`, `log.md`, `glossary.md`, and `style/` rules — those are infrastructure, not retrievable answers.
+`source_type` is required on pages in `wiki/sources/` and omitted elsewhere. `agent_use_cases` is required on every entity page except `sources/`; root meta pages such as `index.md`, `log.md`, and `glossary.md` are infrastructure, not retrievable answers.
+
+`review_by` is optional on most pages and recommended when a claim, forecast, or decision should be graded against future outcomes. Decisions should carry a `review_by` checkpoint unless there is a clear reason not to enroll them in the outcome-review loop.
 
 Followed by:
 1. **One-line summary** (used in `index.md` and in agent-retrieved snippets)

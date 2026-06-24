@@ -1,6 +1,6 @@
 ---
 name: wiki-export
-description: Use this workflow when the user says "export the wiki" or wants a local backup. Builds a zip of the corpus, including gitignored raw/ sources.
+description: Use this workflow when the user says "export the wiki" or wants a local corpus zip. Builds a zip of the template, wiki, and gitignored raw/ sources.
 ---
 
 # Export Workflow
@@ -12,7 +12,7 @@ description: Use this workflow when the user says "export the wiki" or wants a l
 
 ## Why this exists
 
-`raw/` is gitignored, so the git remote may not hold source artifacts. This export builds a local backup of the corpus: wiki pages plus raw sources plus workflows, scripts, archive, command wrappers, and top-level docs.
+`raw/` is gitignored, so the git remote may not hold source artifacts. This export builds a local zip of the corpus and operating framework: wiki pages plus raw sources plus workflows, scripts, wrappers, CI, and top-level docs.
 
 ## Steps
 
@@ -22,7 +22,7 @@ description: Use this workflow when the user says "export the wiki" or wants a l
    python3 scripts/export_wiki.py --date YYYY-MM-DD
    ```
 
-   This includes everything except git internals, `tmp/`, `deliverables/`, Claude worktrees, local Claude settings, Finder metadata, `.env`, and zip files. It includes `wiki/`, `raw/`, `workflows/`, `scripts/` with fixtures and operational ledgers, `archive/`, both command folders, and the top-level docs.
+   This includes `wiki/`, `raw/`, `workflows/`, `scripts/` with fixtures and ledgers, `.claude/commands/`, `.codex/skills/`, `.github/workflows/`, and the top-level docs. It excludes `.git/`, `tmp/`, `deliverables/`, Claude worktrees, local Claude settings, Finder metadata, `.env`, and generated zip files.
 
 2. If you need to inspect before building, run:
 

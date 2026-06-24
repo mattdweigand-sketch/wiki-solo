@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-"""Validate the structured capture approval ledger."""
+"""Validate the structured approval ledger."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
-import json
-import re
 import sys
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from ledger_common import (
+    is_nonempty_string,
+    validate_ledger,
+    validate_pages as _validate_pages,
+    validate_timestamp,
+)
+
 
 DEFAULT_LEDGER = Path("scripts/capture-runs.jsonl")
-RUN_ID_RE = re.compile(r"^[0-9a-f]{16}$")
+VALID_RECORD_TYPES = {"capture_approval", "synthesis_approval"}
 VALID_ROUTES = {"analysis-capture", "promotion-audit"}
 VALID_PHASES = {"accepted"}
 VALID_TRIGGERS = {
@@ -32,74 +35,26 @@ def parser() -> argparse.ArgumentParser:
         "path",
         nargs="?",
         default=str(DEFAULT_LEDGER),
-        help="JSONL capture approval ledger to validate.",
+        help="JSONL approval ledger to validate.",
     )
     return p
 
 
-def is_nonempty_string(value: Any) -> bool:
-    return isinstance(value, str) and bool(value.strip())
-
-
-def stable_run_id(record: dict[str, Any]) -> str:
-    payload = {
-        "artifact": record["artifact"].strip(),
-        "route": record["route"],
-        "phase": record["phase"],
-        "primary_home": record["primary_home"].strip(),
-        "pages_touched": record["pages_touched"],
-        "source_path": record.get("source_path", "").strip(),
-        "synthesized_pages": record.get("synthesized_pages", 0),
-        "word_count": record.get("word_count", 0),
-        "domain_context": record.get("domain_context", False),
-        "triggers": sorted(record.get("triggers", [])),
-    }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()[:16]
-
-
-def validate_timestamp(value: Any) -> str | None:
-    if not is_nonempty_string(value):
-        return "approved_at must be a non-empty string"
-    normalized = value.removesuffix("Z") + "+00:00" if value.endswith("Z") else value
-    try:
-        datetime.fromisoformat(normalized)
-    except ValueError:
-        return "approved_at must be ISO-8601 parseable"
-    return None
-
-
-def validate_schema(record: dict[str, Any], line_no: int) -> list[str]:
+def validate_backfill_fields(record: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if line_no != 1:
-        errors.append("schema record must be the first line")
-    if record.get("schema_version") != 1:
-        errors.append("schema record must have schema_version 1")
-    if not is_nonempty_string(record.get("description")):
-        errors.append("schema record must have a description")
+    if record.get("backfilled") is True and not is_nonempty_string(record.get("backfill_source")):
+        errors.append("backfilled records must include backfill_source")
+    if "backfilled" in record and not isinstance(record.get("backfilled"), bool):
+        errors.append("backfilled must be a boolean when present")
     return errors
 
 
-def validate_pages(record: dict[str, Any]) -> list[str]:
-    pages_touched = record.get("pages_touched")
-    if not isinstance(pages_touched, list) or not pages_touched:
-        return ["pages_touched must be a non-empty list"]
-    if not all(is_nonempty_string(path) for path in pages_touched):
-        return ["pages_touched entries must be non-empty strings"]
-    primary_home = record.get("primary_home")
-    if is_nonempty_string(primary_home) and primary_home not in pages_touched:
-        return ["primary_home must be included in pages_touched"]
-    return []
-
-
-def validate_approval(record: dict[str, Any]) -> list[str]:
+def validate_capture_approval(record: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if record.get("schema_version") != 1:
         errors.append("approval record must have schema_version 1")
     if record.get("approval_status") != "approved":
         errors.append("approval_status must be approved")
-    if not isinstance(record.get("run_id"), str) or not RUN_ID_RE.match(record["run_id"]):
-        errors.append("run_id must be 16 lowercase hex characters")
     for key in ("artifact", "primary_home"):
         if not is_nonempty_string(record.get(key)):
             errors.append(f"{key} must be a non-empty string")
@@ -110,7 +65,7 @@ def validate_approval(record: dict[str, Any]) -> list[str]:
     if record.get("phase") not in VALID_PHASES:
         errors.append("phase must be accepted for capture approvals")
 
-    errors.extend(validate_pages(record))
+    errors.extend(_validate_pages(record))
 
     timestamp_error = validate_timestamp(record.get("approved_at"))
     if timestamp_error:
@@ -141,75 +96,59 @@ def validate_approval(record: dict[str, Any]) -> list[str]:
     if route == "promotion-audit" and triggers == []:
         errors.append("promotion-audit records must include at least one trigger")
 
-    if record.get("backfilled") is True and not is_nonempty_string(record.get("backfill_source")):
-        errors.append("backfilled records must include backfill_source")
-    if "backfilled" in record and not isinstance(record.get("backfilled"), bool):
-        errors.append("backfilled must be a boolean when present")
-
-    if not errors:
-        expected = stable_run_id(record)
-        if record["run_id"] != expected:
-            errors.append(f"run_id mismatch: expected {expected}")
-
+    errors.extend(validate_backfill_fields(record))
     return errors
 
 
-def validate(path: Path) -> tuple[list[str], int]:
+def check_synthesis_record(record: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    approval_count = 0
-    seen_run_ids: set[str] = set()
-    schema_count = 0
+    if record.get("schema_version") != 1:
+        errors.append("approval record must have schema_version 1")
+    if record.get("approval_status") != "approved":
+        errors.append("approval_status must be approved")
+    for key in ("artifact", "drafts", "primary_home"):
+        if not is_nonempty_string(record.get(key)):
+            errors.append(f"{key} must be a non-empty string")
 
-    if not path.exists():
-        return [f"{path} does not exist"], 0
+    pages_touched = record.get("pages_touched")
+    errors.extend(_validate_pages(record))
 
-    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        if not line.strip():
-            errors.append(f"line {line_no}: blank lines are not allowed")
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            errors.append(f"line {line_no}: invalid JSON: {exc.msg}")
-            continue
-        if not isinstance(record, dict):
-            errors.append(f"line {line_no}: record must be a JSON object")
-            continue
+    timestamp_error = validate_timestamp(record.get("approved_at"))
+    if timestamp_error:
+        errors.append(timestamp_error)
 
-        record_type = record.get("record_type")
-        if record_type == "schema":
-            schema_count += 1
-            for error in validate_schema(record, line_no):
-                errors.append(f"line {line_no}: {error}")
-            continue
-        if record_type != "capture_approval":
-            errors.append(f"line {line_no}: unsupported record_type {record_type!r}")
-            continue
+    if isinstance(pages_touched, list) and record.get("primary_home") == "wiki/synthesis.md":
+        if record.get("ledger_update_required") is not True:
+            errors.append("wiki/synthesis.md primary_home requires ledger_update_required true")
 
-        approval_count += 1
-        for error in validate_approval(record):
-            errors.append(f"line {line_no}: {error}")
-        run_id = record.get("run_id")
-        if isinstance(run_id, str):
-            if run_id in seen_run_ids:
-                errors.append(f"line {line_no}: duplicate run_id {run_id}")
-            seen_run_ids.add(run_id)
+    if "ledger_update_required" not in record or not isinstance(record.get("ledger_update_required"), bool):
+        errors.append("ledger_update_required must be a boolean")
 
-    if schema_count != 1:
-        errors.append(f"expected exactly one schema record, found {schema_count}")
+    errors.extend(validate_backfill_fields(record))
+    return errors
 
-    return errors, approval_count
+
+def validate_approval(record: dict[str, Any]) -> list[str]:
+    if record.get("record_type") == "capture_approval":
+        return validate_capture_approval(record)
+    if record.get("record_type") == "synthesis_approval":
+        return check_synthesis_record(record)
+    return [f"unsupported record_type {record.get('record_type')!r}"]
+
+
+def validate(path: Path) -> tuple[list[str], int]:
+    return validate_ledger(path, VALID_RECORD_TYPES, validate_approval)
 
 
 def main() -> int:
     args = parser().parse_args()
     errors, approval_count = validate(Path(args.path))
     if errors:
-        print("Capture run ledger validation failed:")
+        print("Approval ledger validation failed:")
         for error in errors:
             print(f"- {error}")
         return 1
-    print(f"Capture run ledger validation passed: {approval_count} approved record(s)")
+    print(f"Approval ledger validation passed: {approval_count} approved record(s)")
     return 0
 
 

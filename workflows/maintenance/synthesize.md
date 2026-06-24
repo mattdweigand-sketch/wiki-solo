@@ -11,7 +11,7 @@ The core contract is the draft-then-grade loop. Synthesis is judgment that futur
 
 ## Load / Skip
 
-- **Load:** `wiki/synthesis.md` (the human-readable ledger: read Current state and the last few run entries first, so the run builds on prior conclusions instead of re-deriving them), recent `scripts/synthesis-runs.jsonl` approval records when checking whether a prior synthesis scope was approved, full `python3 scripts/lint.py` output, `wiki/log.md` entries since the last `synthesis` entry, `wiki/index.md`, `wiki/overview.md`, and only the candidate pages the signals point to. At drafting time: `wiki/SCHEMA.md` and `REFERENCES.md`.
+- **Load:** `wiki/synthesis.md` (the human-readable ledger: read Current state and the last few run entries first, so the run builds on prior conclusions instead of re-deriving them), recent synthesis approval records in `scripts/capture-runs.jsonl` when checking whether a prior synthesis scope was approved, full `python3 scripts/lint.py` output, `wiki/log.md` entries since the last `synthesis` entry, `wiki/index.md`, `wiki/overview.md`, and only the candidate pages the signals point to. At drafting time: `wiki/SCHEMA.md` and `REFERENCES.md`.
 - **Skip:** `raw/` sources and entity folders the candidates do not touch.
 
 ## Synthesis Targets
@@ -27,8 +27,8 @@ The core contract is the draft-then-grade loop. Synthesis is judgment that futur
 - Never silently overwrite verified content. Anything that conflicts with what a page already says gets flagged in `wiki/contradictions.md` first.
 - Bound each run to at most 5 drafts.
 - Drafting a new `wiki/analyses/` page is the analysis-capture route: run `python3 scripts/capture_gate.py` first and stop at `APPROVAL REQUIRED`.
-- Promoting, approving, or ledgering synthesis output requires the synthesis approval gate: run `python3 scripts/synthesis_gate.py` with `--artifact`, `--drafts`, and `--pages-touched` before updating `wiki/synthesis.md`, flipping draft confidence/status, or logging a synthesis promotion. If it prints `APPROVAL REQUIRED`, show the request and stop. Re-run with `--approved` only after the user clearly approves the displayed draft and file scope.
-- `scripts/synthesis-runs.jsonl` is the structured approval ledger. It records approved approval boundaries only. Unreviewed synthesis drafts do not get structured run records; the approved gate rerun appends or confirms the idempotent JSONL record before any human-readable ledger or promotion-log update. `python3 scripts/validate_synthesis_runs.py` must pass after any approved gate write or backfill.
+- Promoting, approving, or ledgering synthesis output requires the unified approval gate: run `python3 scripts/capture_gate.py --kind=synthesis` with `--artifact`, `--drafts`, and `--pages-touched` before updating `wiki/synthesis.md`, flipping draft confidence/status, or logging a synthesis promotion. If it prints `APPROVAL REQUIRED`, show the request and stop. Re-run with `--approved` only after the user clearly approves the displayed draft and file scope.
+- `scripts/capture-runs.jsonl` is the single structured approval ledger. It records approved approval boundaries only. Unreviewed synthesis drafts do not get structured run records; the approved gate rerun appends or confirms the idempotent JSONL record before the durable change crosses the promotion boundary. `python3 scripts/validate_capture_runs.py` must pass after any approved gate write or backfill.
 - Ground every claim in cited pages. Synthesis combines what the corpus says; it never adds facts the corpus does not contain.
 - Cite original pages, never the ledger. `wiki/synthesis.md` is for orientation and drift tracking only.
 
@@ -44,8 +44,8 @@ The core contract is the draft-then-grade loop. Synthesis is judgment that futur
    python3 scripts/lint.py --tier1
    ```
 
-5. Report in chat: each draft, its grounding, and where it sits. Then run `python3 scripts/synthesis_gate.py --artifact "<short run>" --drafts "<drafts the user should review>" --pages-touched "<full approval edit scope, including wiki/synthesis.md if the ledger will be updated>"`. If it prints `APPROVAL REQUIRED`, show the request and stop. Drafts stay at draft/low until reviewed, and no structured run record is written yet.
-6. On approval, first re-run the exact `scripts/synthesis_gate.py` command with `--approved`. This appends or confirms the structured approval record in `scripts/synthesis-runs.jsonl`; then run `python3 scripts/validate_synthesis_runs.py`. After that, flip `confidence:` and `status:` where appropriate, then log a `promotion` entry. On rejection, revert or rework.
+5. Report in chat: each draft, its grounding, and where it sits. Then run `python3 scripts/capture_gate.py --kind=synthesis --artifact "<short run>" --drafts "<drafts the user should review>" --pages-touched "<full approval edit scope, including wiki/synthesis.md if the ledger will be updated>"`. If it prints `APPROVAL REQUIRED`, show the request and stop. Drafts stay at draft/low until reviewed, and no structured run record is written yet.
+6. On approval, first re-run the exact `scripts/capture_gate.py --kind=synthesis` command with `--approved`. This appends or confirms the structured approval record in `scripts/capture-runs.jsonl`; then run `python3 scripts/validate_capture_runs.py`. After that, flip `confidence:` and `status:` where appropriate, then log a `promotion` entry. On rejection, revert or rework.
 7. Update the human-readable ledger as part of the approved run: refresh Current state digest lines that changed and append a run entry recording drafts, approvals, rejections, questions opened and closed, sections reshaped, and ingests that drove the change.
 8. Append to `wiki/log.md`:
 

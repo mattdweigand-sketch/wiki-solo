@@ -2,15 +2,15 @@
 
 `AGENTS.md` is canonical: it holds the folder map, conventions, and hard rules. This file routes a task to the right workspace. Do not read everything; find the task, open the workflow entry, and load only what it says to load.
 
-Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. `.codex/commands/` is kept as a repo-local mirror. Nothing here depends on any wrapper surface.
+Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. Nothing here depends on any wrapper surface.
 
 Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer), and **maintenance** (lint, eval, artifact promotion, captures, sourcing queue, synthesize, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
 
 Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; no separate route preflight runs.
 
-Analysis capture and artifact promotion share one executable approval gate: `python3 scripts/capture_gate.py`. Its job is approval rather than routing: it derives a mode and primary home from its inputs, then blocks durable analysis/promotion edits until the user approves them. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the full output and wait for approval before editing files. Approved reruns write or confirm `scripts/capture-runs.jsonl`.
+Analysis capture, artifact promotion, and synthesis promotion share one executable approval gate: `python3 scripts/capture_gate.py`. Its job is approval rather than routing: it derives a mode and primary home from its inputs, then blocks durable analysis/promotion/synthesis edits until the user approves them. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the full output and wait for approval before editing files. Approved reruns write or confirm `scripts/capture-runs.jsonl`.
 
-Synthesis promotion has a separate executable approval gate: `python3 scripts/synthesis_gate.py`. Run it before updating `wiki/synthesis.md`, flipping synthesis draft status/confidence, or logging a synthesis promotion. Approved reruns write or confirm `scripts/synthesis-runs.jsonl`.
+Synthesis promotion uses `python3 scripts/capture_gate.py --kind=synthesis`. Run it before updating `wiki/synthesis.md`, flipping synthesis draft status/confidence, or logging a synthesis promotion. Approved reruns write or confirm synthesis approval records in `scripts/capture-runs.jsonl`.
 
 ---
 

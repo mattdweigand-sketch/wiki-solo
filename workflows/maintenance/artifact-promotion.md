@@ -5,7 +5,7 @@ description: Use this workflow when a useful output, draft, chat answer, script,
 
 # Artifact Promotion Workflow
 
-Artifact promotion is a router before it is a write. It turns useful work into the right durable layer of the wiki, or decides not to save it. It is not a new entity type. It handles artifacts that start outside the wiki or inside a temporary answer and may deserve to become source, concept, analysis, decision, initiative, style, workflow, schema material, an update to an existing page, or nothing at all.
+Artifact promotion is a router before it is a write. It turns useful work into the right durable layer of the wiki, or decides not to save it. It is not a new entity type. It handles artifacts that start outside the wiki or inside a temporary answer and may deserve to become source, concept, analysis, decision, initiative, workflow, schema material, an update to an existing page, or nothing at all.
 
 This workflow remains the prose policy for promotion. The executable gate is `scripts/capture_gate.py`, which standardizes the approval preflight for artifact promotion and analysis capture. Use code for the checkable approval boundary; use this workflow for judgment about the right home, page quality, links, and logging.
 
@@ -15,8 +15,6 @@ Promotion has two modes:
 - **Apply** - make the chosen wiki update, rebuild backlinks, run Tier-1 lint, and log the promotion. Use when the user explicitly asks to promote, apply, save, file, or update the wiki after the audit.
 
 The `/wiki-promote` shortcut is a route-first command. It does not mean "create a new promotion page." It means: evaluate the artifact, pick the right durable home, then either return an audit or apply the selected route if durable-write intent is already clear. Use `/wiki-capture` instead when the user is directly recording a decision or lived context, not promoting a separate artifact.
-
-Agents may use `python3 scripts/wiki_promote.py "<artifact>"` as an agent-neutral shortcut to start an audit. The shortcut writes no files. It delegates apply approval to `scripts/capture_gate.py` when run with `--apply`.
 
 At the end of wiki-related work, if a useful reusable insight appears, run an audit automatically and show the recommended route. Apply the promotion only if the user has explicitly asked to promote, apply, save, file, or update the wiki with that promotion. A normal ingest request or commit request is not permission to apply extra promotion beyond the already-authorized work. Otherwise stop at the audit and ask for confirmation.
 
@@ -37,7 +35,7 @@ python3 scripts/capture_gate.py \
   [--trigger reusable_distinction|ranking_or_framework|open_question_resolution|future_agent_behavior|existing_page_update]
 ```
 
-The script prints the derived mode: `chat-only`, `ingest`, `analysis-capture`, `promotion-audit`, `capture-decision`, `capture-experience`, or `workflow-update`. An apply route, meaning filing an analysis or promoting an artifact, uses `--phase accepted`: that phase derives `analysis-capture` or `promotion-audit` and triggers the approval gate, while `--phase drafting` and the other phases derive non-approval routes such as `chat-only` that exit 0 without requiring approval, so never use them for an apply (the `scripts/wiki_promote.py --apply` shortcut sets `--phase accepted` for you). The script's `promotion-audit` mode means "promotion apply preflight" when a trigger and durable-write intent are present; audit-only prose recommendations do not run the gate and do not edit files. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope. Approved reruns append or confirm an idempotent structured record in `scripts/capture-runs.jsonl`; validate it with `python3 scripts/validate_capture_runs.py`.
+The script prints the derived mode: `chat-only`, `ingest`, `analysis-capture`, `promotion-audit`, `capture-decision`, `capture-experience`, or `workflow-update`. An apply route, meaning filing an analysis or promoting an artifact, uses `--phase accepted`: that phase derives `analysis-capture` or `promotion-audit` and triggers the approval gate, while `--phase drafting` and the other phases derive non-approval routes such as `chat-only` that exit 0 without requiring approval, so never use them for an apply. The script's `promotion-audit` mode means "promotion apply preflight" when a trigger and durable-write intent are present; audit-only prose recommendations do not run the gate and do not edit files. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope. Approved reruns append or confirm an idempotent structured record in `scripts/capture-runs.jsonl`; validate it with `python3 scripts/validate_capture_runs.py`.
 
 Collaborative drafting is chat-only by default. Requests like "work with me," "let's discuss," "let's define," "refine this," "make this sharper," or "help me think through" are not promotion intent, even when the topic already has a wiki page, the repo is the current working directory, or the result might be reusable. If the draft becomes clearly durable, ask whether to save it; do not edit files first.
 
@@ -58,7 +56,7 @@ Collaborative drafting is chat-only by default. Requests like "work with me," "l
 | Analysis | `wiki/analyses/` | The artifact synthesizes multiple pages or answers a durable question | Competitive comparison |
 | Decision | `wiki/decisions/` | The artifact records a choice and rationale | Adopt typed relationship labels |
 | Initiative update | `wiki/initiatives/` | The artifact changes an active initiative record | Launch scope update |
-| Style rule | `wiki/style/` | The artifact governs writing or naming style | Naming pattern |
+| Operating style rule | `AGENTS.md`, `REFERENCES.md`, or `workflows/` | The artifact governs writing or naming style for future agents | Naming pattern |
 | Operating rule | `AGENTS.md`, `CONTEXT.md`, `REFERENCES.md`, or `workflows/` | The artifact should change how future agents behave | New maintenance workflow |
 | Script | `scripts/` | The artifact is deterministic and repeatable | Link rebuild, lint check |
 
@@ -123,7 +121,7 @@ Use these route labels in audit output and log entries:
 | `ingest` | The artifact is a source that should be preserved before synthesis | `workflows/ingest/CONTEXT.md` |
 | `analysis-capture` | The artifact is a substantial synthesis meeting the analysis criteria | `workflows/research/CONTEXT.md` analysis filing step |
 | `update-existing-page` | A current wiki page already owns the idea or facts | This workflow plus the target page's schema |
-| `create-page` | No current page owns the durable concept, analysis, style rule, or similar artifact | This workflow plus `wiki/SCHEMA.md` |
+| `create-page` | No current page owns the durable concept, analysis, or similar artifact | This workflow plus `wiki/SCHEMA.md` |
 | `capture-decision` | The artifact records a choice and rationale | `workflows/maintenance/capture-decision.md` |
 | `capture-experience` | The artifact records observed or lived context | `workflows/maintenance/capture-experience.md` |
 | `workflow-update` | The artifact changes how future agents should behave | Update `AGENTS.md`, `CONTEXT.md`, `REFERENCES.md`, or `workflows/` |
@@ -172,7 +170,7 @@ When updating operating docs:
 2. Search `wiki/index.md` and relevant folders for existing pages.
 3. Choose one primary home from the promotion ladder.
 4. If the user asked for audit only, return the audit output and stop.
-5. Run `python3 scripts/capture_gate.py --phase accepted` for the proposed apply route (`accepted` derives the approval-requiring `analysis-capture` and `promotion-audit` routes; other phases derive non-approval routes and must not be used for an apply, and `scripts/wiki_promote.py --apply` sets this for you). If it requires approval, show the exact output and stop. Continue only after approval, re-run with `--approved`, and run `python3 scripts/validate_capture_runs.py`.
+5. Run `python3 scripts/capture_gate.py --phase accepted` for the proposed apply route (`accepted` derives the approval-requiring `analysis-capture` and `promotion-audit` routes; other phases derive non-approval routes and must not be used for an apply). If it requires approval, show the exact output and stop. Continue only after approval, re-run with `--approved`, and run `python3 scripts/validate_capture_runs.py`.
 6. Update the existing page or create the new page, workflow file, or script.
 7. Add or update meaningful `[[wikilinks]]`.
 8. Update `wiki/index.md` for new or materially changed wiki pages.

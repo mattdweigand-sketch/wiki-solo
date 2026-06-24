@@ -5,7 +5,7 @@ description: Run the wiki tooling eval workflow. Use when the user says /wiki-ev
 
 # Wiki Eval
 
-Run this workflow when the task is to verify the wiki system itself: scripts, gates, ledgers, backlink rebuilds, export behavior, wrapper sync, and the deterministic Tier-1 gate.
+Run this workflow when the task is to verify the wiki system itself: shared parsing, scripts, gates, the approval ledger, backlink rebuilds, export behavior, wrapper sync, review_due, and the deterministic Tier-1 gate.
 
 This is different from `/wiki-lint`: lint checks wiki content; eval checks the tools that check and protect the wiki.
 

@@ -27,21 +27,23 @@ DEFAULT_EXCLUDE_FILES = {
     ".env",
 }
 REQUIRED_FILES = {
+    ".gitignore",
     "AGENTS.md",
+    "CLAUDE.md",
     "CONTEXT.md",
+    "LICENSE",
     "README.md",
     "REFERENCES.md",
     "SETUP.md",
 }
 REQUIRED_PREFIXES = (
-    "wiki/",
-    "raw/",
-    "workflows/",
-    "scripts/",
     ".claude/commands/",
-    ".codex/commands/",
     ".codex/skills/",
     ".github/workflows/",
+    "raw/",
+    "scripts/",
+    "wiki/",
+    "workflows/",
 )
 
 

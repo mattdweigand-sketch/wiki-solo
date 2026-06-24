@@ -21,6 +21,13 @@ import sys
 from pathlib import Path
 from collections import defaultdict
 
+from _wiki_parse import (
+    LINK_RE,
+    REFERENCED_BY_SECTION_RE,
+    get_entity_pages as _get_entity_pages,
+    strip_referenced_by,
+)
+
 WIKI_ROOT = Path("wiki")
 
 if not WIKI_ROOT.exists():
@@ -31,34 +38,8 @@ if not WIKI_ROOT.exists():
     )
     sys.exit(1)
 
-META_PAGES = {
-    "index", "log", "overview", "glossary", "primer",
-    "sourcing-queue", "contradictions", "design-notes", "SCHEMA", "synthesis",
-    "domain",
-}
-META_DIRS = set()  # all wiki/ subfolders are entity types, style/ included
-
-
 def get_entity_pages():
-    pages = []
-    for p in WIKI_ROOT.rglob("*.md"):
-        parts = p.relative_to(WIKI_ROOT).parts
-        if len(parts) == 1:
-            if p.stem not in META_PAGES:
-                pages.append(p)
-        elif len(parts) == 2:
-            if parts[0] not in META_DIRS:
-                pages.append(p)
-    return sorted(pages)
-
-
-# A generated "## Referenced by" section runs to the next ## heading or EOF.
-REFERENCED_BY_SECTION_RE = re.compile(r'## Referenced by\n.*?(?=\n## |\Z)', re.DOTALL)
-
-
-def strip_referenced_by(text):
-    """Remove generated "## Referenced by" sections so they never count as authored links."""
-    return REFERENCED_BY_SECTION_RE.sub("", text)
+    return _get_entity_pages(WIKI_ROOT)
 
 
 def load_authored_texts(all_pages):
@@ -74,15 +55,11 @@ def load_authored_texts(all_pages):
 
 def find_references(slug, authored_texts, target_path):
     """Return {directory_label: [link_text, ...]} for pages whose authored text mentions [[slug]]."""
-    # Match bare [[slug]], path-qualified [[dir/slug]], or aliased [[dir/slug|text]]
-    pattern = re.compile(
-        r'\[\[(?:[^/\]|]+/)?' + re.escape(slug) + r'(?:\|[^\]]+)?\]\]'
-    )
     refs = defaultdict(list)
     for p, text in authored_texts.items():
         if p == target_path:
             continue
-        if pattern.search(text):
+        if slug in LINK_RE.findall(text):
             parts = p.relative_to(WIKI_ROOT).parts
             dir_label = parts[0] if len(parts) > 1 else "wiki root"
             refs[dir_label].append(f"[[{p.stem}]]")
