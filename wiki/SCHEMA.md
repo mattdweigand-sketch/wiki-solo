@@ -25,7 +25,7 @@ Reference spec for entity types, page format, and source-type summary templates.
 
 ## Page Format
 
-Every wiki page must have this YAML frontmatter:
+Every entity page (any page inside a `wiki/<entity-type>/` folder) must have this YAML frontmatter. Meta pages at the `wiki/` root, such as `index.md`, `log.md`, `overview.md`, `glossary.md`, `primer.md`, `sourcing-queue.md`, `contradictions.md`, `design-notes.md`, `SCHEMA.md`, and `synthesis.md`, are infrastructure and may use their own lightweight frontmatter.
 
 ```yaml
 ---
@@ -57,6 +57,14 @@ Followed by:
 **Filenames:** kebab-case, no extension prefix. Page titles in frontmatter may be title-cased.
 
 **Citations:** When stating a specific fact, append `(source: [[source-filename]])`. When stating an opinion or inference, prefix with "Inference:" or "Hypothesis:".
+
+Three provenance rules:
+
+1. **Quotes are verbatim or unmarked.** Text inside quotation marks attributed to a source must appear in that source word for word. If the page compressed, paraphrased, or synthesized the source, drop the quotation marks or label it as synthesized from `[[page]]`.
+2. **Vague stays vague.** If the source says "a recent study," "last month," or similar relative language, do not upgrade it to a named or dated reference. Convert relative dates only when the source supports the conversion, and preserve uncertainty in the wording.
+3. **Assembled lists are labeled.** An enumeration compiled from points scattered across a source is synthesis, not extraction. Prefix it with `Inference:` or state that the list is synthesized.
+
+**Live current-state:** Do not restate volatile values for a changing thread across many pages. Put targets, prices, statuses, dates, rates, stage labels, model states, or similar moving values on one owner page, then have other pages link that owner with stable pointer language. If a configured wiki later needs script-backed drift detection, add that as an explicit schema/tooling decision instead of inventing hidden registry requirements.
 
 ## Related Page Labels
 

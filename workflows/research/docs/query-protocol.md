@@ -64,7 +64,7 @@ The answer should stand alone. Someone reading it without the wiki should still 
 2. The answer is **>300 words** (substantive, not a quick fact).
 3. The answer addresses a durable question about this wiki's configured domain.
 
-Before writing the analysis, run the capture gate with the proposed path and touched pages:
+Before writing the analysis, stage the draft in `tmp/<slug>.md`, then run the capture gate with the proposed path, touched pages, and staged draft path:
 
 ```bash
 python3 scripts/capture_gate.py \
@@ -72,12 +72,12 @@ python3 scripts/capture_gate.py \
   --phase accepted \
   --primary-home "wiki/analyses/<slug>.md" \
   --pages-touched "<comma-separated wiki pages>" \
+  --path "tmp/<slug>.md" \
   --synthesized-pages <count> \
-  --word-count <count> \
   --domain-context yes
 ```
 
-If the gate prints `APPROVAL REQUIRED`, show that exact block and wait. Re-run with `--approved` only after the user approves the exact analysis route. If the gate does not require approval, file the analysis and notify in one line:
+The gate measures word count from `--path`; do not use a hand-declared `--word-count` for analysis capture. If the gate prints `APPROVAL REQUIRED`, show that exact block and wait. Re-run with `--approved` only after the user approves the exact analysis route. If the gate does not require approval, file the analysis and notify in one line:
 
 > Filed as `analyses/<slug>.md` — delete if not useful.
 
@@ -88,6 +88,7 @@ When filing:
 - Add proper frontmatter (`type: analysis`, `confidence`, `agent_use_cases`, etc. — see [`../../../wiki/SCHEMA.md`](../../../wiki/SCHEMA.md)).
 - Add cross-references back to the entity pages cited. In `## Related pages`, use typed relationship labels from [`../../../wiki/SCHEMA.md`](../../../wiki/SCHEMA.md) when the relationship is clear; plain `- [[page]]` links remain valid.
 - Update [`../../../wiki/index.md`](../../../wiki/index.md) with a one-line summary of the new analysis.
+- Run `python3 scripts/rebuild_referenced_by.py` and `python3 scripts/lint.py --tier1` from the repo root.
 
 If any criterion is not met, skip filing — the answer stays in chat and no `wiki/log.md` entry is written unless the user explicitly asked to record the research session. Deletion is cheaper than recall, so err on the side of filing only when the criteria and capture gate both allow it.
 
@@ -106,7 +107,7 @@ Output filed: yes — analyses/<slug>.md
 Wiki gaps noticed: ... (if any)
 ```
 
-If a file was created, run `python3 scripts/rebuild_referenced_by.py` from the repo root to refresh backlinks across the wiki.
+If a file was created, `rebuild_referenced_by.py` and Tier-1 lint should already have run during filing. Name those checks in the log entry.
 
 ---
 

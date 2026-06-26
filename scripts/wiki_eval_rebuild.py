@@ -20,6 +20,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from eval_lib import Results
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REBUILD_SCRIPT = REPO_ROOT / "scripts" / "rebuild_referenced_by.py"
 FIXTURE_WIKI = REPO_ROOT / "scripts" / "fixtures" / "wiki-rebuild" / "wiki"
@@ -40,10 +42,8 @@ def referenced_by_section(text: str) -> str:
 
 
 def main() -> int:
-    results = []  # (name, passed, detail)
-
-    def check(name, passed, detail=""):
-        results.append((name, passed, detail))
+    results = Results()
+    check = results.record
 
     tmp = Path(tempfile.mkdtemp(prefix="wiki-rebuild-eval-"))
     try:
@@ -125,15 +125,7 @@ def main() -> int:
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
-    failed = 0
-    for name, passed, detail in results:
-        if passed:
-            print(f"PASS {name}")
-        else:
-            failed += 1
-            print(f"FAIL {name}: {detail}")
-    print(f"\nSummary: {len(results) - failed} passed, {failed} failed")
-    return 1 if failed else 0
+    return results.finish()
 
 
 if __name__ == "__main__":

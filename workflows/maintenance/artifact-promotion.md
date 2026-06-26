@@ -29,13 +29,14 @@ python3 scripts/capture_gate.py \
   --primary-home "<path or none>" \
   --pages-touched "<comma-separated paths>" \
   [--source-path "<raw path or URL>"] \
+  [--path "tmp/<draft>.md"] \
   [--synthesized-pages <count>] \
   [--word-count <count>] \
   [--domain-context yes|no] \
   [--trigger reusable_distinction|ranking_or_framework|open_question_resolution|future_agent_behavior|existing_page_update]
 ```
 
-The script prints the derived mode: `chat-only`, `ingest`, `analysis-capture`, `promotion-audit`, `capture-decision`, `capture-experience`, or `workflow-update`. An apply route, meaning filing an analysis or promoting an artifact, uses `--phase accepted`: that phase derives `analysis-capture` or `promotion-audit` and triggers the approval gate, while `--phase drafting` and the other phases derive non-approval routes such as `chat-only` that exit 0 without requiring approval, so never use them for an apply. The script's `promotion-audit` mode means "promotion apply preflight" when a trigger and durable-write intent are present; audit-only prose recommendations do not run the gate and do not edit files. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope. Approved reruns append or confirm an idempotent structured record in `scripts/capture-runs.jsonl`; validate it with `python3 scripts/validate_capture_runs.py`.
+The script prints the derived mode: `chat-only`, `ingest`, `analysis-capture`, `promotion-audit`, `capture-decision`, `capture-experience`, or `workflow-update`. An apply route, meaning filing an analysis or promoting an artifact, uses `--phase accepted`: that phase derives `analysis-capture` or `promotion-audit` and triggers the approval gate, while `--phase drafting` and the other phases derive non-approval routes such as `chat-only` that exit 0 without requiring approval, so never use them for an apply. For `analysis-capture`, stage the draft in `tmp/` and pass `--path`; the gate measures `word_count` from that file instead of trusting a declared count. The script's `promotion-audit` mode means "promotion apply preflight" when a trigger and durable-write intent are present; audit-only prose recommendations do not run the gate and do not edit files. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope. Approved reruns append or confirm an idempotent structured record in `scripts/capture-runs.jsonl`; validate it with `python3 scripts/validate_capture_runs.py`.
 
 Collaborative drafting is chat-only by default. Requests like "work with me," "let's discuss," "let's define," "refine this," "make this sharper," or "help me think through" are not promotion intent, even when the topic already has a wiki page, the repo is the current working directory, or the result might be reusable. If the draft becomes clearly durable, ask whether to save it; do not edit files first.
 
@@ -115,7 +116,7 @@ Use this decision order:
 
 1. **Is the user still drafting?** If yes, stay in chat. Do not audit or edit.
 2. **Is it a source?** If yes, use ingest, not this workflow.
-3. **Does it meet research analysis-capture criteria?** It must synthesize 3+ wiki pages, run over 300 words, and answer a durable domain-context question. If yes, route to `wiki/analyses/<slug>.md`.
+3. **Does it meet research analysis-capture criteria?** It must synthesize 3+ wiki pages, run over 300 measured words in a staged draft, and answer a durable domain-context question. If yes, route to `wiki/analyses/<slug>.md` through the research workflow's analysis filing step.
 4. **Is it already covered by an existing page?** If yes, update that page instead of creating a duplicate.
 5. **Is it a durable answer or synthesis that does not meet analysis capture?** If yes, audit before deciding whether to update an existing analysis or keep it chat-only.
 6. **Is it a reusable model?** If yes, create or update `wiki/concepts/<slug>.md`.

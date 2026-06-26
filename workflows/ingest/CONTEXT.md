@@ -80,6 +80,14 @@ python3 scripts/lint.py --tier1
 
 Tier-1 is machine-checkable: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, index coverage, repo structure, raw/deliverables hygiene, and related structural rules. Treat failures as must-fix before logging.
 
+Then run full lint and inspect Tier-2 findings only for pages touched by this ingest:
+
+```bash
+python3 scripts/lint.py
+```
+
+Tier-2 is a review queue, not a failure gate. For newly created or changed pages, check whether the ingest left an orphan source page, missing cross-reference, uncited/thin page, quote mismatch, confidence-upgrade candidate, missing `Open questions / gaps`, or missing `review_by` checkpoint. Fix clear ingest misses before logging; leave unrelated existing candidates for the lint workflow.
+
 ## Step 7 - Promotion audit
 
 Before logging, check whether the ingest produced a reusable artifact that belongs outside normal source/concept/analysis updates. Auto-audit if the ingest created or refined:

@@ -2,7 +2,7 @@
 title: Synthesis Ledger
 type: synthesis
 created: 2026-06-13
-updated: 2026-06-13
+updated: 2026-06-26
 status: draft
 ---
 
@@ -13,6 +13,8 @@ This page tracks approved synthesis runs. It is an orientation and drift-trackin
 ## Current state
 
 - No approved synthesis runs yet.
+- When synthesis is approved, keep this section as a pointer digest: name the owning pages and stable conclusions, but do not copy volatile values from owner pages.
+- `No change` is a valid synthesis result when the corpus does not yet imply a new durable conclusion.
 
 ## Run ledger
 
