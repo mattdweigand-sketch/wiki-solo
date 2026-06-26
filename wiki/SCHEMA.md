@@ -25,7 +25,7 @@ Reference spec for entity types, page format, and source-type summary templates.
 
 ## Page Format
 
-Every entity page (any page inside a `wiki/<entity-type>/` folder) must have this YAML frontmatter. Meta pages at the `wiki/` root, such as `index.md`, `log.md`, `overview.md`, `glossary.md`, `primer.md`, `sourcing-queue.md`, `contradictions.md`, `design-notes.md`, `SCHEMA.md`, and `synthesis.md`, are infrastructure and may use their own lightweight frontmatter.
+Every entity page (any page inside a `wiki/<entity-type>/` folder) must have this YAML frontmatter. `scripts/lint.py` checks the full entity-page contract there. Meta pages at the `wiki/` root, such as `index.md`, `log.md`, `overview.md`, `glossary.md`, `primer.md`, `sourcing-queue.md`, `contradictions.md`, `design-notes.md`, `SCHEMA.md`, and `synthesis.md`, are infrastructure and may use their own lightweight frontmatter with descriptive `type` values outside the entity enum.
 
 ```yaml
 ---
@@ -85,11 +85,11 @@ Examples:
 
 ```markdown
 ## Related pages
-- Depends on: [[agent-harness]]
-- Supports: [[context-as-moat]]
-- Part of: [[sales-harness-os]]
-- Derived from: [[outreach-architecture-of-autonomy]]
-- Related: [[agent-security]]
+- Depends on: [[workflow-automation]]
+- Supports: [[q3-board-deck]]
+- Part of: [[enterprise-onboarding]]
+- Derived from: [[customer-discovery-notes]]
+- Related: [[pricing-packaging]]
 ```
 
 Plain links remain valid:

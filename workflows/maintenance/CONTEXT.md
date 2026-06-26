@@ -9,6 +9,8 @@ Wiki hygiene, tooling evals, artifact promotion, first-person capture, corpus sy
 
 Invoking `/wiki-lint` authorizes the full lint workflow, including its verifier-agent evidence check, unless the user asks for deterministic-only lint, no subagents, or skipping the evidence check.
 
+Wrapper-surface maintenance is tooling eval work. If the task concerns `.claude/commands/`, `.codex/skills/`, duplicate global Codex `wiki-*` skills, or `scripts/sync_codex_skills.py`, open [`eval.md`](eval.md).
+
 Artifact promotion uses the shared capture preflight. Before applying artifact promotion, run `python3 scripts/capture_gate.py` with the proposed route and stop if it requires approval. Approved reruns write or confirm `scripts/capture-runs.jsonl` and must be followed by `python3 scripts/validate_capture_runs.py`. Decision capture, experience capture, workflow updates, setup updates, and routine page updates do not require this approval gate unless they are part of a promotion or analysis-capture route. If the user directly says they made a decision or lived through something they want remembered, use `/wiki-capture`; use `/wiki-promote` only when evaluating a separate artifact.
 
 Synthesis promotion uses `python3 scripts/capture_gate.py --kind=synthesis` before updating `wiki/synthesis.md`, flipping draft confidence/status, or logging a synthesis promotion. Approved reruns write or confirm synthesis approval records in `scripts/capture-runs.jsonl` and must be followed by `python3 scripts/validate_capture_runs.py`.

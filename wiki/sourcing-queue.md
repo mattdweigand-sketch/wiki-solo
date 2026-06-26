@@ -15,12 +15,27 @@ Maintenance workflows refresh this list during lint runs.
 
 No open sourcing gaps yet.
 
-| Priority | Missing evidence | Best source | Blocks | Status |
-|---|---|---|---|---|
-|  |  |  |  |  |
+Entry template:
 
-Use `Priority` for rough urgency (`high`, `medium`, `low`). Use `Blocks` to name the page, decision, or question that cannot be trusted until the source exists.
+```text
+### [Priority: high | medium | low] <gap summary>
+Missing evidence: <specific claim, page, or question that needs grounding>
+Best source: <document, interview, export, or research source most likely to resolve it>
+Blocks: <page, decision, workflow, or question affected>
+Status: open
+```
+
+Use priority for rough urgency. Use `Blocks` to name the page, decision, or question that cannot be trusted until the source exists.
 
 ## Closed
 
 No closed sourcing gaps yet.
+
+Closed-entry template:
+
+```text
+### [Closed] <gap summary>
+Resolved: YYYY-MM-DD
+Source added: [[source-page]]
+Pages updated: <pages>
+```

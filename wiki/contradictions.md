@@ -16,9 +16,9 @@ No open contradictions yet.
 Template:
 
 ```text
-### <short contradiction name>
-Claim A: <claim and source page>
-Claim B: <conflicting claim and source page>
+### [Status: open] <short contradiction name>
+Claim A: <quote or paraphrase> - source: [[source-page]]
+Claim B: <conflicting quote or paraphrase> - source: [[source-page]]
 Opened: YYYY-MM-DD
 Why it matters: <decision, page, or workflow this blocks>
 Resolution needed: <source, user judgment, or page update needed>
@@ -31,7 +31,7 @@ No resolved contradictions yet.
 Resolved-entry shape:
 
 ```text
-### <short contradiction name>
+### [Status: resolved] <short contradiction name>
 Opened: YYYY-MM-DD
 Resolved: YYYY-MM-DD
 Resolution: <what changed or which source now owns the truth>

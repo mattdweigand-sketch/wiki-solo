@@ -1,8 +1,8 @@
 ---
 title: Primer for Downstream Agents
-type: style
+type: primer
 created: 2026-05-17
-updated: 2026-05-17
+updated: 2026-06-26
 ---
 
 # Primer

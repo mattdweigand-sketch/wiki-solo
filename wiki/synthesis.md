@@ -8,7 +8,7 @@ status: draft
 
 # Synthesis Ledger
 
-This page tracks approved synthesis runs. It is an orientation and drift-tracking ledger, not a source page. Cite original wiki pages, never this ledger.
+This page tracks approved synthesis runs. The current-state section is a pointer digest; the run ledger is append-only history. This is an orientation and drift-tracking ledger, not a source page. Cite original wiki pages, never this ledger.
 
 ## Current state
 

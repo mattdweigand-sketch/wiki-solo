@@ -14,8 +14,8 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 ## 2026-06-26 - maintenance | source-wiki enhancement port
 
 Change: Ported template-safe source-wiki improvements into `wiki-solo`: analysis capture now stages drafts with `--path`, review due pages are routable from root docs, schema provenance/current-state rules are explicit, wrapper parity is documented in the eval workflow, lint eval coverage is expanded, rebuild eval reporting uses the shared result helper, and root meta pages now include starter templates for contradictions, sourcing gaps, glossary terms, design notes, and synthesis.
-Reason: The public template should capture reusable mechanics and operating judgment from the source wiki without importing private content, private entity assumptions, or private backup behavior.
-Rejected alternative: Copy source-wiki folders, source buckets, current-state registries, property-specific lint, ledger history, or private export semantics.
+Reason: The public template should capture reusable mechanics and operating judgment from the source wiki without importing private content, private entity assumptions, or source-repo backup behavior.
+Rejected alternative: Copy source-wiki folders, source buckets, current-state registries, property-specific lint, ledger history, or source-repo export semantics.
 Accepted tradeoff: Keep the changes generic and mechanics-focused; richer domain behavior remains setup-driven or an explicit future schema/tooling decision.
 Validation: PASS - `rebuild_referenced_by.py`, targeted lint eval, rebuild eval, wrapper parity, full `wiki_eval.py`, Tier-1 lint, full lint, approval-ledger validation, export dry-run, and `git diff --check`.
 
@@ -25,8 +25,8 @@ Validation: PASS - `rebuild_referenced_by.py`, targeted lint eval, rebuild eval,
 
 Change: Ported the template-safe parts of the recent source-repo workflow improvements into `wiki-solo`: memo-first synthesis with explicit no-change outcomes, Good/Bad calibration examples for ingest/research/artifact-promotion, and an operating-rule norm to record reason, one rejected alternative, and accepted tradeoff.
 Reason: Future agents need concrete calibration at the point of execution, not only abstract routing rules.
-Rejected alternative: Copy the source diffs directly, including domain-specific lint, private backup target, and source-repo content.
-Accepted tradeoff: Keep the port narrow and generic; the template gains reusable workflow judgment while excluding private content, private domain routing, and private export policy.
+Rejected alternative: Copy the source diffs directly, including domain-specific lint, source-repo backup target, and source-repo content.
+Accepted tradeoff: Keep the port narrow and generic; the template gains reusable workflow judgment while excluding private content, private domain routing, and source-repo export policy.
 Validation: PASS - `rebuild_referenced_by.py`, Tier-1 lint, full lint, approval-ledger validation, wrapper parity, export dry-run, full `wiki_eval.py`, targeted private-content scan, and `git diff --check`.
 
 ---

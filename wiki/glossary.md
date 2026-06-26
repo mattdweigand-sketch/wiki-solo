@@ -9,6 +9,16 @@ updated: 2026-06-26
 
 Canonical definitions for domain-specific terms used in this wiki. Add an entry whenever a term has a precise meaning that downstream agents shouldn't paraphrase.
 
+Entry template:
+
+```text
+### <Term>
+Type: domain-term | framework | principle | workflow-convention
+Definition: <one or two precise sentences>
+Source: [[source-page]] or experience: <brief description>
+Related: [[page]], [[page]]
+```
+
 ## Wiki Operating Terms
 
 - **Analysis capture** - saving a substantial, cross-page research answer as `wiki/analyses/<slug>.md` after the capture gate approves the exact destination and file scope.

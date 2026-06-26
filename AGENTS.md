@@ -45,7 +45,7 @@ Run `python3 scripts/capture_gate.py` before exactly three approval boundaries: 
 
 If the script prints `APPROVAL REQUIRED`, show the full block and stop until the user approves the displayed durable action, primary destination, and allowed file scope. Plain-language approval such as "approve" or "yes" is enough when it clearly approves the displayed action, destination, and file scope. Re-run with `--approved` only after that approval.
 
-The script owns the checkable approval boundary. The prose workflows own judgment about what to write, how to cite it, where to link it, and how to log it.
+The script owns the checkable approval boundary and verifies the parts prose should not hand-wave: analysis capture must point `--path` at a real draft so the gate can count its words, a free route may not target `wiki/analyses/`, and approval-required routes reject placeholder (`<...>`) or out-of-root destinations. The prose workflows own judgment about what to write, how to cite it, where to link it, and how to log it.
 
 The approved rerun writes or confirms the idempotent structured approval record in `scripts/capture-runs.jsonl`. The non-approved gate call is display-only: it must not update `wiki/analyses/`, promoted pages, `scripts/capture-runs.jsonl`, or `wiki/log.md`.
 
