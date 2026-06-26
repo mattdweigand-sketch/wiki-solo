@@ -16,18 +16,17 @@ title: <Decision-as-statement, title-cased>
 type: decision
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
-sources: [list of wiki/sources/ pages that informed this — call notes, exec memos, board decks]
+review_by: YYYY-MM-DD         # OPTIONAL — outcome-review checkpoint
+sources: [list of raw source filenames or "experience: <brief description>" entries that informed this]
 tags: [topic tags — pricing, product, gtm, etc.]
 confidence: high | medium | low | contested
 agent_use_cases:
   - <e.g., "answering 'why did we move off Stripe?'">
   - <e.g., "context for downstream pricing decisions">
-revisit: YYYY-MM-DD | "when X happens" | "no scheduled revisit"
-decider: <role or person>
 ---
 ```
 
-`type: decision` is required. `revisit` and `decider` are required for decisions specifically (they're not in the general entity frontmatter).
+`type: decision` is required. Use `review_by` when the decision should be graded against a future outcome. Record decider, revisit trigger, and revisit owner in the page body unless a future schema decision adds dedicated frontmatter keys.
 
 ---
 

@@ -1,6 +1,6 @@
 ---
 type: source
-source_type: article
+source_type: other
 created: 2026-06-10
 updated: 2026-06-10
 confidence: medium

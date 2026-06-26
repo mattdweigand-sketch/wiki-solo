@@ -11,9 +11,17 @@ Gaps where the wiki needs more grounding - entity pages with `confidence: low` o
 
 Maintenance workflows refresh this list during lint runs.
 
-## Queue
+## High Priority
 
-No open sourcing gaps yet.
+No high-priority sourcing gaps yet.
+
+## Medium Priority
+
+No medium-priority sourcing gaps yet.
+
+## Low Priority
+
+No low-priority sourcing gaps yet.
 
 Entry template:
 
@@ -25,7 +33,7 @@ Blocks: <page, decision, workflow, or question affected>
 Status: open
 ```
 
-Use priority for rough urgency. Use `Blocks` to name the page, decision, or question that cannot be trusted until the source exists.
+File open gaps under the matching priority heading. Use `Blocks` to name the page, decision, or question that cannot be trusted until the source exists.
 
 ## Closed
 

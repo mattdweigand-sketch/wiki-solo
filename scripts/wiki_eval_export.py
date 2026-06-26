@@ -9,6 +9,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
+import export_wiki
 from eval_lib import Results
 
 
@@ -115,5 +116,23 @@ with tempfile.TemporaryDirectory(prefix="wiki-export-eval-") as td:
         build.returncode == 0 and required_present and prefixes_present and excluded_absent,
         "stdout: " + build.stdout.replace("\n", " | ") + " names: " + repr(sorted(names)),
     )
+    if zip_path.exists():
+        count_ok, count_errors = export_wiki.verify_zip(zip_path, len(names) + 1)
+        results.record(
+            "verify-rejects-count-mismatch",
+            not count_ok and any("did not match expected" in e for e in count_errors),
+            f"verify_zip should fail on count mismatch; ok={count_ok} errors={count_errors}",
+        )
+        with zipfile.ZipFile(zip_path, "a") as zf:
+            zf.writestr("tmp/wiki-export-2026-06-24.zip", "nested export")
+        nested_ok, nested_errors = export_wiki.verify_zip(zip_path, len(names) + 1)
+        results.record(
+            "verify-rejects-nested-export-path",
+            not nested_ok and any("archive contains excluded path" in e and ".zip" in e for e in nested_errors),
+            f"verify_zip should reject nested export paths; ok={nested_ok} errors={nested_errors}",
+        )
+    else:
+        results.record("verify-rejects-count-mismatch", False, "export zip was not created")
+        results.record("verify-rejects-nested-export-path", False, "export zip was not created")
 
 sys.exit(results.finish())

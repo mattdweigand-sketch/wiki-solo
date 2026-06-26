@@ -34,7 +34,7 @@ type: source | product | feature | persona | customer | competitor | concept | i
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 review_by: YYYY-MM-DD         # OPTIONAL — outcome-review checkpoint, especially for decisions
-sources: [list of raw source filenames that informed this page]
+sources: [list of raw source filenames or "experience: <brief description>" entries that informed this page]
 source_type: help-doc | slack-thread | call-transcript | exec-memo | deck | crm-export | strategy-doc | release-note | press | analyst-report | competitor-collateral | sales-battlecard | product-spec | board-doc | synthesis | other  # SOURCE PAGES ONLY — describes the underlying raw artifact
 tags: [relevant tags]
 confidence: high | medium | low | contested   # how well-sourced this page is; "contested" means active disagreement across sources
@@ -51,8 +51,8 @@ agent_use_cases:                  # which downstream-agent questions this page i
 Followed by:
 1. **One-line summary** (used in `index.md` and in agent-retrieved snippets)
 2. **Body** — structured with headers, lists, and tables
-3. **Open questions / gaps** section — what we don't know yet
-4. **Related pages** section — `[[wiki-page-name]]` links, with typed labels when the relationship is clear
+3. **Open questions / gaps** section — what we don't know yet. Required on non-source entity pages; optional on source pages when the source leaves real unknowns.
+4. **Related pages** section — `[[wiki-page-name]]` links, with typed labels when the relationship is clear. Plain-text entries without `[[ ]]` are permitted for pages that do not exist yet or for terms deliberately kept as prose; they carry no graph edge.
 
 **Filenames:** kebab-case, no extension prefix. Page titles in frontmatter may be title-cased.
 

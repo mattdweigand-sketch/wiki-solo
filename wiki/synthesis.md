@@ -18,7 +18,7 @@ This page tracks approved synthesis runs. The current-state section is a pointer
 
 ## Run ledger
 
-Add approved synthesis runs here in reverse chronological order.
+Add approved synthesis runs here in oldest-first append order.
 
 Template:
 

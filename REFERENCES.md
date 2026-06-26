@@ -81,7 +81,7 @@ In `## Related pages`, use typed relationship labels when the relationship is cl
 | `Part of` | This page is a component of the linked larger system, project, or framework |
 | `Related` | Meaningful connection, but no stronger typed relationship fits |
 
-Format each item as `- Label: [[page]]`. Do not invent new labels casually; if a new relationship type is repeatedly needed, add it here and to `AGENTS.md` / `wiki/SCHEMA.md`. Existing untyped related links remain valid, but new or touched pages should prefer labels where they add signal.
+Format each item as `- Label: [[page]]`. The canonical label set is enforced by `RELATED_LABELS` in `scripts/lint.py`; `AGENTS.md` and `wiki/SCHEMA.md` document the same six labels. Do not invent new labels casually. To add one, update `RELATED_LABELS` and those docs together. Existing untyped related links remain valid, but new or touched pages should prefer labels where they add signal.
 
 When stating a specific fact, append `(source: [[source-filename]])`. When stating an opinion or inference, prefix with `Inference:` or `Hypothesis:`.
 

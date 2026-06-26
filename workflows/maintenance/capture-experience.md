@@ -5,7 +5,7 @@ description: Use this workflow when the user says "capture observation", "captur
 
 ## Load / Skip
 
-- **Load:** `wiki/SCHEMA.md` (frontmatter), `wiki/index.md` when creating a new page, and the most relevant entity folder plus the related pages the observation connects to.
+- **Load:** `wiki/SCHEMA.md` (frontmatter), `wiki/index.md` to check whether an existing page already owns the observation, and the most relevant entity folder plus the related pages the observation connects to.
 - **Skip:** raw sources and unrelated entity folders.
 
 ## Capture Preflight
@@ -14,7 +14,7 @@ Observation capture does not require `scripts/capture_gate.py` approval unless i
 
 ## Steps
 
-1. Create or update a page in the most appropriate entity folder. Use frontmatter from `wiki/SCHEMA.md`.
+1. Check `wiki/index.md` and the most relevant entity folder for an existing page that already owns the observation. Update that page when it exists; create a new page only when no current page fits. Use frontmatter from `wiki/SCHEMA.md`.
 2. Capture:
    - What happened
    - What was learned
@@ -22,7 +22,7 @@ Observation capture does not require `scripts/capture_gate.py` approval unless i
    - When it occurred
    - What it connects to
 3. Cross-link from related pages back to this page.
-4. Add a `wiki/index.md` row if a page was created.
+4. Add or update the `wiki/index.md` row for the page.
 5. Run `python3 scripts/rebuild_referenced_by.py`
 6. Run `python3 scripts/lint.py --tier1`
 7. Append to `wiki/log.md`:

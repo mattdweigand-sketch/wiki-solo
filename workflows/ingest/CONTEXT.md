@@ -42,7 +42,7 @@ Ingest is a normal durable write. It does not require `scripts/capture_gate.py` 
 ## Step 1 - Read and discuss
 
 1. Read the source file(s) from `raw/`.
-2. Discuss 2-3 key takeaways and ask any clarifying questions.
+2. Discuss 2-3 key takeaways. Ask clarifying questions only when needed to avoid a wrong durable write; an explicit ingest request should otherwise keep moving.
 
 ## Step 2 - Create source page
 

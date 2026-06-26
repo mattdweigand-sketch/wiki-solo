@@ -7,7 +7,7 @@ updated: 2026-06-26
 
 # Contradictions
 
-Open issues where sources disagree. Maintenance workflows append entries here when lint or ingest surfaces a conflict.
+Open issues where sources disagree. Maintenance workflows append entries here when lint or ingest surfaces a conflict. Flag conflicts here before updating any page; never silently overwrite contested claims.
 
 ## Open
 
