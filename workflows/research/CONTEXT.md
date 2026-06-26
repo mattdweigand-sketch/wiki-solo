@@ -14,6 +14,20 @@ Analysis capture is a prose workflow with an executable preflight. `scripts/capt
 - **Load:** `wiki/index.md` to locate pages, `wiki/primer.md` for entry points by question type, then only the specific pages the question touches. When filing an analysis (Step 4), also load `wiki/SCHEMA.md`'s citation/provenance rules.
 - **Skip:** the rest of `wiki/SCHEMA.md`, raw sources, and entity folders unrelated to the question.
 
+## Calibration Examples
+
+### Good
+
+- Answer from the smallest set of relevant pages, cite them with `[[page]]`, and separate source-backed facts from inference.
+- File an analysis only when the answer synthesizes 3+ pages, is substantial, and creates durable value for the configured domain.
+- Surface a promotion candidate when the answer creates a reusable distinction, but keep the audit chat-only unless the user asked to apply it.
+
+### Bad
+
+- Read broad folders because the question feels important.
+- File a polished answer as an analysis when it is really a one-off clarification.
+- Update a durable page just because the answer could be reusable; first identify the owning page and ask whether the change should be applied.
+
 ## Steps
 
 1. Read `wiki/index.md` and `wiki/primer.md` if unsure where to start.

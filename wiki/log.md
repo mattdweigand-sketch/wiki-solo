@@ -11,6 +11,16 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## 2026-06-25 - maintenance | source-repo workflow calibration port
+
+Change: Ported the template-safe parts of the recent source-repo workflow improvements into `wiki-solo`: memo-first synthesis with explicit no-change outcomes, Good/Bad calibration examples for ingest/research/artifact-promotion, and an operating-rule norm to record reason, one rejected alternative, and accepted tradeoff.
+Reason: Future agents need concrete calibration at the point of execution, not only abstract routing rules.
+Rejected alternative: Copy the source diffs directly, including domain-specific lint, private backup target, and source-repo content.
+Accepted tradeoff: Keep the port narrow and generic; the template gains reusable workflow judgment while excluding private content, private domain routing, and private export policy.
+Validation: PASS - `rebuild_referenced_by.py`, Tier-1 lint, full lint, approval-ledger validation, wrapper parity, export dry-run, full `wiki_eval.py`, targeted private-content scan, and `git diff --check`.
+
+---
+
 ## 2026-06-16 — maintenance | promotion apply phase clarity
 
 Change: `workflows/maintenance/artifact-promotion.md` now states that an apply route uses `--phase accepted` (in the mode-description paragraph and in step 5). The direct `capture_gate.py` path no longer leaves the approval-triggering phase unspecified.

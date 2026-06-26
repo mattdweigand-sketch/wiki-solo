@@ -14,6 +14,20 @@ Ingest is a normal durable write. It does not require `scripts/capture_gate.py` 
 - **Load:** `wiki/SCHEMA.md` (source-type templates + frontmatter), `wiki/domain.md` for active entity types and raw taxonomy, the source file(s) in `raw/`, and the specific existing pages the source touches. At the link step (Step 5), also load `REFERENCES.md` (cross-referencing rules), `wiki/index.md`, `wiki/glossary.md`, and `wiki/log.md`.
 - **Skip:** the rest of the wiki, the other workspaces, and `wiki/contradictions.md` unless a clash actually surfaces.
 
+## Calibration Examples
+
+### Good
+
+- Preserve the raw artifact once, then treat it as immutable even if a better title, date, or URL appears later.
+- Update the existing pages the source actually changes, then add source-page links and let `rebuild_referenced_by.py` regenerate inbound links.
+- Keep source summaries dense and caveated: name what the source claims, what it supports, and what remains unverified.
+
+### Bad
+
+- Rename or edit an existing raw file to make provenance look cleaner.
+- Create a new concept page because the source uses a catchy phrase when an existing page already owns the idea.
+- Treat customer, metric, market, or strategy claims inside a source as verified facts when the underlying evidence has not been ingested.
+
 ## Step 0 - File handling (before reading anything)
 
 `raw/` holds source artifacts. Do not edit existing raw files. If the user provides a new source outside the proper location, place it once under the correct `raw/` subfolder with a kebab-case filename, then treat it as immutable.

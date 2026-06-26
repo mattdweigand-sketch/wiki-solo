@@ -78,6 +78,20 @@ Do not promote when all are true:
 3. It duplicates an existing page without a meaningful update.
 4. It would create a new category just to hold one artifact.
 
+## Calibration Examples
+
+### Good
+
+- Update an existing owner page when the artifact sharpens a concept already represented in the wiki.
+- Promote a chat insight into an operating rule only when future agents should behave differently.
+- When changing an operating rule, record why, one rejected alternative, and the accepted tradeoff in the log or a decision page.
+
+### Bad
+
+- Create a new page for a useful phrase that fits cleanly inside an existing concept, initiative, decision, workflow, or analysis page.
+- Treat `/wiki-promote` as permission to save everything.
+- Add a new folder or entity type to hold one artifact.
+
 ## Auto-Audit Triggers
 
 Promotion audit auto-triggers after wiki research, ingest, or maintenance work when the answer or work product does any of these:
@@ -163,6 +177,7 @@ When updating operating docs:
 2. Avoid putting canonical behavior only in tool-specific wrappers.
 3. Keep the rule short enough for future agents to follow.
 4. Update route tables if the new workflow must be discoverable.
+5. For new or changed operating rules, record the reason, one rejected alternative, and the accepted tradeoff in `wiki/log.md` or a decision page. Do this going forward; do not backfill old rules unless the user asks.
 
 ## Workflow Steps
 
