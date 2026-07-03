@@ -74,11 +74,17 @@ def validate_capture_approval(record: dict[str, Any]) -> list[str]:
     synthesized_pages = record.get("synthesized_pages")
     word_count = record.get("word_count")
     domain_context = record.get("domain_context")
+    if domain_context is None and "life_context" in record:
+        # Legacy alias from an older personal-wiki gate spelling.
+        domain_context = record.get("life_context")
     triggers = record.get("triggers")
     if not isinstance(synthesized_pages, int) or synthesized_pages < 0:
         errors.append("synthesized_pages must be a non-negative integer")
     if not isinstance(word_count, int) or word_count < 0:
         errors.append("word_count must be a non-negative integer")
+    # Measurement provenance; optional because historical records predate it.
+    if "word_count_path" in record and not isinstance(record.get("word_count_path"), str):
+        errors.append("word_count_path must be a string when present")
     if not isinstance(domain_context, bool):
         errors.append("domain_context must be a boolean")
     if not isinstance(triggers, list) or not all(trigger in VALID_TRIGGERS for trigger in triggers):
@@ -100,7 +106,7 @@ def validate_capture_approval(record: dict[str, Any]) -> list[str]:
     return errors
 
 
-def check_synthesis_record(record: dict[str, Any]) -> list[str]:
+def validate_synthesis_approval(record: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if record.get("schema_version") != 1:
         errors.append("approval record must have schema_version 1")
@@ -120,6 +126,8 @@ def check_synthesis_record(record: dict[str, Any]) -> list[str]:
     if isinstance(pages_touched, list) and record.get("primary_home") == "wiki/synthesis.md":
         if record.get("ledger_update_required") is not True:
             errors.append("wiki/synthesis.md primary_home requires ledger_update_required true")
+    if record.get("primary_home") != "wiki/synthesis.md" and record.get("ledger_update_required") is True:
+        errors.append("ledger_update_required must be false unless primary_home is wiki/synthesis.md")
 
     if "ledger_update_required" not in record or not isinstance(record.get("ledger_update_required"), bool):
         errors.append("ledger_update_required must be a boolean")
@@ -132,7 +140,7 @@ def validate_approval(record: dict[str, Any]) -> list[str]:
     if record.get("record_type") == "capture_approval":
         return validate_capture_approval(record)
     if record.get("record_type") == "synthesis_approval":
-        return check_synthesis_record(record)
+        return validate_synthesis_approval(record)
     return [f"unsupported record_type {record.get('record_type')!r}"]
 
 

@@ -1,29 +1,26 @@
 #!/usr/bin/env python3
 """Regression eval for lint.py.
 
-Guards lint's checks against going vacuous: every generic Tier-1 check
-(filename, folder structure incl. root/wiki file and directory branches,
-entity folder, frontmatter presence and keys, type/folder, confidence,
-source-type, dates, raw/ and bare-slug source refs, dangling links including
-code-span exemptions, related labels, confidence restate, index coverage,
-adjudication integrity, raw-buckets integrity, meta-page dangling links, and
-stray tool-call tag artifacts including the in-prose negative) gets a seeded
-violation that must fire, and the Tier-2 candidate and
-adjudication/suppression machinery gets positive and negative cases. A check
-that cannot fail is indistinguishable from no check; this suite exists so a
-future lint edit cannot silently disarm one.
+Guards lint's checks against going vacuous: every check in lint.py's
+registries — TIER1_PATH_CHECKS, TIER1_PAGE_CHECKS, the repo/meta-level checks
+inside tier1(), and TIER2_SIGNALS (those registries are authoritative; this
+docstring deliberately does not enumerate them) — gets a seeded violation that
+must fire, and the adjudication/suppression machinery gets positive and
+negative cases. A check that cannot fail is indistinguishable from no check;
+this suite exists so a future lint edit cannot silently disarm one.
 
 Runs against the fixture mini-wiki in scripts/fixtures/wiki-lint/, copied to
 a system temp directory per case. Writes nothing inside the repo.
 """
 
 import json
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+
+from _wiki_parse import get_entity_pages
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LINT = REPO_ROOT / "scripts" / "lint.py"
@@ -80,16 +77,17 @@ def edit(root, rel, old, new):
     p.write_text(t.replace(old, new, 1))
 
 
+def add_index_row(root, rel, summary):
+    append(root, "wiki/index.md", f"| [{Path(rel).name}]({rel}) | {summary} |\n")
+
+
 def write_adjudications(root, **kwargs):
     base = {"accepted_orphans": [], "hub_pages": [], "skipped_crossref_pairs": [],
             "reviewed_confidence_low": [], "reviewed_near_duplicates": [],
-            "reviewed_quotes": []}
+            "reviewed_quotes": [], "reviewed_recompile_candidates": []}
     base.update(kwargs)
     (root / "scripts" / "lint-adjudications.json").write_text(json.dumps(base))
 
-
-def write_raw_buckets(root, buckets):
-    (root / "scripts" / "raw-buckets.json").write_text(json.dumps({"buckets": buckets}))
 
 
 # ---- Tier 1: clean fixture is the control ----
@@ -128,8 +126,8 @@ run_case(
 )
 run_case(
     "invalid-source-type-fires",
-    lambda r: edit(r, "wiki/sources/gamma.md", "source_type: other", "source_type: memo"),
-    expect_code=1, expect=("source-type", "invalid value 'memo'"),
+    lambda r: edit(r, "wiki/sources/gamma.md", "source_type: other", "source_type: invalid"),
+    expect_code=1, expect=("source-type", "invalid value 'invalid'"),
 )
 run_case(
     "source-type-on-non-source-fires",
@@ -179,12 +177,19 @@ run_case(
     expect_code=1, expect=("dangling-link",),
 )
 run_case(
+    # content:links#2 + #3: a [[link]] written as a syntax example inside an
+    # inline code span on an ENTITY page must not be reported dangling, matching
+    # the meta-page behavior. Reverting the code-span strip in the Tier-1
+    # dangling scan turns this into a [dangling-link] failure (exit 1).
     "in-code-span-link-not-dangling",
     lambda r: append(r, "wiki/concepts/alpha.md",
                      "\nLink syntax example: `[[some-undefined-demo-page]]`.\n"),
     expect_code=0, absent=("some-undefined-demo-page",),
 )
 run_case(
+    # code:lint#4: a raw/ token inside a non-sources frontmatter field (here a
+    # title) must NOT be existence-checked as a provenance ref. Reverting the
+    # sources-scoped scan reintroduces a spurious (source-ref) failure.
     "raw-token-in-title-not-source-ref",
     lambda r: edit(r, "wiki/concepts/alpha.md",
                    'title: "Alpha"',
@@ -192,16 +197,23 @@ run_case(
     expect_code=0, absent=("source-ref",),
 )
 run_case(
+    # code:lint#3: a prose bullet of the form "- Word: ..." with NO wikilink in
+    # a Related pages section is permitted (page-to-create / descriptive prose).
+    # Reverting the "[[ in line" guard makes this a (related-label) failure.
     "related-label-prose-bullet-allowed",
     lambda r: append(r, "wiki/concepts/alpha.md", "- Background: context, no link\n"),
     expect_code=0, absent=("related-label",),
 )
 run_case(
+    # code:lint#3 companion: a "- Word: [[link]]" bullet with a non-vocabulary
+    # label DOES still fire, so the guard narrows scope without disarming.
     "related-label-with-link-still-fires",
     lambda r: append(r, "wiki/concepts/alpha.md", "- Causes: [[delta-one]] context\n"),
     expect_code=1, expect=("related-label", "'Causes:'"),
 )
 run_case(
+    # content:contradictions#2: a bare-slug source ref that names no
+    # wiki/sources/ page (a typo'd citation) is a Tier-1 source-ref failure.
     "bare-slug-source-ref-typo-fires",
     lambda r: edit(r, "wiki/concepts/alpha.md",
                    'sources: ["experience: lint eval fixture"]',
@@ -209,11 +221,25 @@ run_case(
     expect_code=1, expect=("source-ref", "matches no wiki/sources/ page"),
 )
 run_case(
+    # content:contradictions#2 companion: a bare-slug ref that DOES name a real
+    # source page passes, and an experience: entry is never treated as a slug.
     "bare-slug-source-ref-resolves-passes",
     lambda r: edit(r, "wiki/concepts/alpha.md",
                    'sources: ["experience: lint eval fixture"]',
                    'sources: [gamma]'),
     expect_code=0, absent=("source-ref",),
+)
+run_case(
+    "empty-agent-use-cases-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   "agent_use_cases:\n  - lint eval fixture", "agent_use_cases:"),
+    expect_code=1, expect=("frontmatter", "agent_use_cases has no list items"),
+)
+run_case(
+    "impossible-review-by-date-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md", "confidence: medium",
+                   "confidence: medium\nreview_by: 2026-13-99"),
+    expect_code=1, expect=("date", "real calendar date"),
 )
 run_case(
     "adjudication-stale-fires",
@@ -222,11 +248,36 @@ run_case(
     expect_code=1, expect=("adjudication-stale", "renamed-away"),
 )
 run_case(
+    # reviewed_quotes carries a 'page' field like the other entity-page keys, so a
+    # stale entry pointing at a renamed/deleted page must also fail loudly rather
+    # than keep silently suppressing.
     "adjudication-stale-fires-reviewed-quotes",
     lambda r: write_adjudications(r, reviewed_quotes=[
         {"page": "concepts/renamed-quote-page.md", "quote": "x", "reason": "y",
          "date": "2026-06-11"}]),
     expect_code=1, expect=("adjudication-stale", "renamed-quote-page"),
+)
+run_case(
+    "recompile-adjudication-stale-fires",
+    lambda r: write_adjudications(r, reviewed_recompile_candidates=[
+        {"pair": ["concepts/renamed-away.md", "sources/gamma.md"],
+         "reason": "fixture", "date": "2026-06-26"}]),
+    expect_code=1, expect=("adjudication-stale", "renamed-away"),
+)
+run_case(
+    "recompile-adjudication-source-shape-fires",
+    lambda r: write_adjudications(r, reviewed_recompile_candidates=[
+        {"pair": ["concepts/alpha.md", "concepts/beta.md"],
+         "reason": "fixture", "date": "2026-06-26"}]),
+    expect_code=1, expect=("adjudication-stale", "source page must be under sources/"),
+)
+run_case(
+    "recompile-adjudication-compiled-shape-fires",
+    lambda r: write_adjudications(r, reviewed_recompile_candidates=[
+        {"pair": ["sources/gamma.md", "sources/gamma.md"],
+         "reason": "fixture", "date": "2026-06-26"}]),
+    expect_code=1, expect=("adjudication-stale",
+                           "compiled page must not be under sources/"),
 )
 run_case(
     "non-utf8-page-fails-cleanly",
@@ -237,6 +288,28 @@ run_case(
     "malformed-adjudication-json-fails-cleanly",
     lambda r: (r / "scripts/lint-adjudications.json").write_text("{not json"),
     expect_code=1, expect=("adjudication-file", "unreadable JSON"),
+)
+run_case(
+    # A suppression filed under a misspelled category key would silently
+    # detach; an unknown top-level key is a Tier-1 adjudication-file failure.
+    "adjudication-unknown-key-fails-cleanly",
+    lambda r: (r / "scripts/lint-adjudications.json").write_text(
+        '{"accepted_orphanz": []}'),
+    expect_code=1, expect=("adjudication-file", "unknown top-level"),
+)
+run_case(
+    # Underscore-prefixed keys are documentation metadata, not categories.
+    "adjudication-metadata-key-allowed",
+    lambda r: (r / "scripts/lint-adjudications.json").write_text(
+        '{"_description": "fixture", "accepted_orphans": []}'),
+    expect_code=0, absent=("unknown top-level",),
+)
+run_case(
+    # An undecodable log.md must fail the header guard loudly instead of
+    # silently disarming the rotate_log cut-point protection.
+    "non-utf8-log-fails-header-guard",
+    lambda r: (r / "wiki" / "log.md").write_bytes(b"# Log\n\n\xff\xfe## garbage\n"),
+    expect_code=1, expect=("log-entry-header", "not valid UTF-8"),
 )
 run_case(
     "misshapen-adjudication-entry-fails-cleanly",
@@ -264,7 +337,6 @@ run_case(
     "resolving-raw-source-ref-passes",
     lambda r: (
         (r / "raw" / "notes").mkdir(parents=True),
-        write_raw_buckets(r, {"notes": "fixture notes"}),
         (r / "raw" / "notes" / "real.md").write_text("raw fixture"),
         edit(r, "wiki/concepts/alpha.md",
              'sources: ["experience: lint eval fixture"]',
@@ -272,11 +344,43 @@ run_case(
     ),
 )
 run_case(
+    # Block-style sources: lists get the same provenance checks as inline
+    # lists: a missing raw/ ref on an indented '- item' line must fire.
+    "block-style-missing-raw-source-ref-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   'sources: ["experience: lint eval fixture"]',
+                   'sources:\n  - raw/notes/does-not-exist.md'),
+    expect_code=1, expect=("source-ref", "does-not-exist"),
+)
+run_case(
+    # Companion: block-style refs that resolve (a real raw path, a real source
+    # slug, and free-text provenance) pass without source-ref noise.
+    "block-style-source-refs-resolve-passes",
+    lambda r: (
+        (r / "raw" / "notes").mkdir(parents=True),
+        (r / "raw" / "notes" / "real.md").write_text("raw fixture"),
+        edit(r, "wiki/concepts/alpha.md",
+             'sources: ["experience: lint eval fixture"]',
+             'sources:\n  - raw/notes/real.md\n  - gamma\n'
+             '  - "experience: block-style fixture"'),
+    ),
+)
+run_case(
+    # A typo'd bare slug on a block-style line is caught like an inline one.
+    "block-style-bare-slug-typo-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   'sources: ["experience: lint eval fixture"]',
+                   'sources:\n  - gamma-typo-not-a-real-source'),
+    expect_code=1, expect=("source-ref", "matches no wiki/sources/ page"),
+)
+run_case(
     "unexpected-root-file-fires",
     lambda r: (r / "loose.txt").write_text("loose root file"),
     expect_code=1, expect=("repo-structure", "unexpected top-level file"),
 )
 run_case(
+    # code:eval-lint#2: the directory branch of the repo-structure check was
+    # never proven. An unknown top-level directory is a Tier-1 failure.
     "unexpected-root-dir-fires",
     lambda r: (r / "notabucket").mkdir(),
     expect_code=1, expect=("repo-structure", "unexpected top-level directory"),
@@ -287,11 +391,15 @@ run_case(
     expect_code=1, expect=("wiki-structure", "unexpected wiki/ folder"),
 )
 run_case(
+    # code:eval-lint#2: the file branch of the wiki-structure check was never
+    # proven. A stray non-allowed file directly under wiki/ is a Tier-1 failure.
     "stray-wiki-root-file-fires",
     lambda r: (r / "wiki" / "notes.txt").write_text("stray wiki root file"),
     expect_code=1, expect=("wiki-structure", "unexpected wiki/ root file"),
 )
 run_case(
+    # code:eval-lint#1: the entity-folder check (unknown wiki subfolder) had no
+    # firing case. A page under a folder absent from FOLDER_TYPE fires.
     "unknown-entity-folder-fires",
     lambda r: (
         (r / "wiki" / "misc").mkdir(),
@@ -300,9 +408,32 @@ run_case(
     expect_code=1, expect=("entity-folder", "unknown folder 'misc'"),
 )
 run_case(
+    # code:eval-lint#1: the missing/malformed-frontmatter branch (a body-only
+    # page with no --- block) had no firing case.
     "body-only-page-fires",
     lambda r: (r / "wiki/concepts/alpha.md").write_text("Just a body, no frontmatter.\n"),
     expect_code=1, expect=("frontmatter", "missing or malformed"),
+)
+run_case(
+    # code:eval-lint#1: corrupt raw-buckets.json (the integrity branch) had no
+    # firing case. A raw/ tree plus unparseable taxonomy is a Tier-1 failure.
+    "corrupt-raw-buckets-fires",
+    lambda r: (
+        (r / "raw" / "notes").mkdir(parents=True),
+        (r / "raw" / "notes" / ".gitkeep").write_text(""),
+        (r / "scripts" / "raw-buckets.json").write_text("{not valid json"),
+    ),
+    expect_code=1, expect=("raw-buckets", "unreadable JSON"),
+)
+run_case(
+    # code:eval-lint#1: wrong-shape raw-buckets.json (buckets not an object).
+    "wrong-shape-raw-buckets-fires",
+    lambda r: (
+        (r / "raw" / "notes").mkdir(parents=True),
+        (r / "raw" / "notes" / ".gitkeep").write_text(""),
+        (r / "scripts" / "raw-buckets.json").write_text('{"buckets": ["notes"]}'),
+    ),
+    expect_code=1, expect=("raw-buckets", "must contain a 'buckets' object"),
 )
 run_case(
     "loose-raw-file-fires",
@@ -314,75 +445,32 @@ run_case(
 )
 run_case(
     "unknown-raw-bucket-fires",
-    lambda r: (
-        (r / "raw" / "misc").mkdir(parents=True),
-        write_raw_buckets(r, {"notes": "fixture notes"}),
-    ),
+    lambda r: (r / "raw" / "misc").mkdir(parents=True),
     expect_code=1, expect=("raw-structure", "missing from scripts/raw-buckets.json"),
 )
 run_case(
-    "missing-raw-buckets-file-fires",
-    lambda r: (r / "raw" / "notes").mkdir(parents=True),
-    expect_code=1, expect=("raw-buckets", "raw bucket taxonomy file is missing"),
-)
-run_case(
-    "corrupt-raw-buckets-fires",
-    lambda r: (
-        (r / "raw" / "notes").mkdir(parents=True),
-        (r / "raw" / "notes" / ".gitkeep").write_text(""),
-        (r / "scripts" / "raw-buckets.json").write_text("{not valid json"),
-    ),
-    expect_code=1, expect=("raw-buckets", "unreadable JSON"),
-)
-run_case(
-    "wrong-shape-raw-buckets-fires",
-    lambda r: (
-        (r / "raw" / "notes").mkdir(parents=True),
-        (r / "raw" / "notes" / ".gitkeep").write_text(""),
-        (r / "scripts" / "raw-buckets.json").write_text('{"buckets": ["notes"]}'),
-    ),
-    expect_code=1, expect=("raw-buckets", "must contain a 'buckets' object"),
-)
-run_case(
     "raw-folder-nonkebab-fires",
-    lambda r: (r / "raw" / "BadBucket").mkdir(parents=True),
+    lambda r: (
+        (r / "raw" / "BadBucket").mkdir(parents=True),
+    ),
     expect_code=1, expect=("raw-structure", "raw/ folder is not kebab-case"),
 )
 run_case(
-    "markdown-md-link-fires",
-    lambda r: append(r, "wiki/index.md", "[Missing](missing.md)\n"),
-    expect_code=1, expect=("markdown-link", "missing.md"),
-)
-run_case(
-    "meta-dangling-link-fires",
-    lambda r: append(r, "wiki/index.md", "[[no-such-meta-target]]\n"),
-    expect_code=1, expect=("meta-dangling-link", "no-such-meta-target"),
-)
-run_case(
-    "empty-agent-use-cases-fires",
-    lambda r: edit(r, "wiki/concepts/alpha.md",
-                   "agent_use_cases:\n  - lint eval fixture",
-                   "agent_use_cases:"),
-    expect_code=1, expect=("frontmatter", "agent_use_cases has no list items"),
-)
-run_case(
-    "bad-review-by-date-fires",
-    lambda r: edit(r, "wiki/concepts/alpha.md",
-                   "confidence: medium",
-                   "confidence: medium\nreview_by: 2026-13-99"),
-    expect_code=1, expect=("date", "not a real calendar date"),
-)
-run_case(
+    # The tracked .gitkeep placeholder is exempt; any other loose file fires.
     "loose-deliverable-fires",
     lambda r: (
         (r / "deliverables").mkdir(),
+        (r / "deliverables" / ".gitkeep").write_text(""),
         (r / "deliverables" / "model.xlsx").write_text("loose deliverable"),
     ),
     expect_code=1, expect=("deliverables-structure", "loose deliverable"),
+    absent=(".gitkeep",),
 )
 run_case(
     "deliverables-folder-nonkebab-fires",
-    lambda r: (r / "deliverables" / "Bad Folder").mkdir(parents=True),
+    lambda r: (
+        (r / "deliverables" / "Bad Folder").mkdir(parents=True),
+    ),
     expect_code=1, expect=("deliverables-structure", "deliverables/ subfolder is not kebab-case"),
 )
 run_case(
@@ -391,19 +479,28 @@ run_case(
     expect_code=1, expect=("os-metadata", ".DS_Store"),
 )
 run_case(
+    # A standalone </content> line is a stray agent tool-call artifact that leaks
+    # into a page during ingest Write/Edit. Removing check_stray_tool_tags stops
+    # this firing.
     "stray-content-tag-fires",
     lambda r: append(r, "wiki/concepts/alpha.md", "\n</content>\n"),
     expect_code=1, expect=("stray-tag", "</content>"),
 )
 run_case(
+    # The <parameter ...> opening tag is matched by prefix, not exact string,
+    # because it carries attributes. This exercises the startswith branch.
     "stray-parameter-tag-fires",
     lambda r: append(r, "wiki/concepts/alpha.md", '\n<parameter name="content">x\n'),
     expect_code=1, expect=("stray-tag", "<parameter"),
 )
 run_case(
+    # Negative/precision: a sentence that merely mentions the tag (the
+    # whole-line-equals / startswith guard) must NOT fire, matching the real
+    # wiki/log.md prose that records a prior cleanup. Reverting the standalone-only
+    # match would turn this into a spurious stray-tag failure.
     "stray-tag-in-prose-does-not-fire",
     lambda r: append(r, "wiki/concepts/alpha.md",
-                     "\nThe maintenance sweep removed two stray </content> "
+                     "\nThe 2026-06-10 sweep removed two stray </content> "
                      "ingestion artifacts from the corpus.\n"),
     expect_code=0, absent=("stray-tag",),
 )
@@ -445,6 +542,114 @@ run_case(
     args=(), expect=("suppressed",), absent=("not found in cited source",),
 )
 
+# ---- Tier 2: compiled-page recompile candidates ----
+def seed_recompile_candidate(root):
+    edit(root, "wiki/sources/gamma.md", "updated: 2026-06-01", "updated: 2026-06-10")
+    append(root, "wiki/concepts/alpha.md", "\n- Derived from: [[gamma]]\n")
+
+
+PERSON_RECOMPILE_BODY = (
+    "Fixture Person records source-backed relationship context for the lint "
+    "eval. Person pages are compiled pages in this wiki because they summarize "
+    "roles, transactions, decisions, collaboration history, and evidence-backed "
+    "status context that can become stale when a newer source clarifies the "
+    "person's role. This dense fixture text keeps the page out of unrelated "
+    "thin-page noise while the recompile candidate signal proves that people "
+    "pages intentionally remain in scope for compiled-page freshness review."
+)
+
+
+def seed_person_recompile_candidate(root):
+    edit(root, "wiki/sources/gamma.md", "updated: 2026-06-01", "updated: 2026-06-10")
+    (root / "wiki" / "people").mkdir()
+    (root / "wiki" / "people" / "fixture-person.md").write_text(
+        '---\ntitle: "Fixture Person"\ntype: person\ncreated: 2026-06-01\n'
+        'updated: 2026-06-01\nsources: ["experience: lint eval fixture"]\n'
+        'tags: [fixture]\nconfidence: medium\nagent_use_cases:\n'
+        '  - lint eval fixture\n---\n\n'
+        f'{PERSON_RECOMPILE_BODY}\n\n'
+        '## Open questions / gaps\n\n- Fixture page; no real questions.\n\n'
+        '## Related pages\n\n- Related: [[gamma]]\n'
+    )
+    append(root, "wiki/index.md",
+           "| [fixture-person.md](people/fixture-person.md) | Test person fixture |\n")
+    append(root, "wiki/concepts/alpha.md", "\n- Related: [[fixture-person]]\n")
+
+
+run_case(
+    "recompile-candidate-direct-source-link-fires",
+    seed_recompile_candidate,
+    args=(), expect=("compiled pages with newer source inputs",
+                     "concepts/alpha.md (page 2026-06-01): newer sources: sources/gamma.md 2026-06-10"),
+)
+run_case(
+    "recompile-candidate-tier2-only",
+    seed_recompile_candidate,
+    absent=("compiled pages with newer source inputs", "newer sources: sources/gamma.md"),
+)
+run_case(
+    "recompile-candidate-person-page-fires",
+    seed_person_recompile_candidate,
+    args=(), expect=("people/fixture-person.md (page 2026-06-01): newer sources: sources/gamma.md 2026-06-10",),
+)
+run_case(
+    "recompile-candidate-generated-backlink-ignored",
+    lambda r: (
+        edit(r, "wiki/sources/gamma.md", "updated: 2026-06-01", "updated: 2026-06-10"),
+        append(r, "wiki/concepts/alpha.md", "\n## Referenced by\n\n**sources/** [[gamma]]\n"),
+    ),
+    args=(), absent=("newer sources: sources/gamma.md",),
+)
+run_case(
+    "recompile-candidate-same-date-not-flagged",
+    lambda r: append(r, "wiki/concepts/alpha.md", "\n- Derived from: [[gamma]]\n"),
+    args=(), absent=("newer sources: sources/gamma.md",),
+)
+run_case(
+    "recompile-candidate-status-note-freshness-suppresses",
+    lambda r: (
+        seed_recompile_candidate(r),
+        append(r, "wiki/concepts/alpha.md",
+               "\n**Status (2026-06-15):** Alpha reviewed gamma.\n"),
+    ),
+    args=(), absent=("newer sources: sources/gamma.md",),
+)
+run_case(
+    "recompile-candidate-not-flagged-when-page-fresh",
+    lambda r: (
+        seed_recompile_candidate(r),
+        edit(r, "wiki/concepts/alpha.md", "updated: 2026-06-01", "updated: 2026-06-15"),
+    ),
+    args=(), absent=("newer sources: sources/gamma.md",),
+)
+run_case(
+    "recompile-candidate-suppressed-by-adjudication",
+    lambda r: (
+        seed_recompile_candidate(r),
+        write_adjudications(r, reviewed_recompile_candidates=[
+            {"pair": ["concepts/alpha.md", "sources/gamma.md"],
+             "reason": "fixture no-change", "date": "2026-06-26"}]),
+    ),
+    args=(), expect=("suppressed",), absent=("newer sources: sources/gamma.md",),
+)
+run_case(
+    "recompile-candidate-skips-source-stale-side",
+    lambda r: (
+        (r / "wiki/sources/epsilon.md").write_text(
+            '---\ntitle: "Epsilon"\ntype: source\ncreated: 2026-06-01\n'
+            'updated: 2026-06-10\nsources: ["experience: lint eval fixture"]\n'
+            'tags: [fixture]\nconfidence: medium\nsource_type: other\n'
+            'agent_use_cases:\n  - lint eval fixture\n---\n\n'
+            'Epsilon is a newer source page used to prove source pages are not '
+            'the stale compiled side of the recompile candidate signal.\n\n'
+            '## Open questions / gaps\n\n- Fixture page; no real questions.\n'
+        ),
+        append(r, "wiki/index.md", "| [epsilon.md](sources/epsilon.md) | Test source epsilon |\n"),
+        append(r, "wiki/sources/gamma.md", "\n- Related: [[epsilon]]\n"),
+    ),
+    args=(), absent=("sources/gamma.md (page 2026-06-01): newer sources: sources/epsilon.md",),
+)
+
 # ---- Tier 2: candidates and suppression ----
 run_case(
     "orphan-and-crossref-surface",
@@ -456,8 +661,10 @@ run_case(
     "orphan-suppressed-by-adjudication",
     lambda r: write_adjudications(r, accepted_orphans=[
         {"page": "sources/gamma.md", "reason": "fixture", "date": "2026-06-11"}]),
-    # the bare line is the orphan listing; the thin-pages listing has a "(Nw)" suffix
-    args=(), expect=("suppressed",), absent=("      sources/gamma.md\n",),
+    # the bare line is the orphan listing; the thin-pages listing has a "(Nw)"
+    # suffix. A consumed suppression must NOT show up as a dead adjudication.
+    args=(), expect=("suppressed",),
+    absent=("      sources/gamma.md\n", "accepted_orphans: sources/gamma.md"),
 )
 run_case(
     "crossref-pair-suppressed",
@@ -484,15 +691,19 @@ run_case(
     args=(), absent=("concepts/alpha.md  +  concepts/beta.md",),
 )
 
-# ---- Tier 2: positive cases for generic categories ----
+# ---- Tier 2: positive cases for categories that previously had none ----
+# Shared body text long enough to push two derived pages over the 0.35 Jaccard
+# near-duplicate bar (the token set must overlap heavily).
 NEAR_DUP_BODY = (
-    "Market positioning strategy across multiple customer segments requires "
-    "balancing product capabilities against buyer urgency, competitive pressure, "
-    "implementation risk, pricing thresholds, deployment dependencies, support "
-    "load, expansion potential, and the exact evidence available from current "
-    "source material before making durable claims in the wiki."
+    "Capital allocation strategy across diversified portfolio assets requires "
+    "balancing concentrated thesis positions against broad index exposure while "
+    "managing sequence risk, liquidity buffers, taxable rebalancing thresholds, "
+    "and withdrawal timing throughout the accumulation and decumulation phases."
 )
 run_case(
+    # code:eval-lint#3: near-duplicate category had no firing case. Two derived
+    # (non-source) concept pages sharing the same dense body exceed the Jaccard
+    # bar and surface as a near-duplicate pair.
     "near-duplicate-pair-surfaces",
     lambda r: (
         edit(r, "wiki/concepts/delta-one.md", "Delta one body.", NEAR_DUP_BODY),
@@ -501,74 +712,417 @@ run_case(
     args=(), expect=("concepts/delta-one.md", "concepts/delta-two.md", "jaccard"),
 )
 run_case(
+    # code:eval-lint#3: confidence_upgrade category had no firing case. A
+    # low-confidence non-source page with >=2 inbound links is flagged as an
+    # upgrade candidate. delta-one already has inbound from alpha and delta-three.
     "confidence-upgrade-surfaces",
     lambda r: (
         edit(r, "wiki/concepts/delta-one.md", "confidence: medium", "confidence: low"),
         edit(r, "wiki/concepts/delta-one.md", "Delta one body.",
              "Delta one body. Confidence is low here for the fixture."),
     ),
-    args=(), expect=("confidence:low with >=2 inbound", "concepts/delta-one.md"),
+    args=(), expect=("confidence:low with >=2 inbound", "concepts/delta-one.md (3 inbound)"),
 )
 run_case(
-    "missing-open-questions-surfaces",
+    # The Open questions / gaps mandate is Tier-1 (SCHEMA requires it on every
+    # non-source page): removing the heading fails the gate.
+    "missing-open-questions-fails-tier1",
     lambda r: edit(r, "wiki/concepts/alpha.md",
                    "## Open questions / gaps", "## Notes"),
-    args=(), expect=("non-source pages missing Open questions", "concepts/alpha.md"),
+    expect_code=1, expect=("open-questions", "missing Open questions / gaps section"),
+)
+run_case(
+    # Sources are exempt from the Open-questions mandate (gamma has none).
+    "sources-exempt-from-open-questions",
+    None,
+    absent=("sources/gamma.md: missing Open questions",),
+)
+run_case(
+    # signal_thin had no case: every fixture page is under 80 words, so the
+    # "(Nw)" listing must name them. Deleting the signal removes the marker.
+    "thin-page-surfaces",
+    None,
+    args=(), expect=("thin pages (<80 words):", "concepts/alpha.md ("),
+)
+run_case(
+    # signal_uncited had no case: a page with empty sources and no authored
+    # body links must surface. The clean fixture has zero uncited pages.
+    "uncited-surfaces",
+    lambda r: (
+        (r / "wiki" / "concepts" / "uncited-fixture.md").write_text(
+            '---\ntitle: "Uncited"\ntype: concept\ncreated: 2026-06-01\n'
+            'updated: 2026-06-01\nsources: []\ntags: [fixture]\n'
+            'confidence: medium\nagent_use_cases:\n  - lint eval fixture\n---\n\n'
+            'Uncited fixture body with no links and no sources at all.\n\n'
+            '## Open questions / gaps\n\n- Fixture page; no real questions.\n'
+        ),
+        add_index_row(r, "concepts/uncited-fixture.md", "uncited fixture"),
+    ),
+    args=(), expect=("uncited (no sources, no body links): 1",
+                     "concepts/uncited-fixture.md"),
+)
+run_case(
+    # A block-style sources: list is flattened to '' by the key parser, but the
+    # page is cited: it must NOT surface as uncited.
+    "block-sourced-page-not-uncited",
+    lambda r: (
+        (r / "wiki" / "concepts" / "block-sourced-fixture.md").write_text(
+            '---\ntitle: "Block sourced"\ntype: concept\ncreated: 2026-06-01\n'
+            'updated: 2026-06-01\nsources:\n  - "experience: block-style fixture"\n'
+            'tags: [fixture]\n'
+            'confidence: medium\nagent_use_cases:\n  - lint eval fixture\n---\n\n'
+            'Block-sourced fixture body with no links.\n\n'
+            '## Open questions / gaps\n\n- Fixture page; no real questions.\n'
+        ),
+        add_index_row(r, "concepts/block-sourced-fixture.md", "block sourced fixture"),
+    ),
+    args=(), expect=("uncited (no sources, no body links): 0",),
+)
+run_case(
+    # reviewed_near_duplicates suppression path had no case.
+    "near-duplicate-suppressed",
+    lambda r: (
+        edit(r, "wiki/concepts/delta-one.md", "Delta one body.", NEAR_DUP_BODY),
+        edit(r, "wiki/concepts/delta-two.md", "Delta two body.", NEAR_DUP_BODY),
+        write_adjudications(r, reviewed_near_duplicates=[
+            {"pair": ["concepts/delta-one.md", "concepts/delta-two.md"],
+             "reason": "fixture", "date": "2026-06-11"}]),
+    ),
+    args=(), expect=("suppressed",),
+    absent=("concepts/delta-one.md  ~  concepts/delta-two.md",),
+)
+run_case(
+    # reviewed_confidence_low suppression path had no case.
+    "confidence-upgrade-suppressed",
+    lambda r: (
+        edit(r, "wiki/concepts/delta-one.md", "confidence: medium", "confidence: low"),
+        edit(r, "wiki/concepts/delta-one.md", "Delta one body.",
+             "Delta one body. Confidence is low here for the fixture."),
+        write_adjudications(r, reviewed_confidence_low=[
+            {"page": "concepts/delta-one.md", "reason": "fixture", "date": "2026-06-11"}]),
+    ),
+    args=(), expect=("suppressed",), absent=("concepts/delta-one.md (3 inbound)",),
+)
+run_case(
+    # A [[link]] inside a code fence is a syntax example, not a graph edge:
+    # gamma must STAY an orphan when the only "link" to it is fenced. Before the
+    # shared strip_code_spans rule reached the outbound scan, this fenced link
+    # suppressed the orphan signal.
+    "code-fence-link-is-not-an-edge",
+    lambda r: append(r, "wiki/concepts/alpha.md",
+                     "\n```\nSyntax example: [[gamma]] inside a fence.\n```\n"),
+    args=(), expect=("      sources/gamma.md\n",),
+)
+run_case(
+    # review_due Tier-2 surface: a page whose review_by has passed is listed.
+    "review-due-surfaces",
+    lambda r: edit(r, "wiki/concepts/alpha.md", "updated: 2026-06-01",
+                   "updated: 2026-06-01\nreview_by: 2020-01-01"),
+    args=(), expect=("outcome reviews due (review_by has passed; run the review workflow): 1",
+                     "concepts/alpha.md (review_by 2020-01-01"),
+)
+run_case(
+    # adjudication_dead: an entry that suppresses nothing (alpha has inbound
+    # links, so it is not an orphan) is reported as inert residue.
+    "adjudication-dead-surfaces",
+    lambda r: write_adjudications(r, accepted_orphans=[
+        {"page": "concepts/alpha.md", "reason": "fixture", "date": "2026-06-11"}]),
+    args=(), expect=("adjudication entries suppressing nothing",
+                     "accepted_orphans: concepts/alpha.md"),
+)
+run_case(
+    # hub_pages suppresses event-driven candidates that can legitimately go
+    # quiet between events; it is excluded from the dead-entry report.
+    "adjudication-dead-skips-hub-pages",
+    lambda r: write_adjudications(
+        r,
+        hub_pages=[{"page": "concepts/alpha.md", "reason": "fixture",
+                    "date": "2026-06-11"}],
+    ),
+    args=(), absent=("hub_pages: concepts/alpha.md",),
 )
 
+
+def write_burst_log(root, ingests, then_synthesis=False, trailing_ingests=0):
+    lines = ["# Log\n\n"]
+    day = 1
+    for _ in range(ingests):
+        lines.append(f"## [2026-03-{day:02d}] ingest | fixture source {day}\nBody.\n\n")
+        day += 1
+    if then_synthesis:
+        lines.append(f"## [2026-03-{day:02d}] synthesis | fixture pass\nBody.\n\n")
+        day += 1
+    for _ in range(trailing_ingests):
+        lines.append(f"## [2026-03-{day:02d}] ingest | fixture source {day}\nBody.\n\n")
+        day += 1
+    (root / "wiki" / "log.md").write_text("".join(lines))
+
+
+run_case(
+    # synthesis_due: an ingest burst with no synthesis pass following fires.
+    "synthesis-due-burst-fires",
+    lambda r: write_burst_log(r, ingests=8),
+    args=(), expect=("ingest burst with no synthesis pass following", "8 ingest entries"),
+)
+run_case(
+    # A synthesis entry resets the count: burst then synthesis then a few
+    # ingests stays quiet.
+    "synthesis-due-reset-by-synthesis-entry",
+    lambda r: write_burst_log(r, ingests=8, then_synthesis=True, trailing_ingests=3),
+    args=(), absent=("ingest entries since the last synthesis pass",),
+)
+run_case(
+    # The plain-pipe header form ("## date | type | ...") is a recognized live
+    # form and must count toward the burst exactly like the bracketed form.
+    "synthesis-due-plain-pipe-headers-fire",
+    lambda r: (r / "wiki" / "log.md").write_text(
+        "# Log\n\n" + "".join(
+            f"## 2026-03-{d:02d} | ingest | fixture source {d}\nBody.\n\n"
+            for d in range(1, 9))),
+    args=(), expect=("ingest burst with no synthesis pass following",
+                     "8 ingest entries"),
+)
+run_case(
+    # One below the burst threshold stays quiet.
+    "synthesis-due-below-threshold-quiet",
+    lambda r: write_burst_log(r, ingests=7),
+    args=(), absent=("ingest entries since the last synthesis pass",),
+)
+
+# ---- Tier 2: meta-maintenance signals ----
+def write_log(root, lines):
+    (root / "wiki" / "log.md").write_text(
+        "".join(f"line {i}\n" for i in range(1, lines + 1))
+    )
+
+
+def write_sourcing_queue(root, *markers):
+    (root / "wiki" / "sourcing-queue.md").write_text(
+        "# Sourcing Queue\n\n" + "\n".join(markers) + "\n"
+    )
+
+
+def fixture_entity_count(root, folder):
+    return sum(1 for p in get_entity_pages(root / "wiki") if p.parent.name == folder)
+
+
+CONCEPT_FIXTURE_COUNT = fixture_entity_count(FIXTURE, "concepts")
+SOURCE_FIXTURE_COUNT = fixture_entity_count(FIXTURE, "sources")
+
+
+run_case(
+    "log-rotation-due-fires",
+    lambda r: write_log(r, 2501),
+    args=(), expect=("log rotation due: 1",
+                     "wiki/log.md has 2501 lines; threshold is 2500"),
+)
+run_case(
+    "log-rotation-below-threshold-clean",
+    lambda r: write_log(r, 2500),
+    args=(), expect=("log rotation due: 0",),
+    absent=("wiki/log.md has",),
+)
+run_case(
+    "log-absent-clean-fixture-passes",
+    None,
+    args=(), expect=("log rotation due: 0",),
+    absent=("wiki/log.md has",),
+)
+run_case(
+    "sourcing-queue-count-drift-fires",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=concepts count=99 -->"
+    ),
+    args=(), expect=("sourcing queue entity count drift: 1",
+                     f"folder concepts declares 99 but actual count is {CONCEPT_FIXTURE_COUNT}"),
+)
+run_case(
+    "sourcing-queue-count-drift-clean",
+    lambda r: write_sourcing_queue(
+        r,
+        "<!-- lint:entity-count folder=concepts "
+        f"count={fixture_entity_count(r, 'concepts')} -->",
+    ),
+    args=(), expect=("sourcing queue entity count drift: 0",),
+    absent=("folder concepts declares",),
+)
+run_case(
+    "sourcing-queue-count-drift-multiple-markers-only-stale-fires",
+    lambda r: write_sourcing_queue(
+        r,
+        "<!-- lint:entity-count folder=concepts count=99 -->",
+        f"<!-- lint:entity-count folder=sources count={SOURCE_FIXTURE_COUNT} -->",
+    ),
+    args=(), expect=("sourcing queue entity count drift: 1",
+                     f"folder concepts declares 99 but actual count is {CONCEPT_FIXTURE_COUNT}"),
+    absent=("folder sources declares",),
+)
+run_case(
+    "sourcing-queue-count-bad-folder-fails-tier1",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=unknown count=0 -->"
+    ),
+    expect_code=1, expect=("sourcing-queue-count-marker", "unknown folder"),
+)
+run_case(
+    "sourcing-queue-count-missing-folder-fails-tier1",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count count=0 -->"
+    ),
+    expect_code=1, expect=("sourcing-queue-count-marker", "missing folder"),
+)
+run_case(
+    "sourcing-queue-count-bad-count-fails-tier1",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=concepts count=many -->"
+    ),
+    expect_code=1, expect=("sourcing-queue-count-marker", "not an integer"),
+)
+run_case(
+    "sourcing-queue-count-negative-count-fails-tier1",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=concepts count=-3 -->"
+    ),
+    args=(), expect_code=1,
+    expect=("sourcing-queue-count-marker", "non-negative",
+            "sourcing queue entity count drift: 0"),
+    absent=("folder concepts declares",),
+)
+run_case(
+    "sourcing-queue-count-missing-count-fails-tier1",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=concepts -->"
+    ),
+    expect_code=1, expect=("sourcing-queue-count-marker", "missing count"),
+)
+run_case(
+    "sourcing-queue-count-duplicate-folder-fails-tier1",
+    lambda r: write_sourcing_queue(
+        r,
+        "<!-- lint:entity-count folder=concepts count=5 -->",
+        "<!-- lint:entity-count folder=concepts count=5 -->",
+    ),
+    expect_code=1, expect=("sourcing-queue-count-marker", "duplicate folder"),
+)
+
+# ---- Tier 1: index-row uniqueness ----
+run_case(
+    "index-duplicate-row-fails-tier1",
+    lambda r: add_index_row(r, "concepts/alpha.md", "duplicate row"),
+    expect_code=1, expect=("index-duplicate", "multiple index.md rows"),
+)
+
+# ---- Tier 1: log entry headers (the grammar rotate_log.py cuts at) ----
+def write_log_text(root, text):
+    (root / "wiki" / "log.md").write_text(text)
+
+
+run_case(
+    "log-entry-header-bad-heading-fails-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-06-01] ingest | ok\nBody.\n\n## Random Section\nBody.\n",
+    ),
+    expect_code=1, expect=("log-entry-header", "not a recognized log entry header"),
+)
+run_case(
+    "log-entry-header-valid-forms-pass-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-06-01] ingest | ok\nBody.\n\n## 2026-06-02 | plain form\nBody.\n",
+    ),
+)
+run_case(
+    # rotate_log's cuts are fence-unaware, so ANY fenced '## ' line in log.md
+    # is a hazard: a fenced date-shaped header would become a bogus cut point.
+    "log-entry-header-fenced-line-fails-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-06-01] ingest | ok\nBody.\n\n"
+        "```\n## [2026-06-02] fenced example\n```\n",
+    ),
+    expect_code=1, expect=("log-entry-header", "fenced '## ' line"),
+)
+
+# ---- Tier 2: review_by enrollment for decisions ----
+# A dense body (>=80 authored words) plus an inbound link from alpha keep the
+# seeded decision out of the thin and orphan listings, so its only appearance in
+# lint output is the enrollment signal. That isolation is what lets the negative
+# case assert the page vanishes entirely once review_by is set.
 DECISION_BODY = (
-    "This fixture decision exists to exercise the review_by enrollment signal. "
-    "It carries a deliberately dense body so it clears the thin-page threshold "
-    "and its only appearance in lint output comes from the enrollment check "
-    "rather than the orphan or thin listings. The decision describes a dated "
-    "choice whose realized outcome should eventually be graded against what "
-    "actually happened instead of standing on self-assessed confidence forever, "
-    "which is exactly the population the outcome-review loop is meant to enroll."
+    "This fixture decision exists to exercise the review_by enrollment signal. It "
+    "carries a deliberately dense body so it clears the thin-page threshold and "
+    "its only appearance in lint output comes from the enrollment check rather "
+    "than the orphan or thin listings. The decision describes a dated choice whose "
+    "realized outcome should eventually be graded against what actually happened "
+    "instead of standing on self-assessed confidence forever, which is exactly "
+    "the population the outcome-review loop is meant to enroll and surface for "
+    "periodic grading by a human reviewer working the maintenance review task."
 )
 
 
 def seed_decision_without_review_by(root):
-    (root / "wiki" / "decisions").mkdir()
-    (root / "wiki" / "decisions" / "template-decision.md").write_text(
-        '---\ntitle: "Template Decision"\ntype: decision\ncreated: 2026-06-01\n'
-        'updated: 2026-06-01\nsources: ["experience: lint eval fixture"]\n'
-        'tags: [fixture]\nconfidence: medium\nagent_use_cases:\n'
-        '  - lint eval fixture\n---\n\n'
+    (root / "wiki" / "decisions").mkdir(exist_ok=True)
+    (root / "wiki" / "decisions" / "target.md").write_text(
+        '---\ntitle: "Target"\ntype: decision\ncreated: 2026-06-01\nupdated: 2026-06-01\n'
+        'sources: ["experience: lint eval fixture"]\ntags: [fixture]\nconfidence: medium\n'
+        'agent_use_cases:\n  - lint eval fixture\n---\n\n'
         f'{DECISION_BODY}\n\n'
-        '## Open questions / gaps\n\n- Fixture page; no real questions.\n'
-    )
-    append(root, "wiki/index.md",
-           "| [template-decision.md](decisions/template-decision.md) | fixture decision |\n")
-    append(root, "wiki/concepts/alpha.md", "- Related: [[template-decision]]\n")
+        '## Open questions / gaps\n\n- Fixture page; no real questions.\n')
+    append(root, "wiki/index.md", "| [target.md](decisions/target.md) | fixture decision |\n")
+    append(root, "wiki/concepts/alpha.md", "- Related: [[target]]\n")
 
 
 run_case(
     "review-by-missing-fires",
     seed_decision_without_review_by,
     args=(), expect_code=0,
-    expect=("decisions with no review_by", "decisions/template-decision.md"),
+    expect=("with no review_by", "decisions/target.md"),
 )
 run_case(
     "review-by-present-not-flagged",
     lambda r: (
         seed_decision_without_review_by(r),
-        edit(r, "wiki/decisions/template-decision.md", "confidence: medium",
+        edit(r, "wiki/decisions/target.md", "confidence: medium",
              "confidence: medium\nreview_by: 2026-12-31"),
     ),
     args=(), expect_code=0,
-    absent=("decisions/template-decision.md",),
+    absent=("decisions/target.md",),
 )
 
+# ---- Tier 1: meta-page dangling links (promoted from Tier-2; gates commit) ----
+run_case(
+    "meta-dangling-link-fires",
+    lambda r: append(r, "wiki/index.md", "\nSee [[no-such-meta-target]] for details.\n"),
+    expect_code=1, expect=("meta-dangling-link", "index.md: [[no-such-meta-target]]"),
+)
+run_case(
+    "meta-dangling-ignores-folder-and-code",
+    lambda r: append(r, "wiki/index.md", "\nRouting: [[concepts/]]. Example: `[[demo]]`.\n"),
+    expect_code=0, absent=("index.md: [[concepts/]]", "index.md: [[demo]]"),
+)
+run_case(
+    # content:links#3: an in-code-span [[link]] on a META page must not fire
+    # even when its target is a real-looking but nonexistent slug.
+    "meta-dangling-in-code-span-ignored",
+    lambda r: append(r, "wiki/index.md",
+                     "\nSyntax example: `[[some-undefined-meta-demo]]`.\n"),
+    expect_code=0, absent=("some-undefined-meta-demo",),
+)
 
 def check_raw_tracked_fires():
-    """The raw-tracked guard needs a git work tree, so it gets a git-backed case."""
+    """The raw-tracked Tier-1 guard needs a git work tree, which the copy-to-temp
+    fixture lacks, so it gets its own git-backed case. When git is unavailable
+    this records a skipped result instead of crashing, mirroring lint.py's own
+    OSError handling in check_no_tracked_raw (the guard no-ops without git)."""
     with tempfile.TemporaryDirectory(prefix="wiki-rawtracked-") as td:
         root = Path(td)
         copy_fixture(root)
         try:
-            subprocess.run(["git", "init", "-q"], cwd=root, check=True, capture_output=True)
+            subprocess.run(["git", "init", "-q"], cwd=root,
+                           check=True, capture_output=True)
             (root / "raw").mkdir()
-            (root / "raw" / "leak.pdf").write_text("source artifact")
+            (root / "raw" / "leak.pdf").write_text("secret")
             subprocess.run(["git", "add", "-f", "raw/leak.pdf"], cwd=root,
                            check=True, capture_output=True)
         except (OSError, subprocess.SubprocessError) as e:
@@ -578,7 +1132,8 @@ def check_raw_tracked_fires():
             return
         proc = subprocess.run([sys.executable, str(LINT), "--tier1"],
                               cwd=root, text=True, capture_output=True)
-        ok = proc.returncode == 1 and "raw-tracked" in proc.stdout and "leak.pdf" in proc.stdout
+        ok = (proc.returncode == 1 and "raw-tracked" in proc.stdout
+              and "leak.pdf" in proc.stdout)
         results.append(("raw-tracked-fires", ok))
         print(("PASS " if ok else "FAIL ") + "raw-tracked-fires")
         if not ok:

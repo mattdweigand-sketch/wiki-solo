@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Run the live wiki evaluation suites.
 
-Entrypoint for the deterministic checks that guard live tooling: shared parser
-coverage, backlink rebuild guards, lint seeded-violation cases, capture_gate.py's
-approval contract across capture and synthesis kinds, the single approval
-ledger, export include/exclude boundaries, review_due surfacing, duplicate global
-Codex skill detection/removal safety, wrapper parity, and Tier-1 lint over the
-live corpus.
+Entrypoint for the deterministic checks that guard live tooling. The SUITES
+registry below is the single enumeration of what runs; each suite's own
+docstring describes what it guards. The autonomy harness suites are archived
+under archive/wiki-harness/ per decisions/archive-wiki-autonomy-harness;
+restore them from there if the harness is reopened.
 """
 
 from __future__ import annotations
@@ -14,6 +13,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from pathlib import Path
 
 
 SUITES = {
@@ -22,14 +22,25 @@ SUITES = {
     "lint": [sys.executable, "scripts/wiki_eval_lint.py"],
     "gate": [sys.executable, "scripts/wiki_eval_gate.py"],
     "capture-runs": [sys.executable, "scripts/validate_capture_runs.py"],
-    "ledger-validators": [sys.executable, "scripts/wiki_eval_ledgers.py"],
     "export": [sys.executable, "scripts/wiki_eval_export.py"],
+    "rotate-log": [sys.executable, "scripts/wiki_eval_rotate_log.py"],
     "review-due": [sys.executable, "scripts/wiki_eval_review.py"],
-    "codex-global-dupes": [sys.executable, "scripts/sync_codex_skills.py", "--check"],
-    "codex-remove-safety": [sys.executable, "scripts/wiki_eval_codex_remove.py"],
-    "wrapper-parity": [sys.executable, "scripts/sync_codex_skills.py", "--wrapper-parity"],
+    "ledger-validators": [sys.executable, "scripts/wiki_eval_ledgers.py"],
+    "wrapper-parity": [sys.executable, "scripts/wiki_eval_wrappers.py"],
     "tier1": [sys.executable, "scripts/lint.py", "--tier1"],
 }
+
+
+def unregistered_suites() -> list[str]:
+    """wiki_eval_*.py files that appear in no registered suite command. A new
+    suite file that is never added to SUITES would otherwise silently never
+    run; this makes the default run fail loudly instead."""
+    registered = {part for command in SUITES.values() for part in command}
+    scripts_dir = Path(__file__).resolve().parent
+    return sorted(
+        p.name for p in scripts_dir.glob("wiki_eval_*.py")
+        if f"scripts/{p.name}" not in registered
+    )
 
 
 def parser() -> argparse.ArgumentParser:
@@ -52,9 +63,16 @@ def run_suite(name: str, command: list[str]) -> int:
 
 def main() -> int:
     args = parser().parse_args()
+    # Default to every suite, derived from SUITES so a newly registered suite can
+    # never be silently dropped from the default run by a forgotten list entry.
     suite_names = args.suite or list(SUITES)
 
     failures: list[str] = []
+    orphans = unregistered_suites()
+    if orphans:
+        failures.append(
+            "unregistered suite file(s) not in SUITES: " + ", ".join(orphans)
+        )
     for name in suite_names:
         code = run_suite(name, SUITES[name])
         if code != 0:

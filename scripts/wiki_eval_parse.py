@@ -2,9 +2,9 @@
 """Regression eval for the shared scripts/_wiki_parse.py primitives.
 
 R1 extracted split_frontmatter, frontmatter_block, LINK_RE, the code-span REs,
-strip_code_spans, and dangling_slugs into one module so lint.py, review_due.py,
-and rebuild_referenced_by.py stop reimplementing them and cannot
-silently drift. This suite pins that contract two ways:
+strip_code_spans, and dangling_slugs into one module so lint.py,
+review_due.py, and rebuild_referenced_by.py stop reimplementing them and cannot
+silently drift. This suite pins that contract three ways:
 
 1. Unit assertions on the primitives against a CRLF / edge-case sample, so the
    parse grammar (wikilink slug capture, code-span stripping, frontmatter split,
@@ -12,7 +12,7 @@ silently drift. This suite pins that contract two ways:
 2. An end-to-end consistency check: one CRLF-on-disk page driven through all
    callers, proving they agree. Every caller reads via Path.read_text (universal
    newlines), so a CRLF source is normalized to LF before _wiki_parse sees it,
-   and all template callers treat the identical page identically.
+   and all scripts treat the identical page identically.
 3. Wiring assertions that each caller's source actually imports from _wiki_parse,
    so reverting any caller to a private reimplementation fails here.
 
@@ -132,7 +132,7 @@ check("raw-crlf-degrades-consistently",
       fm_raw is None and frontmatter_block(CRLF_RAW) == "",
       detail=f"fm_raw={fm_raw}")
 
-# --- 2. end-to-end: one CRLF page through all template callers, must agree ---
+# --- 2. end-to-end: one CRLF page through all callers, must agree ---
 
 with tempfile.TemporaryDirectory() as td:
     root = Path(td) / "wiki"
@@ -145,7 +145,7 @@ with tempfile.TemporaryDirectory() as td:
     (root / "sources" / "real-page.md").write_bytes(
         ("---\ntitle: real\ntype: source\ncreated: 2026-01-01\n"
          "updated: 2026-01-01\nsources: []\ntags: [agent]\n"
-         "confidence: medium\nsource_type: notes\n---\nbody\n").encode("utf-8")
+         "confidence: medium\nsource_type: other\n---\nbody\n").encode("utf-8")
     )
 
     # review_due: review_by is read from the CRLF page and surfaces as overdue.

@@ -5,10 +5,4 @@ description: Run the wiki tooling eval workflow. Use when the user says /wiki-ev
 
 # Wiki Eval
 
-Run the eval workflow for the current wiki repo. Read `AGENTS.md`, check `wiki/domain.md`, then route through `CONTEXT.md` to `workflows/maintenance/eval.md`.
-
-This checks the wiki system itself: backlinks, lint fixtures, approval gates, ledgers, exports, wrapper sync, and Tier-1 lint. It is different from `/wiki-lint`, which reviews wiki content.
-
-The canonical command is `python3 scripts/wiki_eval.py`.
-
-This is a tracked Codex skill wrapper. Canonical behavior lives in the repo workflow files.
+Run the eval workflow for this repo (it checks the wiki tooling itself, not wiki content — distinct from `/wiki-lint`). Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md` and `workflows/maintenance/eval.md`, and follow that workflow's Load / Skip list exactly.

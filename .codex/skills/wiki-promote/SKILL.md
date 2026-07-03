@@ -5,8 +5,4 @@ description: Run the wiki artifact-promotion router. Use when the user says /wik
 
 # Wiki Promote
 
-Run the artifact-promotion router for the current wiki repo. Read `AGENTS.md`, check `wiki/domain.md`, then route through `CONTEXT.md` to `workflows/maintenance/artifact-promotion.md`.
-
-The approval boundary is `python3 scripts/capture_gate.py`; the workflow owns when and how to call it.
-
-This is a tracked Codex skill wrapper. Canonical behavior lives in the repo workflow files.
+Run the artifact-promotion router for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md` and `workflows/maintenance/artifact-promotion.md`, and follow it exactly: that workflow owns the route classification, the `scripts/capture_gate.py` approval gate, and the post-approval validate/rebuild/lint steps.

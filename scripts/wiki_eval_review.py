@@ -29,11 +29,15 @@ with tempfile.TemporaryDirectory() as td:
     (root / "concepts" / "future.md").write_text(page(extra="review_by: 2026-12-01\n"))
     (root / "concepts" / "none.md").write_text(page())
     # Shape-valid but impossible date: must be flagged 'Invalid review_by' and NOT
-    # counted as due (guards the bad-collection branch, review_due.py:55-62).
+    # counted as due (guards review_due.py's bad-collection branch).
     (root / "concepts" / "bad.md").write_text(page(extra="review_by: 2026-13-99\n"))
     # review_by exactly == today: the boundary is inclusive (review_by <= today),
-    # so this page IS surfaced (guards review_due.py:63).
+    # so this page IS surfaced.
     (root / "concepts" / "today.md").write_text(page(extra="review_by: 2026-06-16\n"))
+    # A value with a trailing token must be flagged invalid, not silently
+    # dropped out of the review loop (the \S+-anchored regex regression).
+    (root / "concepts" / "trailing.md").write_text(
+        page(extra="review_by: 2026-05-01 approx\n"))
     proc = subprocess.run(
         [sys.executable, str(SCRIPT), "--root", str(root), "--today", "2026-06-16"],
         text=True, capture_output=True,
@@ -49,6 +53,8 @@ with tempfile.TemporaryDirectory() as td:
         ("invalid-not-counted-due", "concepts/bad.md: " in out
          and "concepts/bad.md  (review_by" not in out),
         ("surfaces-review-by-today", "concepts/today.md" in out),
+        ("trailing-token-flagged-invalid", "concepts/trailing.md: " in out
+         and "concepts/trailing.md  (review_by" not in out),
     ]
     for name, ok in checks:
         results.record(name, ok, "stdout: " + out.replace("\n", " | "))

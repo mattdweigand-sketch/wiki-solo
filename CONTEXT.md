@@ -4,7 +4,7 @@
 
 Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, and `/wiki-export`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. Nothing here depends on any wrapper surface.
 
-Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer), and **maintenance** (lint, eval, artifact promotion, captures, sourcing queue, synthesize, review, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
+Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer), and **maintenance** (lint, rotate-log, eval, artifact promotion, capture, sourcing queue, synthesize, review, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
 
 Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; no separate route preflight runs.
 
@@ -23,10 +23,11 @@ Synthesis promotion uses `python3 scripts/capture_gate.py --kind=synthesis`. Run
 | Answer a question from the wiki | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
 | Compare entities | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
 | Lint the wiki | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |
+| Review compiled pages against newer cited source pages | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |
+| Rotate `wiki/log.md` when `log_rotation_due` fires | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`rotate-log.md`](workflows/maintenance/rotate-log.md) |
 | Run the wiki tooling evals | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`eval.md`](workflows/maintenance/eval.md) |
 | Promote a useful artifact into durable wiki memory | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`artifact-promotion.md`](workflows/maintenance/artifact-promotion.md) |
-| Capture a decision | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`capture-decision.md`](workflows/maintenance/capture-decision.md) |
-| Capture an observation, field note, or lived context | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`capture-experience.md`](workflows/maintenance/capture-experience.md) |
+| Capture a decision, observation, field note, or lived context | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`capture.md`](workflows/maintenance/capture.md) |
 | Refresh the sourcing queue | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`refresh-sourcing-queue.md`](workflows/maintenance/refresh-sourcing-queue.md) |
 | Synthesize the corpus | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`synthesize.md`](workflows/maintenance/synthesize.md) |
 | Review due pages or grade dated predictions/decisions | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`review.md`](workflows/maintenance/review.md) |

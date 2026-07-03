@@ -1,17 +1,18 @@
 #!/bin/sh
-# Block committing raw/ source artifacts. raw/ artifacts are local by default;
-# only raw/.gitkeep and raw/README.md are tracked template exceptions.
+# Block committing raw/ source artifacts. raw/ is never committed under any
+# circumstances; only raw/.gitkeep and raw/README.md are tracked exceptions.
+# Source artifacts stay local and are exported through the wiki export zip, not git.
 #
 # Install (once per clone): git config core.hooksPath scripts/hooks
 # What raw/ paths would this commit leave tracked? ls-files --cached reflects
 # the staged index (additions present, deletions gone), independent of HEAD, so
 # untracking raw/ is allowed while any added/remaining raw/ artifact is blocked.
-staged_raw=$(git ls-files --cached -- raw | grep -v '^raw/\.gitkeep$' | grep -v '^raw/README\.md$')
+staged_raw=$(git ls-files --cached -- raw | grep -Ev '^raw/(\.gitkeep|README\.md)$')
 if [ -n "$staged_raw" ]; then
   echo "pre-commit: refusing to commit raw/ source artifacts." >&2
-  echo "Only raw/.gitkeep and raw/README.md are tracked by default. Offending paths:" >&2
+  echo "raw/ source artifacts are never committed; only raw/.gitkeep and raw/README.md are tracked. Offending paths:" >&2
   printf '%s\n' "$staged_raw" | sed 's/^/  /' >&2
-  echo "Preserve source artifacts locally under raw/; see scripts/raw-buckets.json." >&2
+  echo "raw/ is included in the export zip instead (workflows/maintenance/export.md)." >&2
   exit 1
 fi
 exit 0

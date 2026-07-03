@@ -47,7 +47,7 @@ The repo has seven common workflow shortcuts. Claude Code and Codex expose them 
 | `/wiki-ingest` | Turn a raw source into durable wiki pages. |
 | `/wiki-capture` | Record first-person context, usually a decision or lived experience. |
 | `/wiki-promote` | Route a useful artifact into the wiki, or decide not to save it. |
-| `/wiki-lint` | Run deterministic checks, judgment candidates, and evidence review. |
+| `/wiki-lint` | Run deterministic checks, judgment candidates, compiled-page recompile review candidates, and evidence review. |
 | `/wiki-eval` | Verify that the wiki tools and guardrails still work. |
 | `/wiki-synthesize` | Draft corpus distillations for review and approved promotion. |
 | `/wiki-export` | Build a local zip export of the wiki, including raw sources. |
@@ -82,7 +82,7 @@ The checks and guardrails that protect the corpus:
 | Evidence review | Full `/wiki-lint` adds sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Approval gate and ledger | `scripts/capture_gate.py` makes the agent ask before filing analyses, applying artifact promotions, or approving synthesis; `scripts/capture-runs.jsonl` records what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, the unified approval gate, ledger validation, export, review due checks, wrapper sync, and Tier-1 lint over the live corpus. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, the unified approval gate, ledger validation, export, log rotation, review due checks, wrapper parity, and Tier-1 lint over the live corpus. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 

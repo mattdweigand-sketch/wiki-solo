@@ -1,0 +1,6 @@
+{
+  "description": "Fixture raw bucket taxonomy for lint regression tests.",
+  "buckets": {
+    "notes": "fixture notes"
+  }
+}

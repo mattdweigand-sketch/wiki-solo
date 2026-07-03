@@ -5,8 +5,4 @@ description: Run the wiki export workflow. Use when the user says /wiki-export, 
 
 # Wiki Export
 
-Run the export workflow for the current wiki repo. Read `AGENTS.md`, check `wiki/domain.md`, then route through `CONTEXT.md` to `workflows/maintenance/export.md`.
-
-The canonical command is `python3 scripts/export_wiki.py --date YYYY-MM-DD`.
-
-This is a tracked Codex skill wrapper. Canonical behavior lives in the repo workflow files.
+Run the export workflow for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md` and `workflows/maintenance/export.md`, and follow that workflow's Load / Skip list exactly. Use `python3 scripts/export_wiki.py --date YYYY-MM-DD` to build and verify the zip.

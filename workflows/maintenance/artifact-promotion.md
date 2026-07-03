@@ -36,7 +36,7 @@ python3 scripts/capture_gate.py \
   [--trigger reusable_distinction|ranking_or_framework|open_question_resolution|future_agent_behavior|existing_page_update]
 ```
 
-The script prints the derived mode: `chat-only`, `ingest`, `analysis-capture`, `promotion-audit`, `capture-decision`, `capture-experience`, or `workflow-update`. An apply route, meaning filing an analysis or promoting an artifact, uses `--phase accepted`: that phase derives `analysis-capture` or `promotion-audit` and triggers the approval gate, while `--phase drafting` and the other phases derive non-approval routes such as `chat-only` that exit 0 without requiring approval, so never use them for an apply. It can also print `CAPTURE GATE: BLOCKED` and exit non-zero when required inputs are missing; fix the invocation and re-run. For `analysis-capture`, stage the draft in `tmp/` and pass `--path`; the gate measures `word_count` from that file instead of trusting a declared count. The gate also refuses free routes that target `wiki/analyses/`, and rejects placeholder (`<...>`) or out-of-root destinations for approval-required routes, so an approval always names a concrete in-scope home. The script's `promotion-audit` mode means "promotion apply preflight" when a trigger and durable-write intent are present; audit-only prose recommendations do not run the gate and do not edit files. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope. Approved reruns append or confirm an idempotent structured record in `scripts/capture-runs.jsonl`; validate it with `python3 scripts/validate_capture_runs.py`.
+The script prints the derived mode: `chat-only`, `analysis-capture`, `promotion-audit`, or `non-approval (phase <phase>)`. An apply route, meaning filing an analysis or promoting an artifact, uses `--phase accepted`: that phase derives `analysis-capture` or `promotion-audit` and triggers the approval gate, while `--phase drafting` and the other phases derive non-approval routes that exit 0 without requiring approval, so never use them for an apply. It can also print `CAPTURE GATE: BLOCKED` and exit non-zero when required inputs are missing; fix the invocation and re-run. For `analysis-capture`, stage the draft in `tmp/` and pass `--path`; the gate measures `word_count` from that file instead of trusting a declared count. The gate also refuses free routes that target `wiki/analyses/`, and rejects placeholder (`<...>`) or out-of-root destinations for approval-required routes, so an approval always names a concrete in-scope home. The script's `promotion-audit` mode means "promotion apply preflight" when a trigger and durable-write intent are present; audit-only prose recommendations do not run the gate and do not edit files. Approval is required only for the derived `analysis-capture` and `promotion-audit` routes unless re-run with `--approved` after the user approves the displayed durable action, primary destination, and allowed file scope. Approved reruns append or confirm an idempotent structured record in `scripts/capture-runs.jsonl`; validate it with `python3 scripts/validate_capture_runs.py`.
 
 Collaborative drafting is chat-only by default. Requests like "work with me," "let's discuss," "let's define," "refine this," "make this sharper," or "help me think through" are not promotion intent, even when the topic already has a wiki page, the repo is the current working directory, or the result might be reusable. If the draft becomes clearly durable, ask whether to save it; do not edit files first.
 
@@ -137,8 +137,7 @@ Use these route labels in audit output and log entries:
 | `analysis-capture` | The artifact is a substantial synthesis meeting the analysis criteria | `workflows/research/CONTEXT.md` analysis filing step |
 | `update-existing-page` | A current wiki page already owns the idea or facts | This workflow plus the target page's schema |
 | `create-page` | No current page owns the durable concept, analysis, or similar artifact | This workflow plus `wiki/SCHEMA.md` |
-| `capture-decision` | The artifact records a choice and rationale | `workflows/maintenance/capture-decision.md` |
-| `capture-experience` | The artifact records observed or lived context | `workflows/maintenance/capture-experience.md` |
+| `capture` | The artifact records a choice, rationale, observation, or lived context | `workflows/maintenance/capture.md` |
 | `workflow-update` | The artifact changes how future agents should behave | Update `AGENTS.md`, `CONTEXT.md`, `REFERENCES.md`, or `workflows/` |
 | `script` | The artifact is deterministic repeatable logic | Add or update `scripts/` with tests when appropriate |
 
@@ -150,7 +149,7 @@ When the user asks whether, how, or where to promote an artifact, answer with a 
 
 ```text
 Artifact: <what is being evaluated>
-Route: discard | ingest | analysis-capture | update-existing-page | create-page | capture-decision | capture-experience | workflow-update | script
+Route: discard | ingest | analysis-capture | update-existing-page | create-page | capture | workflow-update | script
 Recommendation: <one sentence action>
 Primary home: <path or "none">
 Reason: <which promotion test it passes or fails>

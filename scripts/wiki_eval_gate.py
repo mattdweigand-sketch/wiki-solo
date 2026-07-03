@@ -27,11 +27,16 @@ DRAFT = Path(TMP.name) / "draft.md"
 DRAFT.write_text("word " * 350)  # >300 measured words so the analysis bar is met
 SHORT_DRAFT = Path(TMP.name) / "short-draft.md"
 SHORT_DRAFT.write_text("word " * 50)  # 50 measured words, below the 300-word bar
+# Sandbox repo root for existence-sensitive cases: the synthesis branch checks
+# analyses paths against the invocation cwd, so these cases run inside here.
+SANDBOX = Path(TMP.name) / "sandbox-repo"
+(SANDBOX / "wiki" / "analyses").mkdir(parents=True)
+(SANDBOX / "wiki" / "analyses" / "existing-eval.md").write_text("existing analysis page\n")
 
 results = Results()
 
 
-def run_case(name, args, expect_code, expect=(), absent=()):
+def run_case(name, args, expect_code, expect=(), absent=(), cwd=None):
     proc = subprocess.run(
         [
             sys.executable,
@@ -42,7 +47,7 @@ def run_case(name, args, expect_code, expect=(), absent=()):
             str(APPROVAL_LEDGER),
             *args,
         ],
-        text=True, capture_output=True,
+        text=True, capture_output=True, cwd=cwd,
     )
     ok = proc.returncode == expect_code
     for marker in expect:
@@ -144,6 +149,8 @@ def check_synthesis_idempotent() -> None:
 
 def check_workflow_contract() -> None:
     text = SYNTHESIZE_WORKFLOW.read_text()
+    # Structural markers only: script paths, banner, and flag. Full-sentence
+    # markers would couple this eval to prose wording that legitimately evolves.
     required = (
         "scripts/capture_gate.py",
         "scripts/capture-runs.jsonl",
@@ -151,7 +158,6 @@ def check_workflow_contract() -> None:
         "APPROVAL REQUIRED",
         "wiki/synthesis.md",
         "--approved",
-        "before the durable change crosses the promotion boundary",
     )
     missing = [marker for marker in required if marker not in text]
     ok = not missing
@@ -181,29 +187,25 @@ run_case("promotion-approved-proceeds", PROMO + ["--approved"], 0,
 check_record_count("approved-promotion-writes-structured-record", "capture_approval", 2)
 check_gate_created_ledger_validates("capture-gate-created-ledger-validates")
 
-# Free capture routes: no approval needed, exit 0.
-run_case("decision-capture-free", ["--phase", "decision"], 0,
-         expect=("capture-decision", "not required"))
-run_case("experience-capture-free", ["--phase", "experience"], 0,
-         expect=("capture-experience",))
-run_case("workflow-update-free", ["--phase", "workflow"], 0,
-         expect=("workflow-update",))
-run_case("ingest-free", ["--phase", "source", "--source-path", "raw/notes/x.md"], 0,
-         expect=("ingest",))
-run_case("drafting-stays-chat-only", ["--phase", "drafting"], 0,
-         expect=("chat-only", "do not edit files"))
+# Free phases: never require this gate; route judgment lives in the prose
+# workflows, so the gate prints a short non-approval notice and exits 0.
+for free_phase in ("drafting", "source", "decision", "experience", "workflow"):
+    run_case(f"{free_phase}-phase-never-requires-approval", ["--phase", free_phase], 0,
+             expect=(f"non-approval (phase {free_phase})", "not required"),
+             absent=("APPROVAL REQUIRED",))
 
 # Boundary conditions.
 run_case("capture-kind-without-phase-blocked", [], 3,
          expect=("BLOCKED", "--phase is required"))
-run_case("source-without-path-blocked", ["--phase", "source"], 3,
-         expect=("BLOCKED",))
 run_case("below-analysis-bar-chat-only",
          ["--phase", "accepted", "--synthesized-pages", "2",
-          "--word-count", "400", "--domain-context", "yes"], 0,
+          "--path", str(DRAFT), "--domain-context", "yes"], 0,
          expect=("chat-only",), absent=("APPROVAL REQUIRED",))
 run_case("approved-flag-cannot-skip-block",
-         ["--phase", "source", "--approved"], 3, expect=("BLOCKED",))
+         ["--phase", "experience", "--approved",
+          "--primary-home", "wiki/analyses/sneaky.md",
+          "--pages-touched", "wiki/analyses/sneaky.md"], 3,
+         expect=("BLOCKED", "may not write to wiki/analyses/"))
 
 # Determinism guards: the gate cannot be talked around.
 run_case("free-route-cannot-target-analyses",
@@ -219,19 +221,66 @@ run_case("free-route-analyses-dotdot-blocked",
           "--pages-touched", "wiki/foo/../analyses/sneaky.md"], 3,
          expect=("BLOCKED", "may not write to wiki/analyses/"))
 run_case("analysis-without-path-blocked",
-         ["--phase", "accepted", "--synthesized-pages", "3", "--word-count", "400",
-          "--domain-context", "yes", "--primary-home", "wiki/analyses/real.md"], 3,
+         ["--phase", "accepted", "--synthesized-pages", "3",
+          "--domain-context", "yes", "--primary-home", "wiki/analyses/real.md",
+          "--trigger", "existing_page_update"], 3,
          expect=("BLOCKED", "requires --path"))
 run_case("placeholder-home-blocked",
          ["--phase", "accepted", "--trigger", "reusable_distinction"], 3,
          expect=("BLOCKED", "concrete --primary-home"))
+run_case("placeholder-pages-touched-blocked",
+         PROMO[:6] + ["--pages-touched", "wiki/concepts/foo.md,wiki/<entity>/bar.md"], 3,
+         expect=("BLOCKED", "not placeholders"))
+run_case("placeholder-pages-touched-blocked-even-approved",
+         PROMO[:6] + ["--pages-touched", "wiki/concepts/foo.md,wiki/<entity>/bar.md",
+                      "--approved"], 3,
+         expect=("BLOCKED", "not placeholders"))
+check_record_count("placeholder-scope-writes-no-record", "capture_approval", 2)
 run_case("out-of-root-scope-blocked",
          PROMO + ["--pages-touched", "wiki/concepts/foo.md,/etc/passwd"], 3,
          expect=("BLOCKED", "allowed root"))
-run_case("measured-count-overrides-declared-high",
+# Any route whose primary home is under wiki/analyses/ must measure the draft.
+run_case("promotion-into-analyses-requires-path",
+         ["--phase", "accepted", "--trigger", "existing_page_update",
+          "--primary-home", "wiki/analyses/update.md",
+          "--pages-touched", "wiki/analyses/update.md"], 3,
+         expect=("BLOCKED", "requires --path"))
+run_case("promotion-into-analyses-with-path-proceeds",
+         ["--phase", "accepted", "--trigger", "existing_page_update",
+          "--primary-home", "wiki/analyses/update.md",
+          "--pages-touched", "wiki/analyses/update.md", "--path", str(DRAFT)], 2,
+         expect=("promotion-audit", "APPROVAL REQUIRED"))
+# The measurement rule covers the whole scope, not just the primary home: an
+# analyses page named only in --pages-touched must still demand a draft.
+run_case("analyses-in-pages-touched-requires-path",
+         ["--phase", "accepted", "--trigger", "existing_page_update",
+          "--primary-home", "wiki/concepts/foo.md",
+          "--pages-touched", "wiki/concepts/foo.md,wiki/analyses/sneaky.md"], 3,
+         expect=("BLOCKED", "requires --path"))
+run_case("analyses-in-pages-touched-with-path-proceeds",
+         ["--phase", "accepted", "--trigger", "existing_page_update",
+          "--primary-home", "wiki/concepts/foo.md",
+          "--pages-touched", "wiki/concepts/foo.md,wiki/analyses/sneaky.md",
+          "--path", str(DRAFT)], 2,
+         expect=("promotion-audit", "APPROVAL REQUIRED"))
+# Case-variant spellings must not slip past the analyses rules (APFS is
+# case-insensitive, so wiki/Analyses/ IS the analyses folder on disk).
+run_case("case-variant-analyses-still-guarded",
+         ["--phase", "experience", "--primary-home", "wiki/Analyses/sneaky.md",
+          "--pages-touched", "wiki/Analyses/sneaky.md"], 3,
+         expect=("BLOCKED", "may not write to wiki/analyses/"))
+# An unreadable --path blocks with the precise diagnosis instead of
+# misclassifying the run as chat-only.
+run_case("unreadable-path-blocked-with-diagnosis",
          ["--phase", "accepted", "--synthesized-pages", "3", "--domain-context", "yes",
-          "--word-count", "400", "--primary-home", "wiki/analyses/x.md",
-          "--pages-touched", "wiki/analyses/x.md", "--path", str(SHORT_DRAFT)], 3)
+          "--primary-home", "wiki/analyses/x.md", "--pages-touched", "wiki/analyses/x.md",
+          "--path", "tmp/does-not-exist.md"], 3,
+         expect=("BLOCKED", "is not a readable file"))
+run_case("short-measured-draft-cannot-reach-analyses",
+         ["--phase", "accepted", "--synthesized-pages", "3", "--domain-context", "yes",
+          "--primary-home", "wiki/analyses/x.md",
+          "--pages-touched", "wiki/analyses/x.md", "--path", str(SHORT_DRAFT)], 3,
+         expect=("BLOCKED", "may not write to wiki/analyses/"))
 run_case("empty-artifact-blocked",
          ANALYSIS + ["--artifact", "   ", "--approved"], 3,
          expect=("BLOCKED", "non-empty"))
@@ -244,6 +293,62 @@ run_case("free-route-out-of-root-blocked",
          ["--phase", "experience", "--primary-home", "wiki/people/p.md",
           "--pages-touched", "/etc/passwd"], 3,
          expect=("BLOCKED", "allowed root"))
+
+# The guards check declared inputs, not the route-derived home: a chat-only
+# classification discards --primary-home, but a declared analyses or
+# out-of-root destination must still block, with a hint toward measurement.
+run_case("chat-only-declared-analyses-home-blocked",
+         ["--phase", "accepted", "--primary-home", "wiki/analyses/foo.md"], 3,
+         expect=("BLOCKED", "may not write to wiki/analyses/", "re-run with --path"))
+run_case("chat-only-declared-out-of-root-home-blocked",
+         ["--phase", "accepted", "--primary-home", "/etc/passwd"], 3,
+         expect=("BLOCKED", "allowed root"))
+# The bare directory (trailing-slash spelling, normalized to 'wiki/analyses')
+# is still the analyses folder.
+run_case("analyses-trailing-slash-blocked",
+         ["--phase", "experience", "--primary-home", "wiki/analyses/"], 3,
+         expect=("BLOCKED", "may not write to wiki/analyses/"))
+# Scope entries the validator would reject must block before a record exists.
+run_case("none-token-in-scope-blocked",
+         PROMO[:6] + ["--pages-touched", "wiki/concepts/foo.md,none", "--approved"], 3,
+         expect=("BLOCKED", "'none'"))
+check_record_count("none-scope-writes-no-record", "capture_approval", 2)
+run_case("negative-synthesized-pages-blocked",
+         ["--phase", "accepted", "--synthesized-pages", "-2", "--domain-context", "yes",
+          "--primary-home", "wiki/analyses/eval.md",
+          "--pages-touched", "wiki/analyses/eval.md",
+          "--path", str(DRAFT), "--approved"], 3,
+         expect=("BLOCKED", "non-negative"))
+check_record_count("negative-synthesized-pages-writes-no-record", "capture_approval", 2)
+# Duplicate scope declarations collapse to one normalized entry.
+run_case("duplicate-scope-entries-deduped",
+         PROMO[:6] + ["--pages-touched", "wiki/concepts/foo.md,./wiki/concepts/foo.md"], 2,
+         expect=("Pages touched: wiki/concepts/foo.md",),
+         absent=("wiki/concepts/foo.md, wiki/concepts/foo.md",))
+# argparse usage errors exit 3, never 2: exit 2 means only "approval required".
+run_case("usage-error-exits-3", ["--no-such-flag"], 3)
+# A short measured draft updating an EXISTING analyses page via a promotion
+# trigger is the intended update path and stays approvable.
+run_case("short-draft-promotion-into-analyses-approvable",
+         ["--phase", "accepted", "--trigger", "existing_page_update",
+          "--primary-home", "wiki/analyses/update.md",
+          "--pages-touched", "wiki/analyses/update.md", "--path", str(SHORT_DRAFT)], 2,
+         expect=("promotion-audit", "APPROVAL REQUIRED"))
+
+
+def check_analysis_record_measurement_provenance():
+    records = [r for r in approval_records("capture_approval")
+               if r.get("route") == "analysis-capture"]
+    ok = (
+        len(records) == 1
+        and records[0].get("word_count_path") == str(DRAFT)
+        and records[0].get("word_count_source") == "measured"
+    )
+    results.record("analysis-record-carries-measurement-provenance", ok,
+                   "records: " + repr(records))
+
+
+check_analysis_record_measurement_provenance()
 
 # Synthesis approval branch. SYNTHESIS intentionally passes no --phase, so this
 # guards the parser-level optionality required by --kind=synthesis.
@@ -311,7 +416,43 @@ run_case(
     3,
     expect=("CAPTURE GATE: BLOCKED", "allowed root"),
 )
+run_case(
+    "synthesis-placeholder-scope-blocked",
+    ["--kind", "synthesis",
+     "--drafts", "wiki/primer.md local-AI routing row",
+     "--pages-touched", "wiki/synthesis.md,wiki/<entity>/x.md"],
+    3,
+    expect=("CAPTURE GATE: BLOCKED", "not placeholders"),
+)
+# The synthesis branch is unmeasured, so it may only touch analyses pages that
+# already exist; a NEW analyses destination must go through analysis-capture.
+run_case(
+    "synthesis-new-analyses-page-blocked",
+    ["--kind", "synthesis",
+     "--drafts", "status flip for a page that does not exist",
+     "--pages-touched", "wiki/synthesis.md,wiki/analyses/missing-eval.md"],
+    3,
+    expect=("CAPTURE GATE: BLOCKED", "existing", "analysis-capture"),
+    cwd=SANDBOX,
+)
+run_case(
+    "synthesis-existing-analyses-page-proceeds",
+    ["--kind", "synthesis",
+     "--drafts", "status flip on the reviewed existing analysis",
+     "--pages-touched", "wiki/synthesis.md,wiki/analyses/existing-eval.md"],
+    2,
+    expect=("APPROVAL REQUIRED",),
+    cwd=SANDBOX,
+)
 check_workflow_contract()
+
+# Appending after a truncated trailing newline must not merge two records into
+# one corrupt line.
+APPROVAL_LEDGER.write_bytes(APPROVAL_LEDGER.read_bytes().rstrip(b"\n"))
+run_case("append-after-missing-trailing-newline",
+         PROMO + ["--artifact", "newline repair fixture", "--approved"], 0,
+         expect=("Structured approval record: appended",))
+check_gate_created_ledger_validates("ledger-validates-after-newline-repair")
 
 exit_code = results.finish()
 TMP.cleanup()

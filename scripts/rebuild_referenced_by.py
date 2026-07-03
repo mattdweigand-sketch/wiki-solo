@@ -24,7 +24,9 @@ from collections import defaultdict
 from _wiki_parse import (
     LINK_RE,
     REFERENCED_BY_SECTION_RE,
-    get_entity_pages as _get_entity_pages,
+    get_entity_pages,
+    mask_code_spans,
+    strip_code_spans,
     strip_referenced_by,
 )
 
@@ -38,23 +40,34 @@ if not WIKI_ROOT.exists():
     )
     sys.exit(1)
 
-def get_entity_pages():
-    return _get_entity_pages(WIKI_ROOT)
-
 
 def load_authored_texts(all_pages):
-    """Read every page once and return {path: text-with-generated-sections-stripped}."""
+    """Read every page once and return {path: authored link-scan text}: the
+    generated "## Referenced by" sections are stripped so they never feed back
+    into the graph, and code spans are blanked so a [[link]] written as a syntax
+    example inside code is not counted as a real inbound reference (the same
+    rule lint's dangling and outbound scans apply via _wiki_parse).
+
+    Composition order matters: code spans are blanked FIRST, so a fenced
+    "## Referenced by" example cannot start a section strip that would eat its
+    own closing fence and the authored links after it."""
     texts = {}
     for p in all_pages:
         try:
-            texts[p] = strip_referenced_by(p.read_text(encoding="utf-8"))
-        except Exception:
+            texts[p] = strip_referenced_by(strip_code_spans(p.read_text(encoding="utf-8")))
+        except Exception as exc:
+            print(f"Warning: skipping unreadable page as a link source: {p} ({exc})",
+                  file=sys.stderr)
             continue
     return texts
 
 
 def find_references(slug, authored_texts, target_path):
-    """Return {directory_label: [link_text, ...]} for pages whose authored text mentions [[slug]]."""
+    """Return {directory_label: [link_text, ...]} for pages whose authored text mentions [[slug]].
+
+    Uses the shared LINK_RE to extract every wikilink slug (bare [[slug]],
+    path-qualified [[dir/slug]], or aliased [[dir/slug|text]]) so the link-graph
+    grammar matches lint.py exactly."""
     refs = defaultdict(list)
     for p, text in authored_texts.items():
         if p == target_path:
@@ -78,28 +91,40 @@ def build_referenced_by_block(refs):
 
 def update_page(path, new_block):
     text = path.read_text(encoding="utf-8")
+    # All section LOCATION happens on the length-preserving code mask, so a
+    # fenced "## Referenced by" example documenting the convention is never
+    # mistaken for the real generated section (nor a fenced "## Related pages"
+    # for the insertion anchor); spans map 1:1 back onto the raw text.
+    masked = mask_code_spans(text)
 
-    # Replace the first "## Referenced by" section (up to next ## heading or
-    # EOF) and drop any duplicates a hand edit may have introduced.
-    if REFERENCED_BY_SECTION_RE.search(text):
-        replaced = [False]
-
-        def _sub(m):
-            if replaced[0]:
-                return ""
-            replaced[0] = True
-            return new_block.rstrip('\n')
-
-        new_text = REFERENCED_BY_SECTION_RE.sub(_sub, text)
+    matches = list(REFERENCED_BY_SECTION_RE.finditer(masked))
+    if matches:
+        # Replace the first "## Referenced by" section (up to next ## heading
+        # or EOF) and drop any duplicates a hand edit may have introduced.
+        parts, last = [], 0
+        for i, m in enumerate(matches):
+            parts.append(text[last:m.start()])
+            if i == 0:
+                parts.append(new_block.rstrip('\n'))
+            last = m.end()
+        parts.append(text[last:])
+        new_text = "".join(parts)
+        # When the replaced section reaches EOF the match swallowed the final
+        # newline; restore it so the first pass converges byte-identically
+        # with the append path.
+        if not new_text.endswith("\n"):
+            new_text += "\n"
     elif text.startswith(("## Related pages", "## Related Pages")):
         # Page begins with the Related section at byte 0: prepend, don't append.
         # Single newline joint matches the replace path's fixed point above.
         new_text = new_block.rstrip('\n') + '\n' + text
     else:
         # Insert before "## Related pages" / "## Related Pages" if present, else append
-        related_re = re.compile(r'(?=\n## Related [Pp]ages)', re.MULTILINE)
-        if related_re.search(text):
-            new_text = related_re.sub('\n\n' + new_block.rstrip('\n'), text, count=1)
+        related_re = re.compile(r'\n## Related [Pp]ages')
+        anchor = related_re.search(masked)
+        if anchor:
+            i = anchor.start()
+            new_text = text[:i] + '\n\n' + new_block.rstrip('\n') + text[i:]
         else:
             new_text = text.rstrip('\n') + '\n\n' + new_block.rstrip('\n') + '\n'
 
@@ -107,7 +132,7 @@ def update_page(path, new_block):
 
 
 if __name__ == "__main__":
-    all_pages = get_entity_pages()
+    all_pages = get_entity_pages(WIKI_ROOT)
     print(f"Found {len(all_pages)} entity pages.")
     # Authored texts are snapshotted once up front; pages mutated during the
     # loop can't feed their regenerated sections back into later scans.

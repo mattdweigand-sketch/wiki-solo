@@ -109,6 +109,66 @@ def main() -> int:
             f"files changed on second rebuild: {changed}",
         )
 
+        # A [[link]] inside a code fence is a syntax example, not an authored
+        # edge: adding a fenced [[gamma]] to beta must NOT give gamma an inbound
+        # entry (the same strip_code_spans rule lint's scans apply).
+        beta_path = tmp / "wiki" / "concepts" / "beta.md"
+        beta_path.write_text(
+            beta_path.read_text()
+            + "\n```\nSyntax example: [[gamma]] inside a fence.\n```\n"
+        )
+        fence_run = run()
+        gamma_after = (tmp / "wiki" / "sources" / "gamma.md").read_text()
+        check(
+            "code-fence-link-not-counted",
+            fence_run.returncode == 0
+            and "_No inbound links yet._" in referenced_by_section(gamma_after),
+            f"gamma section after fenced link: {referenced_by_section(gamma_after)!r}",
+        )
+
+        # A fenced "## Referenced by" example documenting the convention is
+        # authored content, not the generated section: the rebuild must leave
+        # it byte-identical and maintain the real section around it.
+        beta_path = tmp / "wiki" / "concepts" / "beta.md"
+        fenced_example = ("\n```markdown\n## Referenced by\n\n"
+                         "**concepts/**  [[example]]\n```\n")
+        beta_path.write_text(beta_path.read_text() + fenced_example)
+        fence_write_run = run()
+        beta_after = beta_path.read_text()
+        check(
+            "fenced-section-example-preserved",
+            fence_write_run.returncode == 0 and fenced_example in beta_after
+            and "[[alpha]]" in referenced_by_section(beta_after),
+            "a fenced '## Referenced by' example was rewritten or the real "
+            "section was lost",
+        )
+
+        # Scan side of the same fence rule (composition order: fences are
+        # blanked BEFORE the generated-section strip). A fenced "## Referenced
+        # by" example must not start a section strip that eats its own closing
+        # fence and the authored links after it: the fenced [[delta]] must not
+        # leak an inbound edge, and the post-fence [[gamma]] must still count.
+        epsilon_path = tmp / "wiki" / "concepts" / "epsilon.md"
+        epsilon_path.write_text(
+            "# Epsilon\n\nDocumenting the convention:\n"
+            "\n```markdown\n## Referenced by\n\n**concepts/**  [[delta]]\n```\n"
+            "\nAuthored prose referencing [[gamma]].\n"
+        )
+        scan_run = run()
+        gamma_scan = (tmp / "wiki" / "sources" / "gamma.md").read_text()
+        delta_scan = (tmp / "wiki" / "concepts" / "delta.md").read_text()
+        check(
+            "post-fence-authored-link-counts",
+            scan_run.returncode == 0
+            and "[[epsilon]]" in referenced_by_section(gamma_scan),
+            f"gamma section: {referenced_by_section(gamma_scan)!r}",
+        )
+        check(
+            "fenced-example-link-does-not-leak-inbound",
+            "[[epsilon]]" not in referenced_by_section(delta_scan),
+            f"delta section: {referenced_by_section(delta_scan)!r}",
+        )
+
         # last (it mutates state): a hand edit that duplicated the generated
         # section must collapse back to exactly one
         alpha_path = tmp / "wiki" / "concepts" / "alpha.md"

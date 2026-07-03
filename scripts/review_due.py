@@ -21,21 +21,19 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from _wiki_parse import frontmatter_block
+from _wiki_parse import frontmatter_block, get_entity_pages
 
 
-REVIEW_BY_RE = re.compile(r"^review_by:\s*(\S+)\s*$", re.M)
+# Capture the whole rest of the line: a value with trailing tokens (e.g.
+# "2026-05-01 approx") must land in the invalid report, not silently drop the
+# page out of the review loop the way a \S+-anchored match would.
+REVIEW_BY_RE = re.compile(r"^review_by:(.*)$", re.M)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-
-
-def entity_pages(root: Path):
-    return sorted(p for p in root.rglob("*.md")
-                  if len(p.relative_to(root).parts) == 2)
 
 
 def collect(root: Path, today: date):
     due, bad = [], []
-    for p in entity_pages(root):
+    for p in get_entity_pages(root):
         try:
             fm = frontmatter_block(p.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError):
@@ -44,7 +42,9 @@ def collect(root: Path, today: date):
         if not m:
             continue
         rel = str(p.relative_to(root))
-        val = m.group(1)
+        val = m.group(1).strip()
+        if not val:
+            continue  # bare 'review_by:' means not enrolled; lint skips it too
         if not DATE_RE.match(val):
             bad.append((rel, val))
             continue

@@ -1,11 +1,7 @@
 ---
-description: Lint the wiki, deterministic Tier-1 checks plus Tier-2 judgment candidates
+description: Lint the wiki, deterministic Tier-1 checks plus Tier-2 judgment candidates and the verifier-agent evidence check
 ---
 
-Run the lint workflow. Read `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/lint.md`, and follow the Load / Skip list exactly. Treat Tier-1 as must-fix and Tier-2 as judgment candidates to adjudicate.
-
-Invoking `/lint`, `/wiki-lint`, or `wiki-lint` is authorization to run the full lint workflow, including the verifier-agent evidence check. Skip that evidence check only if the user asks for deterministic-only lint, no subagents, or skipping the evidence check.
-
-This command is just a Claude Code shortcut. The workflow file is canonical and model-agnostic.
+Run the lint workflow. Read `workflows/maintenance/lint.md` (via `workflows/maintenance/CONTEXT.md`) and follow it exactly, including its Load / Skip list. Invoking this command authorizes the workflow's Step-3 verifier-agent evidence check. This command is just a Claude Code shortcut; the workflow file is canonical and agent-neutral.
 
 $ARGUMENTS

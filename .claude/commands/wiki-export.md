@@ -1,9 +1,7 @@
 ---
-description: Export a zip of the wiki corpus, including raw sources
+description: Export a zip backup of the entire wiki corpus, including raw sources
 ---
 
-Run the export workflow. Read `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/export.md`, and follow the Load / Skip list exactly. Build or dry-run the archive with `python3 scripts/export_wiki.py --date YYYY-MM-DD`.
-
-This command is just a Claude Code shortcut. The workflow file is canonical and model-agnostic.
+Run the export workflow. Read `workflows/maintenance/export.md` (via `workflows/maintenance/CONTEXT.md`) and follow it exactly, including its Load / Skip list. Use `python3 scripts/export_wiki.py --date YYYY-MM-DD` to build and verify the zip. This command is just a Claude Code shortcut; the workflow file is canonical and agent-neutral.
 
 $ARGUMENTS

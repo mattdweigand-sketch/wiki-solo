@@ -22,9 +22,18 @@ Invoking `/lint`, `/wiki-lint`, or `wiki-lint` is an explicit request to run thi
 
    It reports two tiers. **Tier 1** is machine-checkable and exits non-zero on any failure: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates including `review_by`, dangling `[[links]]`, stale Markdown `.md` links, index coverage, duplicate link stems, empty required block lists, raw source references, raw bucket taxonomy drift against `scripts/raw-buckets.json`, tracked raw artifacts, repo folder-structure hygiene, raw/deliverables hygiene, stray tool-call artifacts, and `.DS_Store` files. These are not judgment calls, so fix them rather than debating them.
 
-   **Tier 2** is ranked candidates the script surfaces but cannot decide: near-duplicate pages, orphans, uncited pages, thin stubs, `confidence: low` pages with enough inbound links to upgrade, missing cross-references, quote/source mismatches that need review, and decisions missing `review_by` outcome checkpoints. Treat Tier 2 as a worklist to adjudicate, not as failures.
+   **Tier 2** is ranked candidates and maintenance signals the script surfaces but cannot decide: near-duplicate pages, orphans, uncited pages, thin stubs, `confidence: low` pages with enough inbound links to upgrade, missing cross-references, quote/source mismatches that need review, decisions missing `review_by` outcome checkpoints, due outcome reviews, stale sourcing-queue entity counts, log rotation due, compiled pages with newer source inputs, synthesis due after an ingest burst, and adjudication records that no longer suppress anything. Treat Tier 2 as a worklist to adjudicate, not as failures.
 
    Do not chase Tier 2 to zero. Add links only when the relationship is editorially meaningful. Leave weak candidates unresolved and record settled judgments in `scripts/lint-adjudications.json` so lint stops re-surfacing them.
+
+   Current deterministic maintenance signals:
+
+   - `sourcing_queue_count_drift`: `wiki/sourcing-queue.md` has machine-readable `<!-- lint:entity-count folder=... count=... -->` markers whose counts no longer match real entity pages. Malformed, duplicated, or negative markers are Tier-1 failures; drift is Tier 2 because the page may need editorial refresh.
+   - `log_rotation_due`: `wiki/log.md` is over the configured live-log threshold. Run `workflows/maintenance/rotate-log.md`; the signal clears after archival.
+   - `recompile_candidates`: a compiled page has source pages with newer `**Status (YYYY-MM-DD)**` dates. Review for no-change, a small update, or a recompile, then record durable no-change judgments under `reviewed_recompile_candidates`.
+   - `review_by_missing` and `review_due`: decisions should either enroll in the outcome-review loop with `review_by`, or be deliberately left out. Due reviews are collected by `scripts/review_due.py`.
+   - `synthesis_due`: enough ingest activity has accumulated without a later synthesis pass that a human should consider running `/wiki-synthesize`.
+   - `adjudication_dead`: an entry in `scripts/lint-adjudications.json` suppressed nothing in the current run. Prune it, or keep it deliberately when the historical judgment is still useful.
 
 2. Read the pages to assess the judgment-only checks the script deliberately does not attempt:
    - Contradictions between pages.

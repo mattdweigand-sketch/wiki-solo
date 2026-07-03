@@ -21,19 +21,11 @@ from typing import Any, Callable
 
 # Durable roots an approved capture/promotion/synthesis may edit. raw/ is
 # excluded on purpose: source artifacts are never edited or committed.
-ALLOWED_ROOTS = ("wiki/", "scripts/", "workflows/", ".claude/", ".codex/", ".github/")
-ALLOWED_ROOT_FILES = {
-    ".gitignore",
-    "AGENTS.md",
-    "CLAUDE.md",
-    "CONTEXT.md",
-    "LICENSE",
-    "README.md",
-    "REFERENCES.md",
-    "SETUP.md",
-}
-LEGACY_ID_FIELD = "run" + "_id"
-IDENTITY_EXCLUDE_FIELDS = {"approved_at", LEGACY_ID_FIELD, "word_count_source"}
+ALLOWED_ROOTS = ("wiki/", "scripts/", "workflows/", ".claude/", ".codex/", "archive/")
+ALLOWED_ROOT_FILES = {"AGENTS.md", "CLAUDE.md", "CONTEXT.md", "README.md", "REFERENCES.md"}
+# Inert identifier field on historical records; new records never generate it.
+LEGACY_ID_FIELD = "run_id"
+IDENTITY_EXCLUDE_FIELDS = {"approved_at", LEGACY_ID_FIELD, "word_count_source", "word_count_path"}
 
 
 def under_allowed_root(path: str) -> bool:
@@ -50,8 +42,10 @@ def is_nonempty_string(value: Any) -> bool:
 
 
 def split_scope(value: str) -> list[str]:
-    """Comma-separated --pages-touched into a clean list, dropping blanks."""
-    return [item.strip() for item in value.split(",") if item.strip()]
+    """Comma-separated --pages-touched into a clean list: blanks dropped,
+    duplicates removed order-preservingly."""
+    items = [item.strip() for item in value.split(",") if item.strip()]
+    return list(dict.fromkeys(items))
 
 
 def approved_at_now() -> str:
@@ -89,7 +83,14 @@ def validate_pages(record: dict[str, Any]) -> list[str]:
     if not all(is_nonempty_string(path) for path in pages_touched):
         return ["pages_touched entries must be non-empty strings"]
     errors: list[str] = []
+    # An approval names real files: placeholder ("<...>") paths are invalid in
+    # any approved scope, matching the gate's own guard.
+    placeholders = [p for p in pages_touched if "<" in p or ">" in p]
+    if placeholders:
+        errors.append(f"pages_touched must not contain placeholder paths: {placeholders}")
     primary_home = record.get("primary_home")
+    if is_nonempty_string(primary_home) and ("<" in primary_home or ">" in primary_home):
+        errors.append("primary_home must not be a placeholder path")
     if is_nonempty_string(primary_home) and primary_home not in pages_touched:
         errors.append("primary_home must be included in pages_touched")
     # Historical backfills may reference paths that predate current roots.
@@ -121,9 +122,9 @@ def has_schema_record(path: Path) -> bool:
 def approval_identity(record: dict[str, Any]) -> str:
     """Canonical content identity for idempotency and duplicate detection.
 
-    approved_at is event metadata, the legacy identifier is inert historical residue, and
-    word_count_source is measurement metadata. None should make the same approved
-    boundary look different.
+    approved_at is event metadata, the legacy identifier is inert historical
+    residue, and word_count_source / word_count_path are measurement metadata.
+    None should make the same approved boundary look different.
     """
     filtered = {
         key: value
@@ -175,7 +176,16 @@ def write_approval_record(
 
     ledger_path.parent.mkdir(parents=True, exist_ok=True)
     seed_schema = not has_schema_record(ledger_path)
+    # A truncated final line (no trailing newline) must not have the next
+    # record appended onto it, which would corrupt both records.
+    needs_newline = (
+        ledger_path.exists()
+        and ledger_path.stat().st_size > 0
+        and not ledger_path.read_bytes().endswith(b"\n")
+    )
     with ledger_path.open("a", encoding="utf-8") as f:
+        if needs_newline:
+            f.write("\n")
         if seed_schema:
             schema = {"record_type": "schema", "schema_version": 1,
                       "description": schema_description}

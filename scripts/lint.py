@@ -10,8 +10,9 @@ corpus by decision, so they are not checked.)
 
 Tier 2 (expert-checkable): ranked candidates, not verdicts. The script computes
 signals a maintainer cannot eyeball across hundreds of pages (near-duplicates,
-orphans, uncited pages, outcome-review enrollment) and surfaces them for a human
-or agent to adjudicate. Tier 2 never fails the run unless --strict is passed.
+orphans, uncited pages, compiled pages with newer source inputs, review dates,
+log growth, and sourcing-queue count drift) and surfaces them for a human or
+agent to adjudicate. Tier 2 never fails the run unless --strict is passed.
 
 Tier 3 (genuine judgment: contradictions, "missing cross-refs that should
 exist", inconsistent terminology) is deliberately NOT attempted here. It stays
@@ -33,21 +34,25 @@ from pathlib import Path
 
 from _wiki_parse import (
     LINK_RE,
-    META_DIRS,
     META_PAGES,
     dangling_slugs,
     frontmatter_block,
     get_entity_pages,
+    parse_log_entry_date,
+    parse_log_entry_type,
     split_frontmatter,
+    split_quoted_csv,
     strip_code_spans,
     strip_referenced_by,
 )
+from review_due import collect as collect_review_due
 
 WIKI_ROOT = Path("wiki")
 ADJUDICATIONS_PATH = Path("scripts/lint-adjudications.json")
+LOG_ROTATION_WARN_LINES = 2500
 
-# META_PAGES and META_DIRS are shared with rebuild_referenced_by.py via
-# _wiki_parse, so the corpus enumeration cannot drift between linter and rebuild.
+# META_PAGES is shared with rebuild_referenced_by.py via _wiki_parse, so the
+# corpus enumeration cannot drift between linter and rebuild.
 
 # folder name -> expected frontmatter type value
 FOLDER_TYPE = {
@@ -69,7 +74,7 @@ ROOT_ALLOWED_FILES = {
     "README.md", "REFERENCES.md", "SETUP.md",
 }
 ROOT_ALLOWED_DIRS = {
-    ".claude", ".codex", ".github", ".git", "deliverables", "raw",
+    ".claude", ".codex", ".github", ".git", "archive", "deliverables", "raw",
     "scripts", "tmp", "wiki", "workflows",
 }
 WIKI_ALLOWED_FILES = {f"{name}.md" for name in META_PAGES}
@@ -87,6 +92,12 @@ RELATED_LABELS = {"Supports", "Contradicts", "Depends on", "Derived from", "Part
 
 MARKDOWN_MD_LINK_RE = re.compile(r"\]\(([^)]+?\.md(?:[?#][^)]*)?)\)")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+STATUS_RE = re.compile(r"\*\*Status(?: note)?\s*\((\d{4}-\d{2}-\d{2})\)")
+SOURCING_QUEUE_COUNT_MARKER_RE = re.compile(r"<!--\s*lint:entity-count\b(?P<attrs>.*?)-->")
+SOURCING_QUEUE_COUNT_MARKER_INTENT_RE = re.compile(
+    r"<!--(?=[^>]*\blint\s*:\s*entity-counts?\b)[\s\S]*?-->"
+)
+SOURCING_QUEUE_COUNT_ATTR_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*)=([^\s]+)")
 
 # Entity classes required to enroll in the review_by outcome-review loop. The
 # template makes decisions mandatory because they carry choices that should be
@@ -138,7 +149,7 @@ def authored_body(body):
 
 
 def tokens(text):
-    text = re.sub(r"\[\[[^\]]*\]\]", " ", text)
+    text = LINK_RE.sub(" ", text)
     text = re.sub(r"[`*#|>_\-\[\]()]", " ", text)
     out = set()
     for w in re.findall(r"[a-z][a-z0-9']+", text.lower()):
@@ -150,44 +161,42 @@ def tokens(text):
 # Tokens in a sources: value that are not provenance slugs to existence-check:
 # raw/ paths are checked separately, and free-text provenance (experience,
 # web research, deliverable, an explicit URL) is prose, not a page reference.
-SOURCE_NONSLUG_PREFIX_RE = re.compile(r"^(experience|web|deliverable|source)\b", re.I)
+# The prefix word must be followed by a colon or space so a kebab slug that
+# merely STARTS with one of these words (e.g. web-agents-2026) stays checked.
+SOURCE_NONSLUG_PREFIX_RE = re.compile(r"^(experience|web|deliverable|source)[:\s]", re.I)
 
 
 def source_items(fm_block):
-    """Split each sources: line in a frontmatter block into its list items,
-    respecting quotes so a comma inside a quoted phrase does not split it."""
+    """Split each sources: line in a frontmatter block into its list items.
+    Inline values use the shared split_quoted_csv grammar; block-style lists
+    (indented '- item' lines under a bare sources: key) are walked the same
+    way block_list_has_items walks agent_use_cases, so block-sourced pages get
+    the same provenance checks as inline-sourced ones."""
     items = []
-    for line in fm_block.splitlines():
+    lines = fm_block.splitlines()
+    for i, line in enumerate(lines):
         m = re.match(r"^\s*sources?:\s*(.*)$", line)
         if not m:
             continue
-        val = m.group(1).strip()
-        if val.startswith("["):
-            val = val[1:]
-        if val.endswith("]"):
-            val = val[:-1]
-        cur, quote = "", None
-        raw_items = []
-        for ch in val:
-            if quote:
-                cur += ch
-                if ch == quote:
-                    quote = None
-            elif ch in "\"'":
-                quote = ch
-                cur += ch
-            elif ch == ",":
-                raw_items.append(cur)
-                cur = ""
-            else:
-                cur += ch
-        if cur:
-            raw_items.append(cur)
-        for it in raw_items:
-            it = it.strip().strip("\"'").strip()
-            if it:
-                items.append(it)
+        inline = m.group(1).strip()
+        if inline:
+            items.extend(split_quoted_csv(inline))
+            continue
+        for nxt in lines[i + 1:]:
+            im = re.match(r"^\s+-\s+(.*)$", nxt)
+            if im:
+                item = im.group(1).strip().strip("\"'").strip()
+                if item:
+                    items.append(item)
+            elif re.match(r"^\S", nxt):  # next top-level key
+                break
     return items
+
+
+def inline_list_items(value):
+    """Parse a simple inline YAML scalar or list (the tags: shape) into item
+    strings, via the shared split_quoted_csv grammar."""
+    return split_quoted_csv(value)
 
 
 # --------------------------- Tier 1 ---------------------------
@@ -222,8 +231,6 @@ def check_folder_structure():
             elif p.is_file():
                 if name not in WIKI_ALLOWED_FILES:
                     fails.append(("wiki-structure", rel, "unexpected wiki/ root file"))
-                elif p.suffix != ".md":
-                    fails.append(("wiki-structure", rel, "wiki/ root files must be Markdown"))
             else:
                 fails.append(("wiki-structure", rel, "unexpected wiki/ entry type"))
 
@@ -271,6 +278,10 @@ def check_folder_structure():
             if p.is_dir():
                 if not KEBAB_RE.match(p.name):
                     fails.append(("deliverables-structure", rel, "deliverables/ subfolder is not kebab-case"))
+            elif p.name == ".gitkeep":
+                # The tracked placeholder (mirroring raw/.gitkeep) that ships
+                # the folder with a fresh clone; not a loose deliverable.
+                continue
             else:
                 fails.append(("deliverables-structure", rel, "loose deliverable; move it into a clearly labeled subfolder"))
 
@@ -281,9 +292,9 @@ def check_folder_structure():
 def check_no_tracked_raw():
     """raw/ source artifacts must not be committed; raw/.gitkeep and
     raw/README.md are tracked template exceptions. Fail Tier-1 on any other
-    tracked raw/ path. No-ops when git is unavailable or this is not a work tree,
-    so lint still runs outside a git context (e.g. eval fixtures copied to a temp
-    dir)."""
+    tracked raw/ path. No-ops when git is unavailable or this is not a work
+    tree, so lint still runs outside a git context (e.g. eval fixtures copied
+    to a temp dir)."""
     try:
         out = subprocess.run(
             ["git", "ls-files", "-z", "--", "raw"],
@@ -338,43 +349,123 @@ def check_stray_tool_tags():
     return fails
 
 
-def normalize_markdown_target(href):
-    href = href.strip()
-    if "://" in href or href.startswith("mailto:"):
-        return None
-    href = href.split("#", 1)[0].split("?", 1)[0]
-    return href if href else None
+def parse_sourcing_queue_count_markers():
+    """Read explicit entity-count markers from wiki/sourcing-queue.md.
 
-
-def check_markdown_md_links():
-    """Fail Tier-1 on stale ordinary Markdown links to .md files.
-
-    Wikilinks are checked separately by slug. This covers direct links such as
-    [index](index.md), [schema](wiki/SCHEMA.md), or [setup](../SETUP.md) from
-    every wiki Markdown page, including meta pages.
+    The sourcing queue is prose, so lint does not infer counts from wording.
+    Only comments like `<!-- lint:entity-count folder=people count=6 -->` are
+    executable. Malformed markers are Tier-1 failures; valid markers feed the
+    Tier-2 drift signal.
     """
+    path = WIKI_ROOT / "sourcing-queue.md"
+    if not path.exists():
+        return [], []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        return [], [("sourcing-queue-count-marker", str(path), f"not valid UTF-8: {e}")]
+
+    markers = []
     fails = []
-    if not WIKI_ROOT.exists():
-        return fails
-    repo_root = Path(".")
-    for p in sorted(WIKI_ROOT.rglob("*.md")):
-        try:
-            text = p.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+    seen_folders = set()
+    strict_spans = set()
+    for match in SOURCING_QUEUE_COUNT_MARKER_RE.finditer(text):
+        strict_spans.add(match.span())
+
+    for match in SOURCING_QUEUE_COUNT_MARKER_INTENT_RE.finditer(text):
+        if match.span() in strict_spans:
             continue
-        rel = str(p.relative_to(WIKI_ROOT))
-        for href in MARKDOWN_MD_LINK_RE.findall(strip_code_spans(text)):
-            target = normalize_markdown_target(href)
-            if target is None:
-                continue
-            if target.startswith("/"):
-                candidate = repo_root / target.lstrip("/")
-            elif target.startswith("wiki/"):
-                candidate = repo_root / target
+        line = text.count("\n", 0, match.start()) + 1
+        fails.append(("sourcing-queue-count-marker", str(path),
+                      f"line {line}: malformed entity-count marker"))
+
+    for match in SOURCING_QUEUE_COUNT_MARKER_RE.finditer(text):
+        line = text.count("\n", 0, match.start()) + 1
+        attrs = {
+            key: value
+            for key, value in SOURCING_QUEUE_COUNT_ATTR_RE.findall(match.group("attrs"))
+        }
+        folder = attrs.get("folder")
+        count_text = attrs.get("count")
+        valid = True
+
+        if not folder:
+            fails.append(("sourcing-queue-count-marker", str(path),
+                          f"line {line}: missing folder"))
+            valid = False
+        elif folder not in FOLDER_TYPE:
+            fails.append(("sourcing-queue-count-marker", str(path),
+                          f"line {line}: unknown folder '{folder}'"))
+            valid = False
+        elif folder in seen_folders:
+            fails.append(("sourcing-queue-count-marker", str(path),
+                          f"line {line}: duplicate folder '{folder}'"))
+            valid = False
+
+        if count_text is None:
+            fails.append(("sourcing-queue-count-marker", str(path),
+                          f"line {line}: missing count"))
+            valid = False
+            count = None
+        else:
+            try:
+                count = int(count_text)
+            except ValueError:
+                fails.append(("sourcing-queue-count-marker", str(path),
+                              f"line {line}: count '{count_text}' is not an integer"))
+                valid = False
+                count = None
             else:
-                candidate = p.parent / target
-            if not candidate.exists():
-                fails.append(("markdown-link", rel, f"{href!r} points to missing file"))
+                if count < 0:
+                    fails.append(("sourcing-queue-count-marker", str(path),
+                                  f"line {line}: count must be non-negative"))
+                    valid = False
+
+        if valid:
+            seen_folders.add(folder)
+            markers.append((folder, count, line))
+    return markers, fails
+
+
+def check_sourcing_queue_count_markers():
+    """Fail Tier-1 on malformed sourcing-queue entity-count markers."""
+    _markers, fails = parse_sourcing_queue_count_markers()
+    return fails
+
+
+def check_log_entry_headers():
+    """Every "## " line in wiki/log.md must be a recognized entry header
+    ("## [YYYY-MM-DD] ..." or "## YYYY-MM-DD ..."), and no "## " line may sit
+    inside a fenced code block at all. rotate_log.py cuts the log only at
+    recognized headers and is deliberately fence-unaware, so a nonconforming
+    header would be silently merged into the previous entry's archive block,
+    and a fenced example that LOOKS like a header would become a bogus cut
+    point. The grammar is the shared LOG_ENTRY_HEADER_RE in _wiki_parse."""
+    fails = []
+    path = WIKI_ROOT / "log.md"
+    if not path.exists():
+        return fails
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        # An undecodable log must fail loudly here: silently returning would
+        # disarm the rotate_log cut-point guard for the whole file.
+        return [("log-entry-header", str(path), f"not valid UTF-8: {e}")]
+    in_fence = False
+    for i, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if not line.startswith("## "):
+            continue
+        if in_fence:
+            fails.append(("log-entry-header", str(path),
+                          f"line {i}: fenced '## ' line; rotate_log.py cuts are "
+                          f"fence-unaware, so reword the example: {line.strip()!r}"))
+        elif parse_log_entry_date(line) is None:
+            fails.append(("log-entry-header", str(path),
+                          f"line {i}: '## ' line is not a recognized log entry "
+                          f"header (\"## [YYYY-MM-DD] ...\"): {line.strip()!r}"))
     return fails
 
 
@@ -393,11 +484,26 @@ def read_adjudications():
         return {}, f"unreadable JSON: {e}"
     if not isinstance(raw, dict):
         return {}, "top level must be a JSON object"
+    # A suppression filed under a misspelled or retired category key would
+    # silently detach; unknown keys fail loudly instead (REFERENCES.md rule).
+    # Underscore-prefixed keys are documentation metadata (e.g. _description),
+    # never suppression lists.
+    known_keys = {
+        "accepted_orphans", "hub_pages", "skipped_crossref_pairs",
+        "reviewed_confidence_low", "reviewed_near_duplicates",
+        "reviewed_quotes", "reviewed_recompile_candidates",
+    }
+    unknown = sorted(k for k in set(raw) - known_keys if not k.startswith("_"))
+    if unknown:
+        return {}, ("unknown top-level category key(s): " + ", ".join(unknown)
+                    + "; suppression entries under an unrecognized key would "
+                      "silently detach")
     for key in ("accepted_orphans", "hub_pages", "reviewed_confidence_low"):
         for e in raw.get(key, []):
             if not isinstance(e, dict) or not isinstance(e.get("page"), str):
                 return {}, f"every '{key}' entry needs a string 'page' field"
-    for key in ("skipped_crossref_pairs", "reviewed_near_duplicates"):
+    for key in ("skipped_crossref_pairs", "reviewed_near_duplicates",
+                "reviewed_recompile_candidates"):
         for e in raw.get(key, []):
             pair = e.get("pair") if isinstance(e, dict) else None
             if not (isinstance(pair, list) and len(pair) == 2
@@ -414,11 +520,12 @@ def read_adjudications():
 #
 # Each per-page check below is a small, self-contained function a maintainer can
 # read in isolation. It receives one PageContext and returns a list of fail
-# tuples (check, page_relpath, detail), the same shape the loop appends. The
-# registry TIER1_PAGE_CHECKS lists them in evaluation order; tier1() iterates the
-# entity pages and, for each, runs every check in order. This preserves the exact
-# emit order of the previous inlined loop (page-outer, check-inner), so the
-# grouped/sorted report is byte-for-byte identical.
+# tuples (check, page_relpath, detail), the same shape the loop appends. Two
+# registries list them in evaluation order: TIER1_PATH_CHECKS (path-only, run
+# before frontmatter parsing) and TIER1_PAGE_CHECKS (frontmatter-dependent);
+# tier1() iterates the entity pages and, for each, runs every check in order.
+# This preserves the exact emit order of the previous inlined loop (page-outer,
+# check-inner), so the grouped/sorted report is byte-for-byte identical.
 
 
 class PageContext:
@@ -562,11 +669,12 @@ def check_dangling_links(ctx):
 
 
 def check_related_labels(ctx):
-    """Related-pages relationship labels come from the fixed vocabulary. A bullet
+    """Related-pages relationship labels come from the fixed vocabulary
+    (RELATED_LABELS here; the meanings table lives in REFERENCES.md). A bullet
     may be untyped ("- [[page]]"), but a "Label:" prefix on a bullet that carries
-    a [[link]] must be one of the six labels defined in AGENTS.md. A plain prose
-    bullet ("- Note: ...", a page-to-create) is permitted by SCHEMA and is not an
-    attempted typed label."""
+    a [[link]] must be one of the six labels. A plain prose bullet ("- Note:
+    ...", a page-to-create) is permitted by SCHEMA and is not an attempted
+    typed label."""
     fails = []
     rp = re.search(r"## Related [Pp]ages\n(.*?)(?=\n## |\Z)", ctx.text, re.DOTALL)
     if rp:
@@ -576,6 +684,18 @@ def check_related_labels(ctx):
                 fails.append(("related-label", ctx.rel,
                               f"'{lm.group(1)}:' is not an allowed relationship label"))
     return fails
+
+
+def check_open_questions(ctx):
+    """Non-source pages carry an "Open questions / gaps" section (SCHEMA rule:
+    required on every non-source entity type). Sources are exempt; confidence
+    already flags preview-only material there. Presence-only and deterministic,
+    so it gates like the other structural mandates."""
+    if ctx.folder == "sources":
+        return []
+    if not re.search(r"^##+ Open [Qq]uestions", ctx.text, re.M):
+        return [("open-questions", ctx.rel, "missing Open questions / gaps section")]
+    return []
 
 
 def check_confidence_restate(ctx):
@@ -604,9 +724,16 @@ def check_confidence_restate(ctx):
 # Per-page Tier-1 checks, in evaluation order. tier1() runs each in turn for
 # every entity page whose frontmatter parsed. To add a check, write a small
 # check_*(ctx) -> fails function above and list it here.
-TIER1_PAGE_CHECKS = (
+# Path-only checks: they read the path, not the frontmatter dict, so tier1()
+# runs them before frontmatter parsing and they still fire on pages whose
+# frontmatter is missing or malformed. Kept as their own tuple so the
+# pre-parse/post-parse split is structural, not a slice-plus-comment.
+TIER1_PATH_CHECKS = (
     check_filename,
     check_entity_folder,
+)
+
+TIER1_PAGE_CHECKS = (
     check_required_keys,
     check_type_matches_folder,
     check_confidence_value,
@@ -615,16 +742,18 @@ TIER1_PAGE_CHECKS = (
     check_source_refs,
     check_dangling_links,
     check_related_labels,
+    check_open_questions,
     check_confidence_restate,
 )
 
 
-def tier1(entity_pages, valid_slugs, index_targets):
+def tier1(entity_pages, valid_slugs, index_targets, index_duplicates):
     fails = []  # (check, page_relpath, detail)
     fails.extend(check_folder_structure())
     fails.extend(check_no_tracked_raw())
     fails.extend(check_stray_tool_tags())
-    fails.extend(check_markdown_md_links())
+    fails.extend(check_sourcing_queue_count_markers())
+    fails.extend(check_log_entry_headers())
 
     def rel(p):
         return str(p.relative_to(WIKI_ROOT))
@@ -660,18 +789,16 @@ def tier1(entity_pages, valid_slugs, index_targets):
 
         ctx = PageContext(p, text, valid_slugs, source_slugs)
 
-        # filename and entity-folder checks run even without parseable
-        # frontmatter (they read the path, not the frontmatter dict).
-        fails.extend(check_filename(ctx))
-        fails.extend(check_entity_folder(ctx))
+        # path-only checks run even without parseable frontmatter.
+        for check in TIER1_PATH_CHECKS:
+            fails.extend(check(ctx))
 
         if ctx.fm is None:
             fails.append(("frontmatter", r, "missing or malformed frontmatter"))
             continue
 
-        # frontmatter-dependent per-page checks, in registry order. The two
-        # path-only checks above already ran, so skip them here.
-        for check in TIER1_PAGE_CHECKS[2:]:
+        # frontmatter-dependent per-page checks, in registry order.
+        for check in TIER1_PAGE_CHECKS:
             fails.extend(check(ctx))
 
     # index coverage (only for paths that name an entity folder)
@@ -680,6 +807,11 @@ def tier1(entity_pages, valid_slugs, index_targets):
     for t in sorted(index_targets - entity_relpaths):
         if "/" in t and t.split("/")[0] in FOLDER_TYPE:
             fails.append(("index-stale", t, "index.md row points to missing page"))
+    # "one row per page" is two-sided: coverage above, uniqueness here. Duplicate
+    # rows have appeared under concurrent sessions and were invisible to lint.
+    for t in index_duplicates:
+        if "/" in t and t.split("/")[0] in FOLDER_TYPE:
+            fails.append(("index-duplicate", t, "multiple index.md rows point to this page"))
 
     # the adjudication file must parse and every entry must reference an
     # existing page; otherwise suppression silently turns off or a rename
@@ -699,6 +831,21 @@ def tier1(entity_pages, valid_slugs, index_targets):
             if page not in entity_relpaths:
                 fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
                               f"entry references missing page '{page}'"))
+        for e in raw.get("reviewed_recompile_candidates", []):
+            compiled, source = e["pair"]
+            if compiled not in entity_relpaths:
+                fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
+                              f"recompile entry references missing compiled page '{compiled}'"))
+            elif Path(compiled).parent.name == "sources":
+                fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
+                              f"recompile compiled page must not be under sources/: '{compiled}'"))
+            if source not in entity_relpaths:
+                fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
+                              f"recompile entry references missing source page '{source}'"))
+            elif Path(source).parent.name != "sources":
+                fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
+                              f"recompile source page must be under sources/: '{source}'"))
+
     seen = set()
     deduped = []
     for f in fails:
@@ -741,11 +888,12 @@ def quote_fragments(quote):
     return [f for f in frags if len(f.split()) >= 6]
 
 
-def quote_mismatches(entity_pages, adjudicated_quotes):
+def quote_mismatches(entity_pages, adjudicated_quotes, used=None):
     """Tier-2 candidates: quoted text attributed to a source that does not
     appear verbatim in the cited wiki page or its raw files. Deterministic
     string matching only; whether a non-match is a defect (vs. labeled own
-    framing) is adjudicated by the lint workflow, not decided here."""
+    framing) is adjudicated by the lint workflow, not decided here. `used`
+    (when given) collects the adjudication keys that suppressed a candidate."""
     by_stem = {p.stem: p for p in entity_pages}
     out, suppressed = [], 0
     for p in entity_pages:
@@ -790,6 +938,8 @@ def quote_mismatches(entity_pages, adjudicated_quotes):
                 continue
             key = (rel, normalize_quote(quote_raw)[:80])
             if key in adjudicated_quotes:
+                if used is not None:
+                    used.add(key)
                 suppressed += 1
                 continue
             preview = quote_raw[:70] + ("..." if len(quote_raw) > 70 else "")
@@ -808,6 +958,7 @@ def load_adjudications():
     empty = {
         "orphans": set(), "hubs": set(), "pairs": set(),
         "confidence": set(), "duplicates": set(), "quotes": set(),
+        "recompile": set(),
     }
     raw, err = read_adjudications()
     if not raw:
@@ -821,7 +972,52 @@ def load_adjudications():
         "duplicates": {frozenset(e["pair"]) for e in raw.get("reviewed_near_duplicates", [])},
         "quotes": {(e["page"], normalize_quote(e["quote"])[:80])
                    for e in raw.get("reviewed_quotes", [])},
+        "recompile": {(e["pair"][0], e["pair"][1])
+                      for e in raw.get("reviewed_recompile_candidates", [])},
     }
+
+
+def latest_status_date(text):
+    # Strip code spans first so a **Status (date)** written as a format example
+    # inside a code fence is not read as a real status note.
+    out = []
+    for value in STATUS_RE.findall(strip_code_spans(text)):
+        try:
+            out.append(date.fromisoformat(value))
+        except ValueError:
+            continue
+    return max(out) if out else None
+
+
+def frontmatter_updated_date(fm):
+    if not fm or not fm.get("updated"):
+        return None
+    try:
+        return date.fromisoformat(fm["updated"])
+    except ValueError:
+        return None
+
+
+def normalize_markdown_target(href):
+    href = href.strip()
+    if "://" in href or href.startswith("mailto:"):
+        return None
+    href = href.split("#", 1)[0].split("?", 1)[0]
+    if href.startswith("./"):
+        href = href[2:]
+    if href.startswith("wiki/"):
+        href = href[len("wiki/"):]
+    return str(Path(href))
+
+
+def resolve_markdown_target(href, relpaths, stem_to_relpaths):
+    normalized = normalize_markdown_target(href)
+    if not normalized:
+        return None
+    if normalized in relpaths:
+        return normalized
+    matches = stem_to_relpaths.get(Path(normalized).stem, [])
+    return matches[0] if len(matches) == 1 else None
 
 
 def meta_dangling_links(valid_slugs):
@@ -865,7 +1061,7 @@ class Tier2Context:
     outbound link graphs, and the adjudication sets), so the individual signal
     functions stay small and never re-walk the corpus."""
 
-    __slots__ = ("pages", "data", "inbound", "outbound", "adj")
+    __slots__ = ("pages", "data", "inbound", "outbound", "adj", "adj_used")
 
     def __init__(self, pages, valid_slugs, adjudicated):
         self.pages = pages
@@ -880,15 +1076,26 @@ class Tier2Context:
                 text = ""
             fm, body = split_frontmatter(text)
             ab = authored_body(body)
+            dates = [d for d in (frontmatter_updated_date(fm), latest_status_date(text))
+                     if d is not None]
             self.data[p] = {
                 "fm": fm or {},
+                "freshness": max(dates) if dates else None,
                 "tokens": tokens(ab),
                 "words": len(re.findall(r"\w+", ab)),
-                "body_links": bool(LINK_RE.search(ab)),
+                # A [[link]] inside a code example is not a citation.
+                "body_links": bool(LINK_RE.search(strip_code_spans(ab))),
+                # Raw-block parse so block-style sources: lists count as cited.
+                "source_items": source_items(frontmatter_block(text)),
             }
             # Outbound links must be authored; generated "Referenced by" blocks
-            # would echo inbound links back and fabricate a bidirectional graph.
-            self.outbound[p] = set(LINK_RE.findall(strip_referenced_by(text)))
+            # would echo inbound links back and fabricate a bidirectional graph,
+            # and a [[link]] inside a code span is a syntax example, not an edge
+            # (the same rule the dangling scan and the rebuild apply). Fences
+            # are blanked before the section strip so a fenced "## Referenced
+            # by" example cannot swallow authored links after it.
+            self.outbound[p] = set(
+                LINK_RE.findall(strip_referenced_by(strip_code_spans(text))))
 
         stems = {p.stem: p for p in pages}
         for p in pages:
@@ -900,18 +1107,28 @@ class Tier2Context:
         # passes load_adjudications()); load_adjudications already returns the
         # empty template when the file is absent, so no fallback is needed here.
         self.adj = adjudicated
+        # Which adjudication entries actually suppressed a candidate this run.
+        # Signals record usage as they suppress; signal_adjudication_dead (kept
+        # last in TIER2_SIGNALS) reports the entries that suppressed nothing.
+        self.adj_used = {key: set() for key in adjudicated}
 
 
 def signal_quote_mismatch(ctx):
     """Quoted text attributed to a source that is not verbatim in the cited page."""
-    return quote_mismatches(ctx.pages, ctx.adj["quotes"])
+    return quote_mismatches(ctx.pages, ctx.adj["quotes"], ctx.adj_used["quotes"])
 
 
 def signal_orphans(ctx):
     """Pages with no inbound links."""
     orphans = [str(p.relative_to(WIKI_ROOT)) for p in ctx.pages if ctx.inbound[p] == 0]
-    suppressed = sum(1 for o in orphans if o in ctx.adj["orphans"])
-    return sorted(o for o in orphans if o not in ctx.adj["orphans"]), suppressed
+    out, suppressed = [], 0
+    for o in sorted(orphans):
+        if o in ctx.adj["orphans"]:
+            ctx.adj_used["orphans"].add(o)
+            suppressed += 1
+        else:
+            out.append(o)
+    return out, suppressed
 
 
 def signal_near_duplicate(ctx):
@@ -929,6 +1146,7 @@ def signal_near_duplicate(ctx):
         if j >= 0.35:
             ra, rb = str(a.relative_to(WIKI_ROOT)), str(b.relative_to(WIKI_ROOT))
             if frozenset((ra, rb)) in ctx.adj["duplicates"]:
+                ctx.adj_used["duplicates"].add(frozenset((ra, rb)))
                 suppressed += 1
                 continue
             dups.append((j, ra, rb))
@@ -936,14 +1154,14 @@ def signal_near_duplicate(ctx):
 
 
 def signal_uncited(ctx):
-    """Non-source pages with no sources and no body links."""
+    """Non-source pages with no sources and no body links. Checked via
+    source_items on the raw frontmatter block: the key parser flattens a
+    block-style sources: list to '', which must still count as cited."""
     uncited = []
     for p in ctx.pages:
         if p.parent.name == "sources":
             continue
-        srcs = ctx.data[p]["fm"].get("sources", "")
-        empty_sources = srcs in ("", "[]")
-        if empty_sources and not ctx.data[p]["body_links"]:
+        if not ctx.data[p]["source_items"] and not ctx.data[p]["body_links"]:
             uncited.append(str(p.relative_to(WIKI_ROOT)))
     return sorted(uncited), 0
 
@@ -964,29 +1182,13 @@ def signal_confidence_upgrade(ctx):
             continue
         fm = ctx.data[p]["fm"]
         if fm.get("confidence") == "low" and ctx.inbound[p] >= 2:
-            if str(p.relative_to(WIKI_ROOT)) in ctx.adj["confidence"]:
+            rel = str(p.relative_to(WIKI_ROOT))
+            if rel in ctx.adj["confidence"]:
+                ctx.adj_used["confidence"].add(rel)
                 suppressed += 1
                 continue
             upgrade.append(f"{p.relative_to(WIKI_ROOT)} ({ctx.inbound[p]} inbound)")
     return sorted(upgrade), suppressed
-
-
-def signal_missing_open_questions(ctx):
-    """Non-source pages missing an Open questions / gaps section.
-
-    SCHEMA requires it on non-source pages; it is optional on sources, where
-    confidence already flags preview-only material."""
-    missing_oq = []
-    for p in ctx.pages:
-        if p.parent.name == "sources":
-            continue
-        try:
-            text = p.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue  # tier1 reports the encoding failure
-        if not re.search(r"^##+ Open [Qq]uestions", text, re.M):
-            missing_oq.append(str(p.relative_to(WIKI_ROOT)))
-    return sorted(missing_oq), 0
 
 
 def signal_missing_related(ctx):
@@ -1011,10 +1213,103 @@ def signal_missing_related(ctx):
             continue
         ra, rb = str(a.relative_to(WIKI_ROOT)), str(b.relative_to(WIKI_ROOT))
         if ra in ctx.adj["hubs"] or rb in ctx.adj["hubs"] or frozenset((ra, rb)) in ctx.adj["pairs"]:
+            for hub in (ra, rb):
+                if hub in ctx.adj["hubs"]:
+                    ctx.adj_used["hubs"].add(hub)
+            if frozenset((ra, rb)) in ctx.adj["pairs"]:
+                ctx.adj_used["pairs"].add(frozenset((ra, rb)))
             suppressed += 1
             continue
         cocite.append((score, len(shared), ra, rb))
     return sorted(cocite, reverse=True), suppressed
+
+
+def signal_log_rotation_due(ctx):
+    """Log file has crossed the documented rotation warning threshold."""
+    _ = ctx
+    path = WIKI_ROOT / "log.md"
+    if not path.exists():
+        return [], 0
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return [], 0  # meta-page encoding is outside this maintenance signal
+    line_count = len(text.splitlines())
+    if line_count <= LOG_ROTATION_WARN_LINES:
+        return [], 0
+    return ([f"{path} has {line_count} lines; threshold is {LOG_ROTATION_WARN_LINES}"], 0)
+
+
+def signal_sourcing_queue_count_drift(ctx):
+    """Entity-count markers in sourcing-queue.md that disagree with the corpus."""
+    _ = ctx
+    markers, fails = parse_sourcing_queue_count_markers()
+    if fails:
+        return [], 0  # Tier-1 reports malformed markers
+    if not markers:
+        return [], 0
+    counts = {}
+    for page in get_entity_pages(WIKI_ROOT):
+        counts[page.parent.name] = counts.get(page.parent.name, 0) + 1
+    out = []
+    for folder, declared, _line in markers:
+        actual = counts.get(folder, 0)
+        if declared != actual:
+            out.append(
+                f"{WIKI_ROOT / 'sourcing-queue.md'}: folder {folder} "
+                f"declares {declared} but actual count is {actual}"
+            )
+    return out, 0
+
+
+def signal_recompile_candidates(ctx):
+    """Compiled pages older than authored source links they already depend on.
+
+    This is a review prompt, not a stale-page verdict. It only follows direct
+    authored links from non-source pages to source pages; reverse source-to-page
+    links are intentionally left out until the noisier direction has a proven
+    precision case.
+    """
+    stem_to_pages = {}
+    for p in ctx.pages:
+        stem_to_pages.setdefault(p.stem, []).append(p)
+
+    out, suppressed = [], 0
+    for p in sorted(ctx.pages):
+        if p.parent.name == "sources":
+            continue
+        page_freshness = ctx.data[p].get("freshness")
+        if page_freshness is None:
+            continue
+        page_rel = str(p.relative_to(WIKI_ROOT))
+        source_hits = []
+        for slug in sorted(ctx.outbound.get(p, set())):
+            matches = stem_to_pages.get(slug, [])
+            if len(matches) != 1:
+                continue
+            source = matches[0]
+            if source.parent.name != "sources":
+                continue
+            source_updated = frontmatter_updated_date(ctx.data[source]["fm"])
+            if source_updated is None or source_updated <= page_freshness:
+                continue
+            source_rel = str(source.relative_to(WIKI_ROOT))
+            pair = (page_rel, source_rel)
+            if pair in ctx.adj["recompile"]:
+                ctx.adj_used["recompile"].add(pair)
+                suppressed += 1
+                continue
+            source_hits.append((source_rel, source_updated))
+        if source_hits:
+            hits = "; ".join(
+                f"{source_rel} {source_updated.isoformat()}"
+                for source_rel, source_updated in source_hits
+            )
+            out.append(
+                f"{page_rel} (page {page_freshness.isoformat()}): "
+                f"newer sources: {hits}"
+            )
+    return out, suppressed
 
 
 def signal_review_by_missing(ctx):
@@ -1029,6 +1324,90 @@ def signal_review_by_missing(ctx):
             continue
         if not ctx.data[p]["fm"].get("review_by"):
             out.append(str(p.relative_to(WIKI_ROOT)))
+    return sorted(out), 0
+
+
+# Ingest entries since the last synthesis pass that count as a burst worth
+# distilling. The synthesize workflow stays manual and approval-gated; this only
+# surfaces the trigger.
+SYNTHESIS_BURST_THRESHOLD = 8
+
+
+def signal_synthesis_due(ctx):
+    """Ingest burst with no synthesis pass following. Counts `ingest` log
+    entries after the most recent `synthesis` entry (all of them if none); at
+    SYNTHESIS_BURST_THRESHOLD or more, surfaces a candidate so the synthesize
+    trigger does not depend on remembering to notice a burst. Self-clearing:
+    logging a synthesis pass resets the count."""
+    _ = ctx
+    path = WIKI_ROOT / "log.md"
+    if not path.exists():
+        return [], 0
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except UnicodeDecodeError:
+        return [], 0
+    ingests_since = 0
+    for line in lines:
+        # Type extraction shares the header grammar (parse_log_entry_type in
+        # _wiki_parse), so both live header forms are recognized identically.
+        entry_type = parse_log_entry_type(line) or ""
+        if entry_type.startswith("synthesis"):
+            ingests_since = 0
+        elif entry_type == "ingest":
+            ingests_since += 1
+    if ingests_since < SYNTHESIS_BURST_THRESHOLD:
+        return [], 0
+    return ([f"{ingests_since} ingest entries since the last synthesis pass "
+             f"(threshold {SYNTHESIS_BURST_THRESHOLD}); consider a synthesize run"], 0)
+
+
+def signal_review_due(ctx):
+    """Pages whose review_by date has passed (outcome grading due). Mirrors
+    review_due.py on the most-frequently-run surface, so a due review cannot
+    wait unseen for the next /wiki-eval; the grading itself stays the review
+    workflow's judgment. Self-clearing: grading advances or clears review_by."""
+    _ = ctx
+    due, _bad = collect_review_due(WIKI_ROOT, date.today())
+    return ([f"{rel} (review_by {val}, {overdue} day(s) overdue)"
+             for overdue, rel, val in due], 0)
+
+
+def _adjudication_entry_labels(category, entries):
+    """Human-readable labels for dead adjudication entries of one category."""
+    out = []
+    for e in sorted(entries, key=repr):
+        if isinstance(e, frozenset):
+            out.append(f"{category}: " + " ~ ".join(sorted(e)))
+        elif isinstance(e, tuple):
+            out.append(f"{category}: " + " -> ".join(str(x) for x in e))
+        else:
+            out.append(f"{category}: {e}")
+    return out
+
+
+def signal_adjudication_dead(ctx):
+    """Adjudication entries that suppressed nothing this run. A dead entry means
+    the candidate it settled no longer fires at all, so the suppression is inert
+    residue; prune it (or keep it deliberately, if the candidate is expected to
+    return). tier2() computes this after every other signal regardless of
+    registry position, because it reads which entries those signals actually
+    consumed via ctx.adj_used.
+
+    hub_pages is excluded on purpose: it suppresses event-driven co-citation
+    candidates that can legitimately go quiet between events and re-fire later,
+    so "suppressed nothing this run" says nothing about whether the entry is
+    inert. The lint workflow documents the exclusion."""
+    out = []
+    names = {
+        "orphans": "accepted_orphans",
+        "pairs": "skipped_crossref_pairs", "confidence": "reviewed_confidence_low",
+        "duplicates": "reviewed_near_duplicates", "quotes": "reviewed_quotes",
+        "recompile": "reviewed_recompile_candidates",
+    }
+    for key, category in names.items():
+        dead = ctx.adj[key] - ctx.adj_used[key]
+        out.extend(_adjudication_entry_labels(category, dead))
     return sorted(out), 0
 
 
@@ -1047,22 +1426,37 @@ TIER2_SIGNALS = (
     ("uncited", "uncited (no sources, no body links)", signal_uncited),
     ("thin", "thin pages (<80 words)", signal_thin),
     ("confidence_upgrade", "confidence:low with >=2 inbound (upgrade?)", signal_confidence_upgrade),
-    ("missing_open_questions", "non-source pages missing Open questions / gaps section", signal_missing_open_questions),
     ("missing_related", "missing cross-refs (link profiles >=50% overlapping, not linked)", signal_missing_related),
+    ("log_rotation_due", "log rotation due", signal_log_rotation_due),
+    ("sourcing_queue_count_drift", "sourcing queue entity count drift", signal_sourcing_queue_count_drift),
+    ("recompile_candidates", "compiled pages with newer source inputs (review for no-change, small update, or recompile)", signal_recompile_candidates),
     ("review_by_missing", "decisions with no review_by (enroll in the outcome-review loop or leave for now)", signal_review_by_missing),
+    ("review_due", "outcome reviews due (review_by has passed; run the review workflow)", signal_review_due),
+    ("synthesis_due", "ingest burst with no synthesis pass following (consider a synthesize run)", signal_synthesis_due),
+    # adjudication_dead's row sets its report position; tier2() computes it
+    # after every other signal regardless of where this row sits, because it
+    # reads which adjudication entries the other signals consumed.
+    ("adjudication_dead", "adjudication entries suppressing nothing this run (prune or keep deliberately)", signal_adjudication_dead),
 )
 
 
 def tier2(entity_pages, valid_slugs, adjudicated):
-    pages = [p for p in entity_pages if p.parent.name not in META_DIRS]
-    ctx = Tier2Context(pages, valid_slugs, adjudicated)
+    ctx = Tier2Context(list(entity_pages), valid_slugs, adjudicated)
 
     out = {}
     suppressed = 0
     for key, _label, signal in TIER2_SIGNALS:
+        if signal is signal_adjudication_dead:
+            continue
         items, delta = signal(ctx)
         out[key] = items
         suppressed += delta
+
+    # Computed after the loop so it sees every other signal's adjudication
+    # consumption; the ordering is structural, not a "keep this row last" rule.
+    dead_items, dead_delta = signal_adjudication_dead(ctx)
+    out["adjudication_dead"] = dead_items
+    suppressed += dead_delta
 
     out["_suppressed"] = suppressed
     return out
@@ -1071,11 +1465,19 @@ def tier2(entity_pages, valid_slugs, adjudicated):
 # --------------------------- reporting ---------------------------
 
 def parse_index_targets():
+    """(targets, duplicates): every .md path index.md links, plus the paths
+    more than one row points to (the uniqueness half of "one row per page")."""
     idx = WIKI_ROOT / "index.md"
     if not idx.exists():
-        return set()
+        return set(), []
     text = idx.read_text(encoding="utf-8")
-    return {m for m in re.findall(r"\]\(([^)]+?\.md)\)", text)}
+    targets = re.findall(r"\]\(([^)]+?\.md)\)", text)
+    seen, dups = set(), set()
+    for t in targets:
+        if t in seen:
+            dups.add(t)
+        seen.add(t)
+    return seen, sorted(dups)
 
 
 def main():
@@ -1091,11 +1493,11 @@ def main():
 
     entity_pages = get_entity_pages(WIKI_ROOT)
     valid_slugs = {p.stem for p in entity_pages} | META_PAGES
-    index_targets = parse_index_targets()
+    index_targets, index_duplicates = parse_index_targets()
 
     print(f"Wiki lint: {len(entity_pages)} entity pages\n")
 
-    t1 = tier1(entity_pages, valid_slugs, index_targets)
+    t1 = tier1(entity_pages, valid_slugs, index_targets, index_duplicates)
     print("TIER 1  (deterministic; must fix)")
     if not t1:
         print("  all checks passed")
