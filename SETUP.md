@@ -51,7 +51,7 @@ Three files have `<Organization>` placeholders that need the user's org name:
 |---|---|---|
 | [`README.md`](README.md) | 1 | `# <Organization> Wiki` → `# <Their Org> Wiki` |
 | [`AGENTS.md`](AGENTS.md) | 1 | `# <Organization> Wiki` → `# <Their Org> Wiki` |
-| [`CONTEXT.md`](CONTEXT.md) | 1 | `# <Organization> Wiki — Task Router` → `# <Their Org> Wiki — Task Router` |
+| [`CONTEXT.md`](CONTEXT.md) | 1 | `# <Organization> Wiki - Task Router` → `# <Their Org> Wiki - Task Router` |
 
 Other framework files reference [`domain.md`](wiki/domain.md) or [`wiki/SCHEMA.md`](wiki/SCHEMA.md) rather than hardcoding a name, so no further edits needed there.
 

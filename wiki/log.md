@@ -11,6 +11,16 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## [2026-07-04] maintenance | root-doc congruence corrections
+
+Change: Corrected the setup replacement table so the `CONTEXT.md` heading uses the actual hyphenated title shape. Reviewed historical log references that mention a retired `scripts/sync_codex_skills.py` helper and an older "13 default entity types" phrasing; left those historical entries in place because current active docs now point to 12 schema entity types and `scripts/check_wrapper_parity.py` as the live wrapper contract.
+Reason: Keep active setup guidance literal and current without rewriting append-only maintenance history.
+Rejected alternative: Edit older log entries in place, which would make the historical record less faithful.
+Accepted tradeoff: A current correction entry makes the active contract clear while preserving older change records as dated history.
+Validation: PASS - `lint.py --tier1`, full `lint.py`, `validate_capture_runs.py`, `check_wrapper_parity.py`, full `wiki_eval.py`, and `git diff --check`.
+
+---
+
 ## [2026-07-04] maintenance | stale-status hardening parity
 
 Change: Ported the template-safe stale-status hardening from the personal wiki into `wiki-solo`: glossary volatile-status lint, structured stale-text sweep proof for new ingest logs, a read-only stale-text sweep helper, eval coverage, command-shape validation, and lint workflow doctrine for when signals should remain Tier 2.
