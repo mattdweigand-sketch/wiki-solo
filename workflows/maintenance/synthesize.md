@@ -204,6 +204,16 @@ A pass is worth running only if it produces at least one of:
 
 Judge quality, not frequency. An empty pass that correctly recommends no change is a success. A pass that mostly produces generic summaries is not. If generic summaries become the pattern, stop using this workflow and let ingest plus lint carry the load.
 
+## Recursive Maintenance Checks
+
+### Synthesis -> Prune
+
+During candidate review, ask whether the strongest action is to merge, shorten, or remove ambiguity rather than add a new page or section. Use this only for the pages already in the candidate set. A prune recommendation can be `No change`, a merge into an existing owner page, or a bounded wording cleanup. If it wants to touch a broad slice of the corpus, stop and treat it as an audit, not a synthesis loop.
+
+### Contradiction -> Resolution
+
+If a synthesis candidate depends on conflicting claims, do not smooth over the conflict. Either recommend a bounded owner-page resolution when the newer source clearly supersedes the old claim, or flag the unresolved conflict in `wiki/contradictions.md` before any durable rewrite. Treat nuance as scope clarification, not contradiction.
+
 ## Cadence
 
-Run manually after a cluster of related ingests, or whenever the log shows a burst with no distillation following. It stays a manual loop: the pass must always stop for the user's grade, so there is little to gain from automating the trigger. Pair with `refresh-sourcing-queue`, which tracks what the wiki is missing from outside; this workflow tracks what the wiki already contains but has not yet said out loud.
+Run when lint's `synthesis_due` Tier-2 signal fires, after a cluster of related ingests, or whenever the user asks. It stays a manual loop: the pass must always stop for the user's grade, so only the trigger is automated. Pair with `refresh-sourcing-queue`, which tracks what the wiki is missing from outside; this workflow tracks what the wiki already contains but has not yet said out loud.

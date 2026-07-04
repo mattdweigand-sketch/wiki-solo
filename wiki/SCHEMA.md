@@ -46,6 +46,8 @@ agent_use_cases:                  # which downstream-agent questions this page i
 
 `source_type` is required on pages in `wiki/sources/` and omitted elsewhere. `agent_use_cases` is required on every entity page except `sources/`; root meta pages such as `index.md`, `log.md`, and `glossary.md` are infrastructure, not retrievable answers.
 
+`sources:` accepts, per item: a `raw/` path, a bare kebab-case slug naming a `wiki/sources/` page, a URL, or free-text provenance prefixed `experience`, `web`, `deliverable`, or `source` followed by a colon or space (for example `experience: <brief description>`). `scripts/lint.py` checks the machine-checkable subset of this grammar: `raw/` paths must exist on disk, and bare kebab-case slugs must resolve to source pages.
+
 `review_by` is optional on most pages and recommended when a claim, forecast, or decision should be graded against future outcomes. Decisions should carry a `review_by` checkpoint unless there is a clear reason not to enroll them in the outcome-review loop.
 
 Optional authority metadata:
