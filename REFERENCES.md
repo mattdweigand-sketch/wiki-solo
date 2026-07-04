@@ -14,7 +14,7 @@ The wiki maintainer:
 - Files substantial answers back into the wiki when the research workflow criteria are met, using `scripts/capture_gate.py` before analysis capture, artifact promotion, and synthesis promotion.
 - Audits reusable artifacts for promotion when they should compound elsewhere.
 - Reviews dated predictions and decisions when `review_by` checkpoints come due.
-- Periodically lints for contradictions, stale content, and orphan pages.
+- Periodically lints for contradictions, stale content, orphan pages, and authority metadata gaps.
 
 Own everything in `wiki/`. `raw/` holds source artifacts: do not edit existing raw files. During ingest, if the user provides a new source outside the proper location, place it once under the correct `raw/` subfolder with a kebab-case filename, then treat it as immutable.
 
@@ -53,7 +53,7 @@ The main control mechanisms are:
 | Mechanism | Purpose |
 |---|---|
 | Route-first loading | Start with `AGENTS.md`, check `wiki/domain.md`, route through `CONTEXT.md`, then open only the selected workflow and its Load / Skip list. |
-| Schema and citations | `wiki/SCHEMA.md` defines page types, frontmatter, source types, confidence values, and citation rules. Specific facts cite `wiki/sources/` pages. |
+| Schema and citations | `wiki/SCHEMA.md` defines page types, frontmatter, source types, confidence values, authority metadata, and citation rules. Specific facts cite `wiki/sources/` pages. |
 | Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`. |
 | Deterministic lint | `scripts/lint.py --tier1` catches structural failures. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
 | Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, log rotation, review due, and wrapper parity. |

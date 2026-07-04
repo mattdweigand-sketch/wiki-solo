@@ -87,6 +87,19 @@ VALID_SOURCE_TYPE = {
     "competitor-collateral", "sales-battlecard", "product-spec", "board-doc",
     "synthesis", "other",
 }
+VALID_AUTHORITY_KIND = {
+    "raw-source", "source-page", "owner-page", "external-url",
+    "local-resource", "mixed", "none",
+}
+VALID_AUTHORITY_FRESHNESS = {
+    "immutable-source", "stable-meaning", "current-state", "event-log",
+    "predictive", "deprecated",
+}
+AUTHORITY_ANCHOR_FIELDS = (
+    "authority_ref", "authority_freshness", "verify_before_action",
+    "last_verified",
+)
+AUTHORITY_METADATA_FIELDS = ("authority_kind",) + AUTHORITY_ANCHOR_FIELDS
 BASE_KEYS = {"title", "type", "created", "updated", "sources", "tags", "confidence"}
 RELATED_LABELS = {"Supports", "Contradicts", "Depends on", "Derived from", "Part of", "Related"}
 
@@ -197,6 +210,16 @@ def inline_list_items(value):
     """Parse a simple inline YAML scalar or list (the tags: shape) into item
     strings, via the shared split_quoted_csv grammar."""
     return split_quoted_csv(value)
+
+
+def fm_scalar(value):
+    """Normalize one scalar frontmatter value for deterministic lint checks."""
+    if value is None:
+        return ""
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1].strip()
+    return value
 
 
 # --------------------------- Tier 1 ---------------------------
@@ -492,13 +515,15 @@ def read_adjudications():
         "accepted_orphans", "hub_pages", "skipped_crossref_pairs",
         "reviewed_confidence_low", "reviewed_near_duplicates",
         "reviewed_quotes", "reviewed_recompile_candidates",
+        "reviewed_authority_missing",
     }
     unknown = sorted(k for k in set(raw) - known_keys if not k.startswith("_"))
     if unknown:
         return {}, ("unknown top-level category key(s): " + ", ".join(unknown)
                     + "; suppression entries under an unrecognized key would "
                       "silently detach")
-    for key in ("accepted_orphans", "hub_pages", "reviewed_confidence_low"):
+    for key in ("accepted_orphans", "hub_pages", "reviewed_confidence_low",
+                "reviewed_authority_missing"):
         for e in raw.get(key, []):
             if not isinstance(e, dict) or not isinstance(e.get("page"), str):
                 return {}, f"every '{key}' entry needs a string 'page' field"
@@ -637,6 +662,142 @@ def check_dates(ctx):
     return fails
 
 
+def check_authority_field_values(ctx):
+    """Authority metadata fields use accepted scalar values and dates."""
+    fails = []
+    kind = fm_scalar(ctx.fm.get("authority_kind"))
+    if "authority_kind" in ctx.fm and kind not in VALID_AUTHORITY_KIND:
+        fails.append(("authority-field-values", ctx.rel,
+                      f"authority_kind '{kind}' is not an accepted value"))
+
+    freshness = fm_scalar(ctx.fm.get("authority_freshness"))
+    if ("authority_freshness" in ctx.fm
+            and freshness not in VALID_AUTHORITY_FRESHNESS):
+        fails.append(("authority-field-values", ctx.rel,
+                      f"authority_freshness '{freshness}' is not an accepted value"))
+
+    verify = fm_scalar(ctx.fm.get("verify_before_action"))
+    if "verify_before_action" in ctx.fm and verify not in {"true", "false"}:
+        fails.append(("authority-field-values", ctx.rel,
+                      "verify_before_action must be true or false"))
+
+    verified = fm_scalar(ctx.fm.get("last_verified"))
+    if "last_verified" in ctx.fm:
+        if not DATE_RE.match(verified):
+            fails.append(("authority-field-values", ctx.rel,
+                          f"last_verified '{verified}' is not YYYY-MM-DD"))
+        else:
+            try:
+                date.fromisoformat(verified)
+            except ValueError:
+                fails.append(("authority-field-values", ctx.rel,
+                              f"last_verified '{verified}' is not a real calendar date"))
+    return fails
+
+
+def check_authority_kind_anchor(ctx):
+    """Any authority-scoped field requires authority_kind as the anchor."""
+    present = [k for k in AUTHORITY_ANCHOR_FIELDS if k in ctx.fm]
+    if present and "authority_kind" not in ctx.fm:
+        return [("authority-kind-anchor", ctx.rel,
+                 "authority metadata present without authority_kind: "
+                 + ", ".join(present))]
+    return []
+
+
+def check_authority_ref_required(ctx):
+    """authority_kind values other than none require a non-empty authority_ref."""
+    kind = fm_scalar(ctx.fm.get("authority_kind"))
+    if kind in VALID_AUTHORITY_KIND and kind != "none" and not fm_scalar(ctx.fm.get("authority_ref")):
+        return [("authority-ref-required", ctx.rel,
+                 f"authority_ref required when authority_kind is '{kind}'")]
+    return []
+
+
+def check_authority_ref_shape(ctx):
+    """authority_ref shape and cheap existence checks by authority_kind."""
+    fails = []
+    if "authority_kind" not in ctx.fm:
+        return fails
+    kind = fm_scalar(ctx.fm.get("authority_kind"))
+    if kind not in VALID_AUTHORITY_KIND:
+        return fails
+    ref = fm_scalar(ctx.fm.get("authority_ref"))
+
+    if kind == "none":
+        if ref:
+            fails.append(("authority-ref-shape", ctx.rel,
+                          "authority_kind 'none' requires authority_ref to be absent or empty"))
+        return fails
+    if not ref:
+        return fails  # authority-ref-required reports the missing value.
+
+    if kind == "raw-source":
+        if not ref.startswith("raw/"):
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"raw-source authority_ref '{ref}' must start with raw/"))
+        elif not Path(ref).exists():
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"raw-source authority_ref '{ref}' does not exist"))
+    elif kind == "source-page":
+        if not (ref.startswith("wiki/sources/") and ref.endswith(".md")):
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"source-page authority_ref '{ref}' must be wiki/sources/*.md"))
+        elif not Path(ref).exists():
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"source-page authority_ref '{ref}' does not exist"))
+    elif kind == "owner-page":
+        if not (ref.startswith("wiki/") and ref.endswith(".md")):
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"owner-page authority_ref '{ref}' must be wiki/*.md"))
+        elif ref.startswith("wiki/sources/"):
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"owner-page authority_ref '{ref}' must not be under wiki/sources/"))
+        elif not Path(ref).exists():
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"owner-page authority_ref '{ref}' does not exist"))
+    elif kind == "external-url":
+        if not (ref.startswith("http://") or ref.startswith("https://")):
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"external-url authority_ref '{ref}' must start with http:// or https://"))
+    elif kind == "local-resource":
+        candidate = Path(ref)
+        if ref.lower().startswith("source:"):
+            return fails
+        if candidate.is_absolute() or ".." in candidate.parts or not candidate.exists():
+            fails.append(("authority-ref-shape", ctx.rel,
+                          f"local-resource authority_ref '{ref}' must exist under the repo root or start with source:"))
+    elif kind == "mixed":
+        # Non-empty is the first-build contract; authority-ref-required already
+        # checked that, and deeper parsing is intentionally deferred.
+        return fails
+    return fails
+
+
+def check_source_page_authority(ctx):
+    """Source pages with authority metadata stay immutable source summaries."""
+    if ctx.folder != "sources" or not any(k in ctx.fm for k in AUTHORITY_METADATA_FIELDS):
+        return []
+    fails = []
+    kind = fm_scalar(ctx.fm.get("authority_kind"))
+    if kind in VALID_AUTHORITY_KIND and kind not in {"raw-source", "external-url", "mixed"}:
+        fails.append(("source-page-authority", ctx.rel,
+                      "source pages with authority metadata must use raw-source, external-url, or mixed"))
+    freshness = fm_scalar(ctx.fm.get("authority_freshness"))
+    if freshness in VALID_AUTHORITY_FRESHNESS and freshness != "immutable-source":
+        fails.append(("source-page-authority", ctx.rel,
+                      "source pages may only set authority_freshness to immutable-source"))
+    return fails
+
+
+def check_predictive_review_enrollment(ctx):
+    """Predictive authority metadata must enroll in the review_by loop."""
+    if fm_scalar(ctx.fm.get("authority_freshness")) == "predictive" and not ctx.fm.get("review_by"):
+        return [("predictive-review-enrollment", ctx.rel,
+                 "authority_freshness 'predictive' requires review_by")]
+    return []
+
+
 def check_source_refs(ctx):
     """Provenance refs in the sources: value must resolve. The scan is scoped to
     the sources line(s), not the whole frontmatter block, so a raw/ token inside
@@ -739,6 +900,12 @@ TIER1_PAGE_CHECKS = (
     check_confidence_value,
     check_source_type_placement,
     check_dates,
+    check_authority_field_values,
+    check_authority_kind_anchor,
+    check_authority_ref_required,
+    check_authority_ref_shape,
+    check_source_page_authority,
+    check_predictive_review_enrollment,
     check_source_refs,
     check_dangling_links,
     check_related_labels,
@@ -822,7 +989,7 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates):
     else:
         referenced = []
         for key in ("accepted_orphans", "hub_pages", "reviewed_confidence_low",
-                    "reviewed_quotes"):
+                    "reviewed_quotes", "reviewed_authority_missing"):
             referenced += [e["page"] for e in raw.get(key, [])]
         for key in ("skipped_crossref_pairs", "reviewed_near_duplicates"):
             for e in raw.get(key, []):
@@ -958,7 +1125,7 @@ def load_adjudications():
     empty = {
         "orphans": set(), "hubs": set(), "pairs": set(),
         "confidence": set(), "duplicates": set(), "quotes": set(),
-        "recompile": set(),
+        "recompile": set(), "authority_missing": set(),
     }
     raw, err = read_adjudications()
     if not raw:
@@ -974,6 +1141,7 @@ def load_adjudications():
                    for e in raw.get("reviewed_quotes", [])},
         "recompile": {(e["pair"][0], e["pair"][1])
                       for e in raw.get("reviewed_recompile_candidates", [])},
+        "authority_missing": {e["page"] for e in raw.get("reviewed_authority_missing", [])},
     }
 
 
@@ -1076,10 +1244,12 @@ class Tier2Context:
                 text = ""
             fm, body = split_frontmatter(text)
             ab = authored_body(body)
-            dates = [d for d in (frontmatter_updated_date(fm), latest_status_date(text))
+            status_date = latest_status_date(text)
+            dates = [d for d in (frontmatter_updated_date(fm), status_date)
                      if d is not None]
             self.data[p] = {
                 "fm": fm or {},
+                "status_date": status_date,
                 "freshness": max(dates) if dates else None,
                 "tokens": tokens(ab),
                 "words": len(re.findall(r"\w+", ab)),
@@ -1312,6 +1482,44 @@ def signal_recompile_candidates(ctx):
     return out, suppressed
 
 
+def signal_authority_missing(ctx):
+    """Pages likely needing authority metadata but lacking authority_kind.
+
+    The template version only uses generic signals available in every configured
+    wiki: dated Status notes and review_by checkpoints. Domain-specific owner
+    registries can add stricter checks later through an explicit tooling change.
+    """
+    candidates = []
+    suppressed = 0
+    for p in sorted(ctx.pages):
+        rel = str(p.relative_to(WIKI_ROOT))
+        if p.parent.name == "sources":
+            continue
+        fm = ctx.data[p]["fm"]
+        if "authority_kind" in fm:
+            continue
+
+        priority = None
+        reason = None
+        if ctx.data[p].get("status_date") is not None:
+            priority = 0
+            reason = "has dated Status note"
+        elif fm.get("review_by"):
+            priority = 1
+            reason = "has review_by"
+        if reason is None:
+            continue
+
+        if rel in ctx.adj["authority_missing"]:
+            ctx.adj_used["authority_missing"].add(rel)
+            suppressed += 1
+            continue
+        candidates.append((priority, rel, reason))
+
+    out = [f"{rel}: {reason}" for _priority, rel, reason in sorted(candidates)]
+    return out, suppressed
+
+
 def signal_review_by_missing(ctx):
     """Decisions with no `review_by` date (outcome-review enrollment).
 
@@ -1404,6 +1612,7 @@ def signal_adjudication_dead(ctx):
         "pairs": "skipped_crossref_pairs", "confidence": "reviewed_confidence_low",
         "duplicates": "reviewed_near_duplicates", "quotes": "reviewed_quotes",
         "recompile": "reviewed_recompile_candidates",
+        "authority_missing": "reviewed_authority_missing",
     }
     for key, category in names.items():
         dead = ctx.adj[key] - ctx.adj_used[key]
@@ -1430,6 +1639,7 @@ TIER2_SIGNALS = (
     ("log_rotation_due", "log rotation due", signal_log_rotation_due),
     ("sourcing_queue_count_drift", "sourcing queue entity count drift", signal_sourcing_queue_count_drift),
     ("recompile_candidates", "compiled pages with newer source inputs (review for no-change, small update, or recompile)", signal_recompile_candidates),
+    ("authority_missing", "pages likely needing authority metadata but lacking authority_kind", signal_authority_missing),
     ("review_by_missing", "decisions with no review_by (enroll in the outcome-review loop or leave for now)", signal_review_by_missing),
     ("review_due", "outcome reviews due (review_by has passed; run the review workflow)", signal_review_due),
     ("synthesis_due", "ingest burst with no synthesis pass following (consider a synthesize run)", signal_synthesis_due),

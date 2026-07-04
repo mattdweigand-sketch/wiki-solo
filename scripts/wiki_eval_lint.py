@@ -84,9 +84,18 @@ def add_index_row(root, rel, summary):
 def write_adjudications(root, **kwargs):
     base = {"accepted_orphans": [], "hub_pages": [], "skipped_crossref_pairs": [],
             "reviewed_confidence_low": [], "reviewed_near_duplicates": [],
-            "reviewed_quotes": [], "reviewed_recompile_candidates": []}
+            "reviewed_quotes": [], "reviewed_recompile_candidates": [],
+            "reviewed_authority_missing": []}
     base.update(kwargs)
     (root / "scripts" / "lint-adjudications.json").write_text(json.dumps(base))
+
+
+def add_authority(root, rel, *lines):
+    p = root / rel
+    t = p.read_text()
+    marker = "confidence: medium\n"
+    assert marker in t, f"fixture drift: no confidence marker in {rel}"
+    p.write_text(t.replace(marker, marker + "\n".join(lines) + "\n", 1))
 
 
 
@@ -242,10 +251,116 @@ run_case(
     expect_code=1, expect=("date", "real calendar date"),
 )
 run_case(
+    "invalid-authority-kind-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: stale-source"),
+    expect_code=1, expect=("authority-field-values", "authority_kind 'stale-source'"),
+)
+run_case(
+    "invalid-authority-freshness-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: none",
+                            "authority_freshness: always-fresh"),
+    expect_code=1, expect=("authority-field-values",
+                           "authority_freshness 'always-fresh'"),
+)
+run_case(
+    "nonboolean-verify-before-action-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: none",
+                            "verify_before_action: yes"),
+    expect_code=1, expect=("authority-field-values",
+                           "verify_before_action must be true or false"),
+)
+run_case(
+    "malformed-last-verified-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: none",
+                            "last_verified: 2026/07/04"),
+    expect_code=1, expect=("authority-field-values",
+                           "last_verified '2026/07/04'"),
+)
+run_case(
+    "authority-field-without-kind-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_ref: wiki/sources/gamma.md"),
+    expect_code=1, expect=("authority-kind-anchor",
+                           "authority metadata present without authority_kind"),
+)
+run_case(
+    "authority-ref-required-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: source-page"),
+    expect_code=1, expect=("authority-ref-required",
+                           "authority_ref required"),
+)
+run_case(
+    "authority-raw-source-missing-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: raw-source",
+                            "authority_ref: raw/notes/missing-authority.md"),
+    expect_code=1, expect=("authority-ref-shape",
+                           "raw/notes/missing-authority.md"),
+)
+run_case(
+    "source-page-current-state-authority-fires",
+    lambda r: (
+        (r / "raw" / "notes").mkdir(parents=True),
+        (r / "raw" / "notes" / "source-authority.md").write_text("raw fixture"),
+        add_authority(r, "wiki/sources/gamma.md",
+                      "authority_kind: raw-source",
+                      "authority_ref: raw/notes/source-authority.md",
+                      "authority_freshness: current-state"),
+    ),
+    expect_code=1, expect=("source-page-authority",
+                           "authority_freshness to immutable-source"),
+)
+run_case(
+    "predictive-authority-without-review-by-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: source-page",
+                            "authority_ref: wiki/sources/gamma.md",
+                            "authority_freshness: predictive"),
+    expect_code=1, expect=("predictive-review-enrollment",
+                           "requires review_by"),
+)
+run_case(
+    "authority-none-with-ref-fires",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: none",
+                            "authority_ref: wiki/sources/gamma.md"),
+    expect_code=1, expect=("authority-ref-shape",
+                           "authority_kind 'none'"),
+)
+run_case(
+    "valid-source-page-authority-passes",
+    lambda r: (
+        (r / "raw" / "notes").mkdir(parents=True),
+        (r / "raw" / "notes" / "source-authority.md").write_text("raw fixture"),
+        add_authority(r, "wiki/sources/gamma.md",
+                      "authority_kind: raw-source",
+                      "authority_ref: raw/notes/source-authority.md"),
+    ),
+)
+run_case(
+    "valid-owner-page-authority-passes",
+    lambda r: add_authority(r, "wiki/concepts/alpha.md",
+                            "authority_kind: owner-page",
+                            "authority_ref: wiki/concepts/beta.md",
+                            "verify_before_action: true"),
+)
+run_case(
     "adjudication-stale-fires",
     lambda r: write_adjudications(r, accepted_orphans=[
         {"page": "sources/renamed-away.md", "reason": "x", "date": "2026-06-11"}]),
     expect_code=1, expect=("adjudication-stale", "renamed-away"),
+)
+run_case(
+    "adjudication-stale-fires-reviewed-authority-missing",
+    lambda r: write_adjudications(r, reviewed_authority_missing=[
+        {"page": "concepts/renamed-authority.md", "reason": "x",
+         "date": "2026-07-04"}]),
+    expect_code=1, expect=("adjudication-stale", "renamed-authority"),
 )
 run_case(
     # reviewed_quotes carries a 'page' field like the other entity-page keys, so a
@@ -648,6 +763,35 @@ run_case(
         append(r, "wiki/sources/gamma.md", "\n- Related: [[epsilon]]\n"),
     ),
     args=(), absent=("sources/gamma.md (page 2026-06-01): newer sources: sources/epsilon.md",),
+)
+
+# ---- Tier 2: authority metadata adoption ----
+run_case(
+    "authority-missing-status-note-fires",
+    lambda r: append(r, "wiki/concepts/alpha.md",
+                     "\n**Status (2026-06-15):** Alpha is currently active.\n"),
+    args=(), expect=("pages likely needing authority metadata",
+                     "concepts/alpha.md: has dated Status note"),
+)
+run_case(
+    "authority-missing-review-by-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md", "confidence: medium",
+                   "confidence: medium\nreview_by: 2026-12-31"),
+    args=(), expect=("pages likely needing authority metadata",
+                     "concepts/alpha.md: has review_by"),
+)
+run_case(
+    "authority-missing-suppressed-by-adjudication",
+    lambda r: (
+        append(r, "wiki/concepts/alpha.md",
+               "\n**Status (2026-06-15):** Alpha is currently active.\n"),
+        write_adjudications(r, reviewed_authority_missing=[
+            {"page": "concepts/alpha.md", "reason": "fixture no-change",
+             "date": "2026-07-04"}]),
+    ),
+    args=(), expect=("suppressed",),
+    absent=("concepts/alpha.md: has dated Status note",
+            "reviewed_authority_missing: concepts/alpha.md"),
 )
 
 # ---- Tier 2: candidates and suppression ----
@@ -1084,7 +1228,7 @@ run_case(
     lambda r: (
         seed_decision_without_review_by(r),
         edit(r, "wiki/decisions/target.md", "confidence: medium",
-             "confidence: medium\nreview_by: 2026-12-31"),
+             "confidence: medium\nauthority_kind: none\nreview_by: 2026-12-31"),
     ),
     args=(), expect_code=0,
     absent=("decisions/target.md",),

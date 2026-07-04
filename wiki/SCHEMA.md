@@ -48,6 +48,59 @@ agent_use_cases:                  # which downstream-agent questions this page i
 
 `review_by` is optional on most pages and recommended when a claim, forecast, or decision should be graded against future outcomes. Decisions should carry a `review_by` checkpoint unless there is a clear reason not to enroll them in the outcome-review loop.
 
+Optional authority metadata:
+
+- `authority_kind: raw-source | source-page | owner-page | external-url | local-resource | mixed | none`
+- `authority_ref: <repo-relative path, URL, or short prose for mixed/local-resource>`
+- `authority_freshness: immutable-source | stable-meaning | current-state | event-log | predictive | deprecated`
+- `verify_before_action: true | false`
+- `last_verified: YYYY-MM-DD`
+
+`sources:` is provenance: what evidence produced the page. `authority_*` is current truth: what an agent should trust or re-check before acting on volatile claims. Adoption is incremental; these fields are optional, but `authority_kind` is required whenever any other authority field is present.
+
+`authority_ref` always uses full repo-relative paths or URLs, never the bare-slug shorthand accepted by `sources:`. Use `raw/...` for raw artifacts, `wiki/sources/name.md` for source pages, `wiki/<folder>/name.md` for owner pages, `http://` or `https://` for external authority, and `source:` prose only for mixed/local-resource cases where one deterministic path is not enough.
+
+Freshness defaults guide authoring; lint does not infer them. Write `authority_freshness` only when the page differs from its type default, acts as the owner for live/current state, or is explicitly predictive/deprecated.
+
+| authority_freshness | Default for |
+|---|---|
+| `immutable-source` | `sources/` pages |
+| `stable-meaning` | `concepts/`, `people/`, settled `decisions/` |
+| `current-state` | live `products/`, `features/`, `initiatives/`, `metrics/`, or other configured owner pages |
+| `event-log` | ledger-style pages where newest dated entry matters |
+| `predictive` | opt-in forward-looking `analyses/` or `decisions/`; requires `review_by` |
+| `deprecated` | no default; always explicit |
+
+Source page example (`raw-source` authority; `authority_freshness` stays omitted because `immutable-source` is the `sources/` type default):
+
+```yaml
+type: source
+source_type: strategy-doc
+sources: [raw/strategy/q3-product-strategy.md]
+authority_kind: raw-source
+authority_ref: raw/strategy/q3-product-strategy.md
+```
+
+Compiled page pointing at a source-page authority:
+
+```yaml
+type: concept
+sources: [q3-product-strategy]
+authority_kind: source-page
+authority_ref: wiki/sources/q3-product-strategy.md
+```
+
+Current-state owner example:
+
+```yaml
+type: initiative
+authority_kind: mixed
+authority_ref: "source: launch owner page, linked source pages, and latest status notes"
+authority_freshness: current-state
+verify_before_action: true
+last_verified: 2026-07-04
+```
+
 Followed by:
 1. **One-line summary** (used in `index.md` and in agent-retrieved snippets)
 2. **Body** — structured with headers, lists, and tables
