@@ -1,6 +1,6 @@
 # Wiki Eval
 
-Run this workflow when the task is to verify the wiki system itself: scripts, gates, ledgers, backlink rebuilds, export behavior, wrapper parity, and the deterministic Tier-1 gate. The `SUITES` registry in `scripts/wiki_eval.py` is the authoritative list of what runs.
+Run this workflow when the task is to verify the wiki system itself: scripts, gates, ledgers, backlink rebuilds, export behavior, stale-text sweep proof, wrapper parity, and the deterministic Tier-1 gate. The `SUITES` registry in `scripts/wiki_eval.py` is the authoritative list of what runs.
 
 This is different from `/wiki-lint`: lint checks wiki content; eval checks the tools that check and protect the wiki.
 

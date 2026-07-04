@@ -25,6 +25,7 @@ SUITES = {
     "export": [sys.executable, "scripts/wiki_eval_export.py"],
     "rotate-log": [sys.executable, "scripts/wiki_eval_rotate_log.py"],
     "review-due": [sys.executable, "scripts/wiki_eval_review.py"],
+    "stale-text-sweep": [sys.executable, "scripts/wiki_eval_stale_text_sweep.py"],
     "ledger-validators": [sys.executable, "scripts/wiki_eval_ledgers.py"],
     "wrapper-parity": [sys.executable, "scripts/wiki_eval_wrappers.py"],
     "tier1": [sys.executable, "scripts/lint.py", "--tier1"],

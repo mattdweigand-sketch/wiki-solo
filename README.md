@@ -78,11 +78,11 @@ The checks and guardrails that protect the corpus:
 | Route-first workflows | Point agents from `AGENTS.md` to `CONTEXT.md` to the right workflow, so they read the instructions that match the task. |
 | Sourcing queue | `wiki/sourcing-queue.md` tracks evidence gaps so weak claims become future work instead of disappearing. |
 | Contradiction tracking | Records conflicts in `wiki/contradictions.md` instead of overwriting inconvenient claims. |
-| Three-tier lint | `scripts/lint.py` reports two deterministic tiers: Tier 1 fails on broken structure; Tier 2 ranks suspicious patterns for review, including compiled pages with newer source inputs and pages likely needing authority metadata. Tier 3, genuine judgment, is left to the `/wiki-lint` prose workflow, not the script. |
+| Three-tier lint | `scripts/lint.py` reports two deterministic tiers: Tier 1 fails on broken structure and malformed proof; Tier 2 ranks suspicious patterns for review, including compiled pages with newer source inputs, glossary status language, and pages likely needing authority metadata. Tier 3, genuine judgment, is left to the `/wiki-lint` prose workflow, not the script. |
 | Evidence review | Full `/wiki-lint` adds sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Approval gate and ledger | `scripts/capture_gate.py` makes the agent ask before filing analyses, applying artifact promotions, or approving synthesis; `scripts/capture-runs.jsonl` records what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, the unified approval gate, ledger validation, export, log rotation, review due checks, wrapper parity, and Tier-1 lint over the live corpus. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, stale-text sweep proof, the unified approval gate, ledger validation, export, log rotation, review due checks, wrapper parity, and Tier-1 lint over the live corpus. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 

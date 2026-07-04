@@ -2,12 +2,22 @@
 title: Activity Log
 type: log
 created: 2026-05-17
-updated: 2026-07-03
+updated: 2026-07-04
 ---
 
 # Activity Log
 
 Append-only history of ingest, lint, query, and decision-capture sessions. Newest entries on top.
+
+---
+
+## [2026-07-04] maintenance | stale-status hardening parity
+
+Change: Ported the template-safe stale-status hardening from the personal wiki into `wiki-solo`: glossary volatile-status lint, structured stale-text sweep proof for new ingest logs, a read-only stale-text sweep helper, eval coverage, command-shape validation, and lint workflow doctrine for when signals should remain Tier 2.
+Reason: Keep the public template aligned with the maintained personal wiki mechanics while avoiding personal corpus content, configured-domain assumptions, current-state registries, or property-specific checks.
+Rejected alternative: Copy the personal repo content or promote broad stale/current-state judgment into hard deterministic gates.
+Accepted tradeoff: The helper and proof schema make stale sweeps auditable, while semantic completeness remains a review judgment.
+Validation: PASS - `py_compile`, targeted stale-text and lint evals, full `wiki_eval.py`, Tier-1 lint, full lint, approval-ledger validation, wrapper parity, export dry-run for 2026-07-04, and `git diff --check`.
 
 ---
 

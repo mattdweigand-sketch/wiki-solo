@@ -26,6 +26,7 @@ Vendor-neutral: stdlib only, no dependencies. Run from the repo root:
 import argparse
 import json
 import re
+import shlex
 import subprocess
 import sys
 from datetime import date
@@ -50,6 +51,9 @@ from review_due import collect as collect_review_due
 WIKI_ROOT = Path("wiki")
 ADJUDICATIONS_PATH = Path("scripts/lint-adjudications.json")
 LOG_ROTATION_WARN_LINES = 2500
+# Date-only log entries before this cutoff predate the structured stale-text
+# sweep proof template. Do not rewrite old history just to satisfy this check.
+STALE_SWEEP_PROOF_REQUIRED_FROM = date(2026, 7, 5)
 
 # META_PAGES is shared with rebuild_referenced_by.py via _wiki_parse, so the
 # corpus enumeration cannot drift between linter and rebuild.
@@ -106,6 +110,16 @@ RELATED_LABELS = {"Supports", "Contradicts", "Depends on", "Derived from", "Part
 MARKDOWN_MD_LINK_RE = re.compile(r"\]\(([^)]+?\.md(?:[?#][^)]*)?)\)")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 STATUS_RE = re.compile(r"\*\*Status(?: note)?\s*\((\d{4}-\d{2}-\d{2})\)")
+# Volatile status language in glossary entries. Glossary definitions are
+# durable by design; live status belongs on owner pages. File-level updated:
+# dates are too coarse to catch a single glossary entry that silently rots.
+VOLATILE_STATUS_RE = re.compile(
+    r"\b(still (?:missing|open|pending|owed|outstanding)|remains? open"
+    r"|not yet|tentative(?:ly)?|awaiting|in progress|up in the air"
+    r"|yet to be|to be determined|unresolved|pending)\b",
+    re.IGNORECASE,
+)
+GLOSSARY_BULLET_ENTRY_RE = re.compile(r"^-\s+\*\*(?P<term>[^*]+)\*\*\s+[-:]\s+(?P<body>.*)$")
 SOURCING_QUEUE_COUNT_MARKER_RE = re.compile(r"<!--\s*lint:entity-count\b(?P<attrs>.*?)-->")
 SOURCING_QUEUE_COUNT_MARKER_INTENT_RE = re.compile(
     r"<!--(?=[^>]*\blint\s*:\s*entity-counts?\b)[\s\S]*?-->"
@@ -492,6 +506,214 @@ def check_log_entry_headers():
     return fails
 
 
+def log_entries(text):
+    """Return recognized wiki/log.md entries with header metadata and body lines."""
+    entries = []
+    current = None
+    for line_no, line in enumerate(text.splitlines(), 1):
+        entry_date = parse_log_entry_date(line)
+        if entry_date is not None:
+            if current is not None:
+                entries.append(current)
+            current = {
+                "line": line_no,
+                "header": line,
+                "date": entry_date,
+                "type": parse_log_entry_type(line),
+                "body": [],
+            }
+        elif current is not None:
+            current["body"].append((line_no, line))
+    if current is not None:
+        entries.append(current)
+    return entries
+
+
+def split_stale_sweep_fields(payload):
+    """Split semicolon fields while allowing semicolons inside JSON strings."""
+    out = []
+    cur = []
+    in_string = False
+    escape = False
+    depth = 0
+    for ch in payload:
+        if in_string:
+            cur.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+            if depth < 0:
+                return [], "unbalanced JSON brackets"
+        elif ch == ";" and depth == 0:
+            out.append("".join(cur).strip())
+            cur = []
+            continue
+        cur.append(ch)
+    if in_string:
+        return [], "unterminated quoted string"
+    if depth != 0:
+        return [], "unbalanced JSON brackets"
+    out.append("".join(cur).strip())
+    return [x for x in out if x], None
+
+
+def json_string_array(value, field):
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as e:
+        return None, f"{field} must be a JSON array of strings: {e.msg}"
+    if not isinstance(parsed, list) or not all(isinstance(x, str) for x in parsed):
+        return None, f"{field} must be a JSON array of strings"
+    return parsed, None
+
+
+def validate_stale_sweep_command(command):
+    try:
+        parts = shlex.split(command)
+    except ValueError as e:
+        return f"commands entries must be shell-parseable: {e}"
+    if not parts or parts[0] != "rg":
+        return "commands entries must be rg evidence shaped like: rg -n -i -- '<phrase>' wiki"
+    try:
+        sep = parts.index("--")
+    except ValueError:
+        return "commands entries must include -- before the phrase"
+    flags = parts[1:sep]
+    if flags != ["-n", "-i"]:
+        return "commands entries must use exactly -n -i before --"
+    tail = parts[sep + 1:]
+    if len(tail) != 2:
+        return "commands entries must name exactly one phrase and the wiki root after --"
+    phrase, root = tail
+    if not phrase.strip():
+        return "commands entries must include a non-empty phrase"
+    if root.rstrip("/") != "wiki":
+        return "commands entries must search the wiki root (wiki or wiki/)"
+    return None
+
+
+def validate_stale_sweep_proof(line):
+    prefix = "Stale-text sweep:"
+    if not line.startswith(prefix):
+        return "line must start with 'Stale-text sweep:'"
+    payload = line[len(prefix):].strip()
+    if not payload:
+        return "missing status field"
+    segments, err = split_stale_sweep_fields(payload)
+    if err:
+        return err
+    fields = {}
+    for segment in segments:
+        if "=" not in segment:
+            return f"field segment missing '=': {segment!r}"
+        key, value = segment.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+        if not key:
+            return f"field segment has empty key: {segment!r}"
+        if key in fields:
+            return f"duplicate field '{key}'"
+        fields[key] = value
+
+    status = fields.get("status")
+    if status not in {"completed", "not_applicable"}:
+        return "status must be completed or not_applicable"
+
+    if status == "completed":
+        required = {
+            "status", "commands", "hit_count", "pages_fixed",
+            "historical_no_change_hits",
+        }
+        extra = set(fields) - required
+        missing = required - set(fields)
+        if missing:
+            return "completed proof missing field(s): " + ", ".join(sorted(missing))
+        if extra:
+            return "completed proof has unexpected field(s): " + ", ".join(sorted(extra))
+        commands, err = json_string_array(fields["commands"], "commands")
+        if err:
+            return err
+        if not commands:
+            return "commands must include at least one command string"
+        for command in commands:
+            err = validate_stale_sweep_command(command)
+            if err:
+                return err
+        for field in ("pages_fixed", "historical_no_change_hits"):
+            _parsed, err = json_string_array(fields[field], field)
+            if err:
+                return err
+        if not re.fullmatch(r"\d+", fields["hit_count"]):
+            return "hit_count must be a non-negative integer"
+        return None
+
+    required = {"status", "reason"}
+    extra = set(fields) - required
+    missing = required - set(fields)
+    if missing:
+        return "not_applicable proof missing field(s): " + ", ".join(sorted(missing))
+    if extra:
+        return "not_applicable proof has unexpected field(s): " + ", ".join(sorted(extra))
+    try:
+        reason = json.loads(fields["reason"])
+    except json.JSONDecodeError as e:
+        return f"reason must be a JSON string: {e.msg}"
+    if not isinstance(reason, str) or not reason.strip():
+        return "reason must be a non-empty JSON string"
+    return None
+
+
+def check_stale_sweep_proof_entries():
+    """New ingest log entries must carry parseable stale-text sweep evidence.
+
+    This validates the proof shape only. It deliberately does not decide whether
+    the search terms or hit classifications were semantically complete.
+    """
+    fails = []
+    path = WIKI_ROOT / "log.md"
+    if not path.exists():
+        return fails
+    try:
+        text = path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        return [("stale-sweep-proof", str(path), f"not valid UTF-8: {e}")]
+    for entry in log_entries(text):
+        if entry["type"] != "ingest":
+            continue
+        entry_date = date.fromisoformat(entry["date"])
+        if entry_date < STALE_SWEEP_PROOF_REQUIRED_FROM:
+            continue
+        proof_lines = [
+            (line_no, line) for line_no, line in entry["body"]
+            if line.startswith("Stale-text sweep:")
+        ]
+        if not proof_lines:
+            fails.append(("stale-sweep-proof", str(path),
+                          f"line {entry['line']}: ingest entry dated {entry['date']} "
+                          "is missing structured Stale-text sweep proof"))
+            continue
+        if len(proof_lines) > 1:
+            fails.append(("stale-sweep-proof", str(path),
+                          f"line {entry['line']}: ingest entry has multiple "
+                          "Stale-text sweep proof lines"))
+        for line_no, line in proof_lines:
+            err = validate_stale_sweep_proof(line)
+            if err:
+                fails.append(("stale-sweep-proof", str(path),
+                              f"line {line_no}: {err}"))
+    return fails
+
+
 def read_adjudications():
     """Parse and shape-validate the adjudication file.
 
@@ -515,7 +737,7 @@ def read_adjudications():
         "accepted_orphans", "hub_pages", "skipped_crossref_pairs",
         "reviewed_confidence_low", "reviewed_near_duplicates",
         "reviewed_quotes", "reviewed_recompile_candidates",
-        "reviewed_authority_missing",
+        "reviewed_authority_missing", "reviewed_glossary_volatile",
     }
     unknown = sorted(k for k in set(raw) - known_keys if not k.startswith("_"))
     if unknown:
@@ -538,6 +760,11 @@ def read_adjudications():
         if not (isinstance(e, dict) and isinstance(e.get("page"), str)
                 and isinstance(e.get("quote"), str)):
             return {}, "every 'reviewed_quotes' entry needs string 'page' and 'quote' fields"
+    for e in raw.get("reviewed_glossary_volatile", []):
+        if not (isinstance(e, dict) and isinstance(e.get("term"), str)
+                and isinstance(e.get("phrase"), str)):
+            return {}, ("every 'reviewed_glossary_volatile' entry needs "
+                        "string 'term' and 'phrase' fields")
     return raw, None
 
 
@@ -921,6 +1148,7 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates):
     fails.extend(check_stray_tool_tags())
     fails.extend(check_sourcing_queue_count_markers())
     fails.extend(check_log_entry_headers())
+    fails.extend(check_stale_sweep_proof_entries())
 
     def rel(p):
         return str(p.relative_to(WIKI_ROOT))
@@ -1012,6 +1240,18 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates):
             elif Path(source).parent.name != "sources":
                 fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
                               f"recompile source page must be under sources/: '{source}'"))
+        gv_entries = raw.get("reviewed_glossary_volatile", [])
+        if gv_entries:
+            glossary_terms = {term for term, _line in glossary_entry_lines()}
+            for e in gv_entries:
+                if e["term"] not in glossary_terms:
+                    fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
+                                  "glossary_volatile entry references missing "
+                                  f"glossary term '{e['term']}'"))
+                if not VOLATILE_STATUS_RE.fullmatch(e["phrase"]):
+                    fails.append(("adjudication-stale", str(ADJUDICATIONS_PATH),
+                                  f"glossary_volatile phrase '{e['phrase']}' is "
+                                  "not in the volatile-language vocabulary"))
 
     seen = set()
     deduped = []
@@ -1116,6 +1356,35 @@ def quote_mismatches(entity_pages, adjudicated_quotes, used=None):
 
 # --------------------------- Tier 2 ---------------------------
 
+def glossary_entry_lines():
+    """Yield (term, line) for every non-fenced body line of each glossary entry.
+
+    The template's starter glossary uses bold bullet entries, while the durable
+    entry template uses `### Term` headings. Support both so the lint signal
+    protects current starter content and future configured entries.
+    """
+    path = WIKI_ROOT / "glossary.md"
+    if not path.exists():
+        return
+    term = None
+    in_fence = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.lstrip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        if line.startswith("### "):
+            term = line[4:].strip()
+            continue
+        bullet = GLOSSARY_BULLET_ENTRY_RE.match(line)
+        if bullet:
+            yield bullet.group("term").strip(), bullet.group("body")
+            continue
+        if term is not None:
+            yield term, line
+
+
 def load_adjudications():
     """Settled Tier-2 judgments, held as data so lint stops re-surfacing them.
 
@@ -1126,6 +1395,7 @@ def load_adjudications():
         "orphans": set(), "hubs": set(), "pairs": set(),
         "confidence": set(), "duplicates": set(), "quotes": set(),
         "recompile": set(), "authority_missing": set(),
+        "glossary_volatile": set(),
     }
     raw, err = read_adjudications()
     if not raw:
@@ -1142,6 +1412,8 @@ def load_adjudications():
         "recompile": {(e["pair"][0], e["pair"][1])
                       for e in raw.get("reviewed_recompile_candidates", [])},
         "authority_missing": {e["page"] for e in raw.get("reviewed_authority_missing", [])},
+        "glossary_volatile": {(e["term"], e["phrase"].lower())
+                              for e in raw.get("reviewed_glossary_volatile", [])},
     }
 
 
@@ -1482,6 +1754,31 @@ def signal_recompile_candidates(ctx):
     return out, suppressed
 
 
+def signal_glossary_volatile_status(ctx):
+    """Glossary entries restating volatile status.
+
+    Definitions should be durable. When a glossary entry says something is
+    still pending or remains open, the claim can rot without any source page
+    changing. Resolve by rewriting to a dated fact or delegating to the owner
+    page. Adjudicate only durable definitional or rhetorical usage.
+    """
+    out = []
+    suppressed = 0
+    hits = dict.fromkeys(
+        (term, m.group(0).lower())
+        for term, line in glossary_entry_lines()
+        for m in VOLATILE_STATUS_RE.finditer(line)
+    )
+    for term, phrase in hits:
+        if (term, phrase) in ctx.adj["glossary_volatile"]:
+            ctx.adj_used["glossary_volatile"].add((term, phrase))
+            suppressed += 1
+            continue
+        out.append(f"glossary.md '{term}': \"{phrase}\" (rewrite to a dated "
+                   "fact or delegate to the owner page)")
+    return out, suppressed
+
+
 def signal_authority_missing(ctx):
     """Pages likely needing authority metadata but lacking authority_kind.
 
@@ -1613,6 +1910,7 @@ def signal_adjudication_dead(ctx):
         "duplicates": "reviewed_near_duplicates", "quotes": "reviewed_quotes",
         "recompile": "reviewed_recompile_candidates",
         "authority_missing": "reviewed_authority_missing",
+        "glossary_volatile": "reviewed_glossary_volatile",
     }
     for key, category in names.items():
         dead = ctx.adj[key] - ctx.adj_used[key]
@@ -1639,6 +1937,7 @@ TIER2_SIGNALS = (
     ("log_rotation_due", "log rotation due", signal_log_rotation_due),
     ("sourcing_queue_count_drift", "sourcing queue entity count drift", signal_sourcing_queue_count_drift),
     ("recompile_candidates", "compiled pages with newer source inputs (review for no-change, small update, or recompile)", signal_recompile_candidates),
+    ("glossary_volatile_status", "glossary entries restating volatile status (rewrite to a dated fact or delegate to the owner page)", signal_glossary_volatile_status),
     ("authority_missing", "pages likely needing authority metadata but lacking authority_kind", signal_authority_missing),
     ("review_by_missing", "decisions with no review_by (enroll in the outcome-review loop or leave for now)", signal_review_by_missing),
     ("review_due", "outcome reviews due (review_by has passed; run the review workflow)", signal_review_due),

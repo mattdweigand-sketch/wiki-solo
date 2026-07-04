@@ -85,7 +85,7 @@ def write_adjudications(root, **kwargs):
     base = {"accepted_orphans": [], "hub_pages": [], "skipped_crossref_pairs": [],
             "reviewed_confidence_low": [], "reviewed_near_duplicates": [],
             "reviewed_quotes": [], "reviewed_recompile_candidates": [],
-            "reviewed_authority_missing": []}
+            "reviewed_authority_missing": [], "reviewed_glossary_volatile": []}
     base.update(kwargs)
     (root / "scripts" / "lint-adjudications.json").write_text(json.dumps(base))
 
@@ -765,6 +765,102 @@ run_case(
     args=(), absent=("sources/gamma.md (page 2026-06-01): newer sources: sources/epsilon.md",),
 )
 
+# ---- Tier 2: volatile status language in glossary entries ----
+GLOSSARY_VOLATILE_LABEL = (
+    "glossary entries restating volatile status "
+    "(rewrite to a dated fact or delegate to the owner page)"
+)
+
+
+def seed_glossary(root, body):
+    (root / "wiki" / "glossary.md").write_text("# Glossary\n\n" + body)
+
+
+run_case(
+    "glossary-volatile-fires",
+    lambda r: seed_glossary(
+        r,
+        "### Alpha Term\n**Definition:** The escrow question remains open.\n",
+    ),
+    args=(),
+    expect=("glossary.md 'Alpha Term': \"remains open\" (rewrite to a dated "
+            "fact or delegate to the owner page)",),
+)
+run_case(
+    "glossary-volatile-bullet-entry-fires",
+    lambda r: seed_glossary(
+        r,
+        "## Operating Terms\n\n"
+        "- **Alpha Term** - The launch decision is still pending.\n",
+    ),
+    args=(),
+    expect=("glossary.md 'Alpha Term': \"still pending\" (rewrite to a dated "
+            "fact or delegate to the owner page)",),
+)
+run_case(
+    "glossary-volatile-boundary-fence-preamble-pass",
+    lambda r: seed_glossary(
+        r,
+        "Preamble text: remains open.\n\n"
+        "### Alpha Term\n**Definition:** The spending reserve; "
+        "policy issued 2026-06-30.\n\n"
+        "```\n### Example\nremains open\n```\n",
+    ),
+    args=(),
+    expect=(GLOSSARY_VOLATILE_LABEL + ": 0",),
+)
+run_case(
+    "glossary-volatile-suppressed-by-adjudication",
+    lambda r: (
+        seed_glossary(
+            r,
+            "### Alpha Term\n**Definition:** ARR not yet recognized as revenue.\n",
+        ),
+        write_adjudications(r, reviewed_glossary_volatile=[
+            {"term": "Alpha Term", "phrase": "not yet",
+             "reason": "fixture definitional usage", "date": "2026-07-04"}]),
+    ),
+    args=(),
+    expect=(GLOSSARY_VOLATILE_LABEL + ": 0", "suppressed"),
+    absent=("glossary.md 'Alpha Term'",),
+)
+run_case(
+    "glossary-volatile-adjudication-missing-term-fires",
+    lambda r: (
+        seed_glossary(r, "### Alpha Term\n**Definition:** Fixture.\n"),
+        write_adjudications(r, reviewed_glossary_volatile=[
+            {"term": "Renamed Away", "phrase": "not yet",
+             "reason": "fixture", "date": "2026-07-04"}]),
+    ),
+    expect_code=1,
+    expect=("adjudication-stale", "missing glossary term"),
+)
+run_case(
+    "glossary-volatile-adjudication-bad-phrase-fires",
+    lambda r: (
+        seed_glossary(r, "### Alpha Term\n**Definition:** Fixture.\n"),
+        write_adjudications(r, reviewed_glossary_volatile=[
+            {"term": "Alpha Term", "phrase": "banana",
+             "reason": "fixture", "date": "2026-07-04"}]),
+    ),
+    expect_code=1,
+    expect=("not in the volatile-language vocabulary",),
+)
+run_case(
+    "glossary-volatile-dead-adjudication-reported",
+    lambda r: (
+        seed_glossary(
+            r,
+            "### Alpha Term\n**Definition:** Fixture with no volatile language.\n",
+        ),
+        write_adjudications(r, reviewed_glossary_volatile=[
+            {"term": "Alpha Term", "phrase": "not yet",
+             "reason": "fixture", "date": "2026-07-04"}]),
+    ),
+    args=(),
+    expect=("reviewed_glossary_volatile: Alpha Term -> not yet",),
+)
+
 # ---- Tier 2: authority metadata adoption ----
 run_case(
     "authority-missing-status-note-fires",
@@ -1186,6 +1282,100 @@ run_case(
         "```\n## [2026-06-02] fenced example\n```\n",
     ),
     expect_code=1, expect=("log-entry-header", "fenced '## ' line"),
+)
+
+# ---- Tier 1: structured stale-text sweep proof on new ingest log entries ----
+run_case(
+    "stale-sweep-completed-proof-passes-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] ingest | fixture source\n"
+        "Stale-text sweep: status=completed; "
+        "commands=[\"rg -n -i -- 'old wording' wiki/\"]; "
+        "hit_count=0; pages_fixed=[]; historical_no_change_hits=[]\n",
+    ),
+)
+run_case(
+    "stale-sweep-not-applicable-proof-passes-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] ingest | fixture source\n"
+        'Stale-text sweep: status=not_applicable; '
+        'reason="source did not resolve an open current-state claim"\n',
+    ),
+)
+run_case(
+    "stale-sweep-missing-hit-count-fails-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] ingest | fixture source\n"
+        "Stale-text sweep: status=completed; "
+        "commands=[\"rg -n -i -- 'old wording' wiki/\"]; "
+        "pages_fixed=[]; historical_no_change_hits=[]\n",
+    ),
+    expect_code=1,
+    expect=("stale-sweep-proof", "missing field(s): hit_count"),
+)
+run_case(
+    "stale-sweep-malformed-json-array-fails-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] ingest | fixture source\n"
+        "Stale-text sweep: status=completed; commands=[rg -n -i old wiki/]; "
+        "hit_count=1; pages_fixed=[]; historical_no_change_hits=[]\n",
+    ),
+    expect_code=1,
+    expect=("stale-sweep-proof", "commands must be a JSON array of strings"),
+)
+run_case(
+    "stale-sweep-non-rg-command-fails-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] ingest | fixture source\n"
+        "Stale-text sweep: status=completed; "
+        "commands=[\"echo stale sweep passed\"]; hit_count=0; "
+        "pages_fixed=[]; historical_no_change_hits=[]\n",
+    ),
+    expect_code=1,
+    expect=("stale-sweep-proof", "commands entries must be rg evidence"),
+)
+run_case(
+    "stale-sweep-wrong-root-fails-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] ingest | fixture source\n"
+        "Stale-text sweep: status=completed; "
+        "commands=[\"rg -n -i -- 'old wording' raw\"]; hit_count=0; "
+        "pages_fixed=[]; historical_no_change_hits=[]\n",
+    ),
+    expect_code=1,
+    expect=("stale-sweep-proof", "commands entries must search the wiki root"),
+)
+run_case(
+    "stale-sweep-extra-rg-flag-fails-tier1",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] ingest | fixture source\n"
+        "Stale-text sweep: status=completed; "
+        "commands=[\"rg -n -i -g '!*' -- 'old wording' wiki\"]; hit_count=0; "
+        "pages_fixed=[]; historical_no_change_hits=[]\n",
+    ),
+    expect_code=1,
+    expect=("stale-sweep-proof", "commands entries must use exactly -n -i"),
+)
+run_case(
+    "stale-sweep-old-pre-cutoff-ingest-ignored",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-04] ingest | fixture source\nBody.\n",
+    ),
+)
+run_case(
+    "stale-sweep-non-ingest-log-entry-ignored",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-07-05] maintenance | fixture pass\nBody.\n",
+    ),
 )
 
 # ---- Tier 2: review_by enrollment for decisions ----

@@ -55,8 +55,8 @@ The main control mechanisms are:
 | Route-first loading | Start with `AGENTS.md`, check `wiki/domain.md`, route through `CONTEXT.md`, then open only the selected workflow and its Load / Skip list. |
 | Schema and citations | `wiki/SCHEMA.md` defines page types, frontmatter, source types, confidence values, authority metadata, and citation rules. Specific facts cite `wiki/sources/` pages. |
 | Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`. |
-| Deterministic lint | `scripts/lint.py --tier1` catches structural failures. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, log rotation, review due, and wrapper parity. |
+| Deterministic lint | `scripts/lint.py --tier1` catches structural failures and malformed proof. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, stale-text sweep proof, log rotation, review due, and wrapper parity. |
 | Outcome review | `scripts/review_due.py` surfaces due `review_by` checkpoints; `workflows/maintenance/review.md` records what happened and whether confidence changes. |
 | Sourcing queue | `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers. `workflows/maintenance/refresh-sourcing-queue.md` can reprioritize it when needed. |
 | Approval gate | `scripts/capture_gate.py` guards analysis capture, artifact-promotion apply routes, and reviewed synthesis promotion (`--kind=synthesis`), then records approved boundaries in `scripts/capture-runs.jsonl`. |

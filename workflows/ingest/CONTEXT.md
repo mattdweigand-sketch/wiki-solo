@@ -62,7 +62,36 @@ Create new entity pages as warranted by the active entity types in `wiki/domain.
 2. Update `wiki/index.md`: add new pages and refresh summaries of changed pages. Index rows must use Markdown links to folder-qualified page paths, such as `[page-slug](concepts/page-slug.md)`, because Tier-1 lint uses those links to verify coverage. Use `[[wikilinks]]` inside authored page bodies and `## Related pages`, not as the index coverage link.
 3. Update `wiki/overview.md` if the source shifts the big picture.
 
-## Step 6 - Rebuild inbound links
+## Step 6 - Stale-text sweep, rebuild, and lint
+
+If the source resolves something the corpus previously recorded as open,
+missing, or pending (for example: a policy issued, an invoice paid, or a
+decision made), the old current-state claim may be stale somewhere. Before
+final verification, prefer the read-only helper for the sweep, using two or
+three phrasings of the old wording across `wiki/`:
+
+```bash
+python3 scripts/stale_text_sweep.py --phrase "<old wording>" --phrase "<alternate wording>" --root wiki
+```
+
+Manual `rg -n -i -- <phrase> wiki/` sweeps remain acceptable when the helper is
+insufficient; keep the same command evidence in the log.
+
+Classify the hits before editing:
+
+- **Current owner pages and compiled pages:** update stale current-state text or
+  replace it with stable delegation to the owner page.
+- **Source pages:** preserve historical source-era claims unless the page's
+  current summary now misleads; if clarification is needed, keep the source
+  boundary and add later-source context.
+- **`wiki/log.md`:** preserve historical log entries; fix only a false
+  verification claim or a current maintenance note that is itself wrong.
+
+Record the actual command, hit count, pages fixed, and historical/no-change hits
+in the log entry using the structured `Stale-text sweep:` line in Step 8. Use
+executable evidence, not a pass/fail claim. The `glossary_volatile_status`
+signal in full lint backstops glossary entries specifically; the sweep covers
+every other page class.
 
 After all `[[wikilinks]]` are written, refresh the auto-generated `## Referenced by` sections:
 
@@ -78,7 +107,7 @@ Then run the deterministic Tier-1 gate:
 python3 scripts/lint.py --tier1
 ```
 
-Tier-1 is machine-checkable: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, index coverage, repo structure, raw/deliverables hygiene, and related structural rules. Treat failures as must-fix before logging.
+Tier-1 is machine-checkable: filename and frontmatter-key validity, type/folder match, invalid `confidence` or `source_type`, malformed dates, dangling `[[links]]`, index coverage, repo structure, raw/deliverables hygiene, structured stale-sweep proof, and related structural rules. Treat failures as must-fix before logging.
 
 Then run full lint and inspect Tier-2 findings only for pages touched by this ingest:
 
@@ -109,8 +138,15 @@ Append to `wiki/log.md`:
 Pages created: ...
 Pages updated: ...
 Key additions: ...
+Stale-text sweep: status=completed; commands=["rg -n -i -- '<phrase>' wiki/"]; hit_count=0; pages_fixed=[]; historical_no_change_hits=[]
 Contradictions flagged: ...
 Promotion audit: none | <recommended route>
+```
+
+If the source did not resolve an open/current-state claim, use this line instead:
+
+```text
+Stale-text sweep: status=not_applicable; reason="<why the source did not resolve an open/current-state claim>"
 ```
 
 A single ingest may touch 5-15 wiki pages. That is expected.
