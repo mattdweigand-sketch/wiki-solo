@@ -2,9 +2,9 @@
 
 `AGENTS.md` is canonical: it holds the folder map, conventions, and hard rules. This file routes a task to the right workspace. Do not read everything; find the task, open the workflow entry, and load only what it says to load.
 
-Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, `/wiki-export`, and `/wiki-swarm`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. Nothing here depends on any wrapper surface.
+Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, `/wiki-export`, and `/wiki-research`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. Nothing here depends on any wrapper surface.
 
-Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer, plus the explicit wiki-swarm overlay), and **maintenance** (lint, rotate-log, eval, artifact promotion, capture, sourcing queue, synthesize, review, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
+Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer, plus the explicit wiki-research overlay), and **maintenance** (lint, rotate-log, eval, artifact promotion, capture, sourcing queue, synthesize, review, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
 
 Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; no separate route preflight runs.
 
@@ -21,7 +21,7 @@ Synthesis promotion uses `python3 scripts/capture_gate.py --kind=synthesis`. Run
 | Configure a fresh clone | [`SETUP.md`](SETUP.md) |
 | Ingest a source (`raw/` -> wiki page) | [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md) |
 | Answer a question from the wiki | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
-| Run high-rigor wiki research with a review packet after `scripts/wiki_swarm.py preflight` accepts | [`workflows/research/wiki-swarm.md`](workflows/research/wiki-swarm.md) |
+| Run high-rigor wiki research with a review packet after `scripts/wiki_research.py preflight` accepts | [`workflows/research/wiki-research.md`](workflows/research/wiki-research.md) |
 | Compare entities | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
 | Lint the wiki | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |
 | Review compiled pages against newer cited source pages | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |

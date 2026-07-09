@@ -35,7 +35,7 @@ EXPECTED_SKILLS = (
     "wiki-ingest",
     "wiki-lint",
     "wiki-promote",
-    "wiki-swarm",
+    "wiki-research",
     "wiki-synthesize",
 )
 

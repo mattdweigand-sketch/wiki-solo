@@ -1,13 +1,13 @@
 ---
 name: wiki-research
-description: Router and default workflow for wiki-grounded research. Use wiki-swarm only when its runtime preflight accepts the request.
+description: Router and default workflow for wiki-grounded research. Use wiki-research only when its runtime preflight accepts the request.
 ---
 
 # Research Workspace
 
-Consumes the wiki to answer a question, files the answer back as a citable analysis when it is substantial, and auto-audits whether the answer created a durable artifact that belongs somewhere else in the wiki. This file is the default research workflow; `wiki-swarm.md` is an explicit-invocation overlay that starts here, loads this workflow, and reuses its durable-write path.
+Consumes the wiki to answer a question, files the answer back as a citable analysis when it is substantial, and auto-audits whether the answer created a durable artifact that belongs somewhere else in the wiki. This file is the default research workflow; `wiki-research.md` is an explicit-invocation deep-research overlay that starts here, loads this workflow, and reuses its durable-write path.
 
-Use [`wiki-swarm.md`](wiki-swarm.md) only after `python3 scripts/wiki_swarm.py preflight --question "<request>"` accepts the request. If the preflight rejects it, stay in this default workflow.
+Use [`wiki-research.md`](wiki-research.md) only after `python3 scripts/wiki_research.py preflight --question "<request>"` accepts the request. If the preflight rejects it, stay in this default workflow.
 
 Analysis capture is a prose workflow with an executable approval gate. `scripts/capture_gate.py` decides whether a durable write is approved; this workflow decides whether the analysis is useful, cited, and worth filing.
 

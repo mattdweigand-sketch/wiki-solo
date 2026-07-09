@@ -11,6 +11,16 @@ Append-only history of ingest, lint, query, and decision-capture sessions. Newes
 
 ---
 
+## [2026-07-09] maintenance | wiki-research template port
+
+Change: Ported the source-wiki deep-research mechanics into `wiki-solo`: renamed the public overlay and wrappers from `wiki-swarm` to `wiki-research`, added the claim-ledger/raw-confirmation runtime, registered the `research` eval suite, and updated root/workflow docs to the new command surface.
+Reason: Keep the template aligned with the maintained wiki research contract while preserving `wiki/domain.md` as `status: unconfigured` and avoiding corpus-specific pages, property ingests, or configured-domain assumptions.
+Rejected alternative: Cherry-pick the source commits directly, which failed against the template-specific surfaces and would have pulled in non-template history. The port was applied manually from the mechanics files, then sanitized with a private-marker scan.
+Accepted tradeoff: The template now carries the stricter high-rigor research packet contract and legacy `wiki-swarm` tombstone behavior, but configured wikis still own their own current-state owner registry and raw-source corpus.
+Validation: PASS - `python3 -m py_compile scripts/*.py`; `python3 scripts/wiki_eval.py --suite research` (113 passed); `python3 scripts/check_wrapper_parity.py`; `python3 scripts/wiki_eval.py --suite wrapper-parity`; full `python3 scripts/wiki_eval.py`; `python3 scripts/validate_capture_runs.py`; `python3 scripts/check_schema_doc_parity.py`; `python3 scripts/export_wiki.py --dry-run --date 2026-07-09`; `python3 scripts/lint.py --tier1`; full `python3 scripts/lint.py`; private-marker scan over changed files; `git diff --check`.
+
+---
+
 ## [2026-07-09] maintenance | personal-wiki feature parity port
 
 Change: Ported the template-safe pieces of the latest personal-wiki mechanics: operating-rule refinement clauses in `workflows/maintenance/artifact-promotion.md`, a general `unconsumed_sources` Tier-2 lint signal with eval coverage, and wiki-swarm scope-retention/runtime raw-file-cap guardrails.
