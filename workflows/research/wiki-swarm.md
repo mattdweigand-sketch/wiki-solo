@@ -40,11 +40,19 @@ Split lanes are read-only. A child lane may return page lists, cited facts, cont
 
 Run every lane in `python3 scripts/wiki_swarm.py manifest`, even when one orchestrator performs them serially. Report the lane outputs under `Lane results`.
 
+## Scope Retention
+
+For any wiki-swarm question, preserve the runtime-owned scope-retention dimensions exposed by `python3 scripts/wiki_swarm.py manifest`. Do not narrow the answer so far that a consulted page's relevant warning disappears.
+
+Page-scout should tag why each consulted page matters using the runtime-owned page relevance tags. Evidence-extractor should pull both positive facts and runtime-owned scope-retention dimensions from those pages. Synthesizer should carry retained caveats into the runtime-owned output targets as appropriate. Reviewer should check that no material caveat from a consulted page was silently dropped; if a caveat is intentionally excluded, say why in `Lane results` or `What not to say`.
+
+Raw verification must not narrow the compiled-page scope. A raw spot-check can verify provenance or expose an ingest gap, but it does not replace the condition, status, contradiction, and open-follow-up review across consulted wiki pages.
+
 ## Targeted Raw Verification
 
 This overlay may read raw sources for one purpose: verifying that consulted source pages still match the raw artifacts their frontmatter provenance names. It is a spot-check of compiled claims, not a parallel evidence layer.
 
-The planner decides whether the question warrants raw verification and says so either way. Explicit completeness or primary-source demands warrant it. Sensitive-category facts (property, legal, financial, insurance, medical) warrant it only when the question also demands completeness, reconstruction, or conflict resolution. Simple lookups and orientation questions never do. Check at most three raw files, only ones named in consulted-page provenance, using reproducible text extraction. Record every file and method under `Raw sources checked` and every gap, unreadable region, or unavailable tool under `Raw extraction limits`. If verification was skipped, say why on the `Raw sources checked` line.
+The planner decides whether the question warrants raw verification and says so either way. Explicit completeness or primary-source demands warrant it. Sensitive-category facts (property, legal, financial, insurance, medical) warrant it only when the question also demands completeness, reconstruction, or conflict resolution. Simple lookups and orientation questions never do. Check up to the runtime-owned raw-file maximum, only files named in consulted-page provenance, using reproducible text extraction. Record every file and method under `Raw sources checked` and every gap, unreadable region, or unavailable tool under `Raw extraction limits`. If verification was skipped, say why on the `Raw sources checked` line.
 
 Cite only wiki pages in `Supported facts` and `Answer`; raw paths appear only in `Raw sources checked`. Label claims as wiki-backed, raw-verified, or inference. Do not claim completeness the raw coverage does not support.
 
@@ -101,5 +109,6 @@ Before finishing, verify:
 - `wiki/index.md` and `wiki/primer.md` were used before page-specific reading.
 - Every material factual claim in the answer has a `[[page]]` citation or is labeled as inference.
 - Contradictions and stale areas were surfaced rather than smoothed over.
+- Scope retention was checked against the runtime-owned dimensions and any material caveat from consulted pages was included or explicitly excluded.
 - Raw verification was performed or explicitly skipped with a reason.
 - Durable writes, if any, went through the normal research approval gate.

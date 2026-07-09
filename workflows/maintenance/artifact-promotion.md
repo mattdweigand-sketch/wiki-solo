@@ -178,6 +178,8 @@ When updating operating docs:
 3. Keep the rule short enough for future agents to follow.
 4. Update route tables if the new workflow must be discoverable.
 5. For new or changed operating rules, record the reason, one rejected alternative, and the accepted tradeoff in `wiki/log.md` or a decision page. Do this going forward; do not backfill old rules unless the user asks.
+6. If the new rule is stable and objectively checkable from files, arguments, structured data, or command output, prefer moving it into lint, gate validation, pre-commit, or eval coverage. Keep prose as the explanation, not the enforcement. Do not encode taste or one-off preferences as hard checks.
+7. If the change comes from repeated workflow friction, simplify before warning. Prefer deleting duplication, narrowing the rule, moving detail into the routed workflow, or replacing vague wording with a concrete boundary. Add a warning only when the risk is high-blast-radius and cannot be enforced mechanically.
 
 ## Workflow Steps
 

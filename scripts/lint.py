@@ -772,6 +772,7 @@ def read_adjudications():
         "reviewed_confidence_low", "reviewed_near_duplicates",
         "reviewed_quotes", "reviewed_recompile_candidates",
         "reviewed_authority_missing", "reviewed_glossary_volatile",
+        "reviewed_unconsumed_sources",
     }
     unknown = sorted(k for k in set(raw) - known_keys if not k.startswith("_"))
     if unknown:
@@ -779,7 +780,7 @@ def read_adjudications():
                     + "; suppression entries under an unrecognized key would "
                       "silently detach")
     for key in ("accepted_orphans", "hub_pages", "reviewed_confidence_low",
-                "reviewed_authority_missing"):
+                "reviewed_authority_missing", "reviewed_unconsumed_sources"):
         for e in raw.get(key, []):
             if not isinstance(e, dict) or not isinstance(e.get("page"), str):
                 return {}, f"every '{key}' entry needs a string 'page' field"
@@ -1256,7 +1257,8 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates, index_read
     else:
         referenced = []
         for key in ("accepted_orphans", "hub_pages", "reviewed_confidence_low",
-                    "reviewed_quotes", "reviewed_authority_missing"):
+                    "reviewed_quotes", "reviewed_authority_missing",
+                    "reviewed_unconsumed_sources"):
             referenced += [e["page"] for e in raw.get(key, [])]
         for key in ("skipped_crossref_pairs", "reviewed_near_duplicates"):
             for e in raw.get(key, []):
@@ -1435,6 +1437,7 @@ def load_adjudications():
         "confidence": set(), "duplicates": set(), "quotes": set(),
         "recompile": set(), "authority_missing": set(),
         "glossary_volatile": set(),
+        "unconsumed_sources": set(),
     }
     raw, err = read_adjudications()
     if not raw:
@@ -1453,6 +1456,8 @@ def load_adjudications():
         "authority_missing": {e["page"] for e in raw.get("reviewed_authority_missing", [])},
         "glossary_volatile": {(e["term"], e["phrase"].lower())
                               for e in raw.get("reviewed_glossary_volatile", [])},
+        "unconsumed_sources": {e["page"]
+                               for e in raw.get("reviewed_unconsumed_sources", [])},
     }
 
 
@@ -1856,6 +1861,36 @@ def signal_authority_missing(ctx):
     return out, suppressed
 
 
+def signal_unconsumed_sources(ctx):
+    """Source pages that no non-source entity page cites with an authored link.
+
+    A source linked only by sibling sources, meta pages, or generated
+    "Referenced by" blocks was filed but never integrated into the knowledge
+    layer. The orphan check cannot see this class because batch-ingested sources
+    can cross-link each other; accepted_orphans also suppresses this signal
+    because an intentional standalone record is accepted as unconsumed too.
+    """
+    consumed = set()
+    for p in ctx.pages:
+        if p.parent.name != "sources":
+            consumed |= ctx.outbound[p]
+
+    out, suppressed = [], 0
+    for p in sorted(ctx.pages):
+        if p.parent.name != "sources" or p.stem in consumed:
+            continue
+        rel = str(p.relative_to(WIKI_ROOT))
+        if rel in ctx.adj["unconsumed_sources"]:
+            ctx.adj_used["unconsumed_sources"].add(rel)
+            suppressed += 1
+        elif rel in ctx.adj["orphans"]:
+            ctx.adj_used["orphans"].add(rel)
+            suppressed += 1
+        else:
+            out.append(f"{rel}: no authored link from any non-source entity page")
+    return out, suppressed
+
+
 def signal_review_by_missing(ctx):
     """Decisions with no `review_by` date (outcome-review enrollment).
 
@@ -1950,6 +1985,7 @@ def signal_adjudication_dead(ctx):
         "recompile": "reviewed_recompile_candidates",
         "authority_missing": "reviewed_authority_missing",
         "glossary_volatile": "reviewed_glossary_volatile",
+        "unconsumed_sources": "reviewed_unconsumed_sources",
     }
     for key, category in names.items():
         dead = ctx.adj[key] - ctx.adj_used[key]
@@ -1978,6 +2014,7 @@ TIER2_SIGNALS = (
     ("recompile_candidates", "compiled pages with newer source inputs (review for no-change, small update, or recompile)", signal_recompile_candidates),
     ("glossary_volatile_status", "glossary entries restating volatile status (rewrite to a dated fact or delegate to the owner page)", signal_glossary_volatile_status),
     ("authority_missing", "pages likely needing authority metadata but lacking authority_kind", signal_authority_missing),
+    ("unconsumed_sources", "source pages not consumed by any non-source entity page (wire an authored link or adjudicate)", signal_unconsumed_sources),
     ("review_by_missing", "decisions with no review_by (enroll in the outcome-review loop or leave for now)", signal_review_by_missing),
     ("review_due", "outcome reviews due (review_by has passed; run the review workflow)", signal_review_due),
     ("synthesis_due", "ingest burst with no synthesis pass following (consider a synthesize run)", signal_synthesis_due),

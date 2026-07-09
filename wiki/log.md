@@ -2,12 +2,22 @@
 title: Activity Log
 type: log
 created: 2026-05-17
-updated: 2026-07-04
+updated: 2026-07-09
 ---
 
 # Activity Log
 
 Append-only history of ingest, lint, query, and decision-capture sessions. Newest entries on top.
+
+---
+
+## [2026-07-09] maintenance | personal-wiki feature parity port
+
+Change: Ported the template-safe pieces of the latest personal-wiki mechanics: operating-rule refinement clauses in `workflows/maintenance/artifact-promotion.md`, a general `unconsumed_sources` Tier-2 lint signal with eval coverage, and wiki-swarm scope-retention/runtime raw-file-cap guardrails.
+Reason: Keep `wiki-solo` aligned with the maintained personal wiki architecture without importing personal corpus content, personal entity assumptions, source-page wiring cleanup, or source-repo backup policy.
+Rejected alternative: Copy the personal wiki commits directly, which would pull in personal knowledge-layer pages and corpus-specific source cleanup that do not belong in the template.
+Accepted tradeoff: The template carries the reusable mechanics and deterministic guards; configured wikis still decide which source pages need owner-page links or adjudication.
+Validation: PASS - `py_compile`; `python3 scripts/wiki_eval.py --suite lint` (160 passed); `python3 scripts/wiki_eval.py --suite wiki-swarm` (46 passed); full `python3 scripts/wiki_eval.py`; `python3 scripts/validate_capture_runs.py`; `python3 scripts/check_wrapper_parity.py`; `python3 scripts/check_schema_doc_parity.py`; `python3 scripts/export_wiki.py --dry-run --date 2026-07-09`; `python3 scripts/lint.py --tier1`; full `python3 scripts/lint.py`; private-marker scan; `git diff --check`.
 
 ---
 

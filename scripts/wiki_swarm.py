@@ -29,6 +29,43 @@ NON_TRIGGER_EXAMPLES = (
     "standalone swarm",
 )
 
+SCOPE_RETENTION_DIMENSIONS = (
+    "material caveats",
+    "status qualifiers",
+    "exclusions",
+    "adverse facts",
+)
+
+PAGE_RELEVANCE_TAGS = (
+    "project timeline",
+    "operating state",
+    "condition caveat",
+    "contradiction",
+    "open follow-up",
+    "source register",
+    "cost/economics",
+    "evidence gap",
+)
+
+SCOPE_RETENTION_OUTPUT_TARGETS = (
+    "Supported facts",
+    "Contradictions or stale areas",
+    "Answer",
+    "What not to say",
+    "Raw-only findings",
+)
+
+SCOPE_RETENTION_REVIEW_MARKERS = (
+    "scope retention",
+    "scope-retention",
+    "retained caveats",
+    "material caveats",
+    "status qualifiers",
+    "adverse facts",
+)
+
+MAX_RAW_FILES = 3
+
 
 @dataclass(frozen=True)
 class Lane:
@@ -45,24 +82,36 @@ class Lane:
 LANES = (
     Lane(
         name="planner",
-        responsibility="Restate the question, intended output, source scope, and stop conditions.",
-        allowed_outputs=("question", "output shape", "scope", "stop conditions"),
+        responsibility=(
+            "Restate the question, intended output, source scope, scope-retention risks, "
+            "and stop conditions."
+        ),
+        allowed_outputs=(
+            "question",
+            "output shape",
+            "scope",
+            "scope-retention risks",
+            "stop conditions",
+        ),
     ),
     Lane(
         name="page-scout",
         responsibility="Use wiki/index.md and wiki/primer.md to identify and narrow candidate pages.",
-        allowed_outputs=("candidate pages", "consulted page list", "scope notes"),
+        allowed_outputs=("candidate pages", "consulted page list", "page relevance tags", "scope notes"),
     ),
     Lane(
         name="evidence-extractor",
-        responsibility="Extract source-backed facts from consulted pages with wiki citations.",
-        allowed_outputs=("cited facts", "source-backed notes"),
+        responsibility=(
+            "Extract source-backed facts, material caveats, status qualifiers, and exclusions "
+            "from consulted pages with wiki citations."
+        ),
+        allowed_outputs=("cited facts", "material caveats", "status qualifiers", "source-backed notes"),
     ),
     Lane(
         name="raw-evidence-extractor",
         responsibility=(
-            "When triggered, spot-check targeted raw files named in consulted-page provenance; "
-            "otherwise report a qualified skip."
+            f"When triggered, spot-check up to {MAX_RAW_FILES} targeted raw files named in "
+            "consulted-page provenance; otherwise report a qualified skip."
         ),
         allowed_outputs=(
             "raw files checked",
@@ -79,13 +128,19 @@ LANES = (
     ),
     Lane(
         name="synthesizer",
-        responsibility="Draft the answer, separating source-backed facts from inference.",
-        allowed_outputs=("answer draft", "inferences", "support notes"),
+        responsibility=(
+            "Draft the answer, separating source-backed facts from inference and carrying "
+            "forward material caveats that bear on the question."
+        ),
+        allowed_outputs=("answer draft", "inferences", "retained caveats", "support notes"),
     ),
     Lane(
         name="reviewer",
-        responsibility="Check citation coverage, unsupported leaps, missed pages, stale claims, and durable-write routing.",
-        allowed_outputs=("review notes", "gaps", "recommended route"),
+        responsibility=(
+            "Check citation coverage, unsupported leaps, missed pages, scope-retention gaps, "
+            "stale claims, and durable-write routing."
+        ),
+        allowed_outputs=("review notes", "scope-retention gaps", "gaps", "recommended route"),
     ),
 )
 
@@ -324,10 +379,15 @@ def registry() -> dict[str, object]:
         "valid_verdicts": VALID_VERDICTS,
         "required_consulted_pages": tuple(REQUIRED_CONSULTED_PAGES),
         "citation_required_sections": CITATION_REQUIRED_SECTIONS,
+        "scope_retention_dimensions": SCOPE_RETENTION_DIMENSIONS,
+        "page_relevance_tags": PAGE_RELEVANCE_TAGS,
+        "scope_retention_output_targets": SCOPE_RETENTION_OUTPUT_TARGETS,
+        "scope_retention_review_markers": SCOPE_RETENTION_REVIEW_MARKERS,
         "raw_check_required_markers": RAW_CHECK_REQUIRED_MARKERS,
         "raw_qualified_skip_markers": RAW_QUALIFIED_SKIP_MARKERS,
         "raw_only_qualified_none_markers": RAW_ONLY_QUALIFIED_NONE_MARKERS,
         "raw_only_reingest_markers": RAW_ONLY_REINGEST_MARKERS,
+        "max_raw_files": MAX_RAW_FILES,
         "citation_integrity_failure_markers": CITATION_INTEGRITY_FAILURE_MARKERS,
         "contradiction_page_markers": CONTRADICTION_PAGE_MARKERS,
         "contradiction_page_required_when": CONTRADICTION_REQUIRED_MARKERS,
@@ -351,6 +411,16 @@ def print_manifest(*, json_mode: bool = False) -> None:
     print("Non-trigger examples:")
     for example in NON_TRIGGER_EXAMPLES:
         print(f"- {example}")
+    print("Scope-retention dimensions:")
+    for dimension in SCOPE_RETENTION_DIMENSIONS:
+        print(f"- {dimension}")
+    print("Page relevance tags:")
+    for tag in PAGE_RELEVANCE_TAGS:
+        print(f"- {tag}")
+    print("Scope-retention output targets:")
+    for target in SCOPE_RETENTION_OUTPUT_TARGETS:
+        print(f"- {target}")
+    print(f"Max raw files: {MAX_RAW_FILES}")
     print("Lanes:")
     for lane in LANES:
         print(f"- {lane.name}: read_only={str(lane.read_only).lower()}; {lane.responsibility}")
@@ -481,6 +551,8 @@ def validate_packet_text(text: str) -> list[str]:
             problems.append(
                 "Raw sources checked must list checked raw files or a qualified skip when the question asks for completeness or primary-source reconstruction"
             )
+        if len(checked_raw_paths) > MAX_RAW_FILES:
+            problems.append(f"Raw sources checked must list no more than {MAX_RAW_FILES} raw/ paths")
         if checked_raw_paths and not raw_limits.strip():
             problems.append("Raw extraction limits must be stated when raw sources are checked")
         if has_raw_only_finding(raw_only):
@@ -492,6 +564,8 @@ def validate_packet_text(text: str) -> list[str]:
                 )
 
     lane_results = normalize(sections.get("Lane results", ""))
+    if non_stop_verdict(verdict) and not has_marker(lane_results, SCOPE_RETENTION_REVIEW_MARKERS):
+        problems.append("Lane results must include a scope-retention review for non-STOP packets")
     if has_unnegated_phrase(
         lane_results,
         (

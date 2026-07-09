@@ -85,7 +85,8 @@ def write_adjudications(root, **kwargs):
     base = {"accepted_orphans": [], "hub_pages": [], "skipped_crossref_pairs": [],
             "reviewed_confidence_low": [], "reviewed_near_duplicates": [],
             "reviewed_quotes": [], "reviewed_recompile_candidates": [],
-            "reviewed_authority_missing": [], "reviewed_glossary_volatile": []}
+            "reviewed_authority_missing": [], "reviewed_glossary_volatile": [],
+            "reviewed_unconsumed_sources": []}
     base.update(kwargs)
     (root / "scripts" / "lint-adjudications.json").write_text(json.dumps(base))
 
@@ -96,6 +97,20 @@ def add_authority(root, rel, *lines):
     marker = "confidence: medium\n"
     assert marker in t, f"fixture drift: no confidence marker in {rel}"
     p.write_text(t.replace(marker, marker + "\n".join(lines) + "\n", 1))
+
+
+def write_peer_source(root, source_name="gamma"):
+    (root / "wiki" / "sources" / "peer-source.md").write_text(
+        '---\ntitle: "Peer Source"\ntype: source\ncreated: 2026-06-01\n'
+        'updated: 2026-06-01\nsources: ["experience: lint eval fixture"]\n'
+        'tags: [fixture]\nconfidence: medium\nsource_type: other\n'
+        'agent_use_cases:\n  - lint eval fixture\n---\n\n'
+        f'This peer source links [[{source_name}]], but source-to-source links '
+        'must not satisfy the source consumption invariant.\n\n'
+        '## Open questions / gaps\n\n- Fixture page; no real questions.\n'
+    )
+    add_index_row(root, "sources/peer-source.md", "fixture peer source")
+    append(root, "wiki/concepts/alpha.md", "\n- Related: [[peer-source]]\n")
 
 
 
@@ -781,6 +796,76 @@ run_case(
         append(r, "wiki/sources/gamma.md", "\n- Related: [[epsilon]]\n"),
     ),
     args=(), absent=("sources/gamma.md (page 2026-06-01): newer sources: sources/epsilon.md",),
+)
+
+# ---- Tier 2: unconsumed source pages (general isolation invariant) ----
+UNCONSUMED_LABEL = ("source pages not consumed by any non-source entity page "
+                    "(wire an authored link or adjudicate)")
+UNCONSUMED_GAMMA = ("sources/gamma.md: no authored link from any non-source "
+                    "entity page")
+
+
+run_case(
+    "unconsumed-source-fires",
+    None, args=(), expect=(UNCONSUMED_GAMMA,),
+)
+run_case(
+    "unconsumed-source-entity-link-passes",
+    lambda r: append(r, "wiki/concepts/alpha.md", "\n- Related: [[gamma]]\n"),
+    args=(), expect=(UNCONSUMED_LABEL + ": 0",),
+)
+run_case(
+    # A sibling source's link is filing, not consumption: gamma stops being an
+    # orphan but must still fire here.
+    "unconsumed-source-peer-link-still-fires",
+    lambda r: write_peer_source(r, source_name="gamma"),
+    args=(), expect=(UNCONSUMED_GAMMA,),
+    absent=("      sources/gamma.md\n",),
+)
+run_case(
+    # A generated Referenced-by echo on an entity page is not consumption.
+    "unconsumed-source-generated-backlink-ignored",
+    lambda r: append(r, "wiki/concepts/alpha.md",
+                     "\n## Referenced by\n\n**sources/**  [[gamma]]\n"),
+    args=(), expect=(UNCONSUMED_GAMMA,),
+)
+run_case(
+    "unconsumed-source-suppressed-by-adjudication",
+    lambda r: write_adjudications(r, reviewed_unconsumed_sources=[
+        {"page": "sources/gamma.md", "reason": "fixture standalone record",
+         "date": "2026-07-09"}]),
+    args=(), expect=("suppressed",),
+    absent=(UNCONSUMED_GAMMA,
+            "reviewed_unconsumed_sources: sources/gamma.md"),
+)
+run_case(
+    # An accepted orphan is a fortiori an accepted standalone: one adjudication
+    # suppresses both signals, no duplicate entry required.
+    "unconsumed-source-accepted-orphan-suppresses",
+    lambda r: write_adjudications(r, accepted_orphans=[
+        {"page": "sources/gamma.md", "reason": "fixture", "date": "2026-06-11"}]),
+    args=(), absent=(UNCONSUMED_GAMMA,),
+)
+run_case(
+    # An adjudicated source that later gains a real consumer is no longer a
+    # candidate, so its entry must surface as DEAD, not as "used".
+    "unconsumed-adjudication-dead-when-consumed",
+    lambda r: (
+        append(r, "wiki/concepts/alpha.md", "\n- Related: [[gamma]]\n"),
+        write_adjudications(r, reviewed_unconsumed_sources=[
+            {"page": "sources/gamma.md", "reason": "fixture standalone record",
+             "date": "2026-07-09"}]),
+    ),
+    args=(),
+    expect=("reviewed_unconsumed_sources: sources/gamma.md",),
+    absent=(UNCONSUMED_GAMMA,),
+)
+run_case(
+    "unconsumed-adjudication-stale-fires",
+    lambda r: write_adjudications(r, reviewed_unconsumed_sources=[
+        {"page": "sources/renamed-unconsumed.md", "reason": "x",
+         "date": "2026-07-09"}]),
+    expect_code=1, expect=("adjudication-stale", "renamed-unconsumed"),
 )
 
 # ---- Tier 2: volatile status language in glossary entries ----

@@ -44,7 +44,7 @@ Verdict: SINGLE-AGENT SWARM
 Question: /wiki-swarm What does the wiki say?
 Source scope: wiki/index.md, wiki/primer.md, selected pages
 Pages consulted: [[index]], [[primer]]
-Lane results: Planner scoped the question; Page Scout found pages; helper lanes returned notes only.
+Lane results: Planner scoped the question; Page Scout tagged page relevance; Reviewer completed scope-retention review; helper lanes returned notes only.
 Supported facts: Facts are cited to [[index]].
 Inferences: Inferences are labeled.
 Contradictions or stale areas: none found
@@ -87,11 +87,41 @@ def check_manifest() -> None:
     except json.JSONDecodeError:
         data = {}
     lanes = data.get("lanes", [])
+    lane_map = {lane.get("name"): lane for lane in lanes}
+    planner = lane_map.get("planner", {})
+    page_scout = lane_map.get("page-scout", {})
+    evidence = lane_map.get("evidence-extractor", {})
+    synthesizer = lane_map.get("synthesizer", {})
+    reviewer = lane_map.get("reviewer", {})
     ok = (
         proc.returncode == 0
         and data.get("trigger_phrases") == ["/wiki-swarm", "wiki-swarm", "swarm the wiki answer"]
         and data.get("required_consulted_pages") == ["index", "primer"]
         and data.get("citation_required_sections") == ["Supported facts", "Answer"]
+        and data.get("scope_retention_dimensions") == [
+            "material caveats",
+            "status qualifiers",
+            "exclusions",
+            "adverse facts",
+        ]
+        and data.get("page_relevance_tags") == [
+            "project timeline",
+            "operating state",
+            "condition caveat",
+            "contradiction",
+            "open follow-up",
+            "source register",
+            "cost/economics",
+            "evidence gap",
+        ]
+        and data.get("scope_retention_output_targets") == [
+            "Supported facts",
+            "Contradictions or stale areas",
+            "Answer",
+            "What not to say",
+            "Raw-only findings",
+        ]
+        and "scope-retention" in data.get("scope_retention_review_markers", [])
         and "may not support" in data.get("citation_integrity_failure_markers", [])
         and "[[contradictions]]" in data.get("contradiction_page_markers", [])
         and "none found" in data.get("contradiction_dismissal_markers", [])
@@ -103,8 +133,15 @@ def check_manifest() -> None:
         and "not triggered" in data.get("raw_qualified_skip_markers", [])
         and "none - no raw-only findings" in data.get("raw_only_qualified_none_markers", [])
         and "re-ingest" in data.get("raw_only_reingest_markers", [])
+        and data.get("max_raw_files") == 3
         and len(lanes) == 7
         and any(lane.get("name") == "raw-evidence-extractor" for lane in lanes)
+        and "scope-retention risks" in planner.get("allowed_outputs", [])
+        and "page relevance tags" in page_scout.get("allowed_outputs", [])
+        and "material caveats" in evidence.get("allowed_outputs", [])
+        and "retained caveats" in synthesizer.get("allowed_outputs", [])
+        and "scope-retention gaps" in reviewer.get("allowed_outputs", [])
+        and "scope-retention gaps" in reviewer.get("responsibility", "")
         and all(lane.get("read_only") is True for lane in lanes)
         and all(lane.get("may_edit_files") is False for lane in lanes)
         and all(lane.get("may_run_durable_writes") is False for lane in lanes)
@@ -172,6 +209,17 @@ def check_packet_validation() -> None:
     results.record(
         "negated-helper-write-claim-passes",
         proc.returncode == 0 and "valid" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    missing_scope_review = packet_path(GOOD_PACKET.replace(
+        "Reviewer completed scope-retention review; ",
+        "",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(missing_scope_review))
+    results.record(
+        "missing-scope-retention-review-fails",
+        proc.returncode == 1 and "scope-retention review" in proc.stdout,
         proc.stdout + proc.stderr,
     )
 
@@ -379,6 +427,22 @@ def check_packet_validation() -> None:
         proc.stdout + proc.stderr,
     )
 
+    too_many_raw_files = packet_path(GOOD_PACKET.replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: raw/records/one.pdf via pdftotext; "
+        "raw/records/two.pdf via pdftotext; raw/records/three.pdf via pdftotext; "
+        "raw/records/four.pdf via pdftotext",
+    ).replace(
+        "Raw extraction limits: not triggered - no raw verification performed",
+        "Raw extraction limits: no unreadable regions found in extracted text",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(too_many_raw_files))
+    results.record(
+        "too-many-raw-files-fails",
+        proc.returncode == 1 and "no more than 3 raw/ paths" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
     raw_checked_empty_limits = packet_path(GOOD_PACKET.replace(
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
@@ -536,6 +600,29 @@ def check_docs_contract() -> None:
         and "**Page Scout:**" not in swarm_text
         and "**Evidence Extractor:**" not in swarm_text,
         "swarm workflow should not duplicate the runtime lane manifest",
+    )
+    results.record(
+        "swarm-doc-preserves-scope-caveats-generally",
+        "## Scope Retention" in swarm_text
+        and "For any wiki-swarm question" in swarm_text
+        and "runtime-owned scope-retention dimensions" in swarm_text
+        and "runtime-owned page relevance tags" in swarm_text
+        and "runtime-owned output targets" in swarm_text
+        and "Reviewer should check that no material caveat from a consulted page was silently dropped" in swarm_text
+        and "Raw verification must not narrow the compiled-page scope" in swarm_text,
+        "swarm workflow must preserve material caveats for every query, not only complete-history prompts",
+    )
+    results.record(
+        "swarm-doc-does-not-duplicate-scope-taxonomy",
+        "project timeline, operating state, condition caveat" not in swarm_text
+        and "material caveats, status qualifiers, exclusions, and adverse facts" not in swarm_text,
+        "swarm workflow should defer scope taxonomy to scripts/wiki_swarm.py manifest",
+    )
+    results.record(
+        "swarm-doc-uses-runtime-raw-file-cap",
+        "runtime-owned raw-file maximum" in swarm_text
+        and "at most three raw files" not in swarm_text,
+        "swarm workflow should defer the raw-file cap to scripts/wiki_swarm.py manifest",
     )
     forbidden_script_duplications = (
         "scripts/capture_gate.py",
