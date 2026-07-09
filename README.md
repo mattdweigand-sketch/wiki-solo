@@ -50,7 +50,7 @@ The repo has eight common workflow shortcuts. Claude Code and Codex expose them 
 | `/wiki-lint` | Run deterministic checks, judgment candidates, compiled-page recompile review candidates, and evidence review. |
 | `/wiki-eval` | Verify that the wiki tools and guardrails still work. |
 | `/wiki-synthesize` | Draft corpus distillations for review and approved promotion. |
-| `/wiki-export` | Build a local zip export of the wiki, including raw sources. |
+| `/wiki-export` | Build a local zip export of the wiki, including raw sources; optionally upload to an explicit `rclone` target. |
 | `/wiki-swarm` | Run high-rigor wiki research with a checked review packet. |
 
 Research answers can stay in chat or become durable analyses when they are worth saving.

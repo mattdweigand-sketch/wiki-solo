@@ -24,6 +24,68 @@ def write(path: Path, text: str = "x") -> None:
     path.write_text(text, encoding="utf-8")
 
 
+def fake_rclone(
+    root: Path,
+    *,
+    target: str = "gdrive:wiki-exports/wiki-export.zip",
+    size_delta: int = 0,
+    configured: bool = False,
+) -> Path:
+    path = root / "rclone"
+    state = root / "configured-remotes.txt"
+    if configured:
+        state.write_text("gdrive\n", encoding="utf-8")
+    path.write_text(f"""#!{sys.executable}
+import pathlib
+import shutil
+import sys
+
+here = pathlib.Path(sys.argv[0]).parent
+configured = here / "configured-remotes.txt"
+config_calls = here / "config-calls.txt"
+remote_zip = here / "remote.zip"
+target = {target!r}
+size_delta = {size_delta}
+command = sys.argv[1] if len(sys.argv) > 1 else ""
+
+def remote_names():
+    if not configured.exists():
+        return []
+    return [line.strip() for line in configured.read_text().splitlines() if line.strip()]
+
+if command == "listremotes":
+    for remote in remote_names():
+        print(remote + ":")
+elif command == "config":
+    if len(sys.argv) != 6 or sys.argv[2:6] != ["create", "gdrive", "drive", "config_is_local=true"]:
+        print("unexpected config args", file=sys.stderr)
+        sys.exit(2)
+    config_calls.write_text(config_calls.read_text() + "x" if config_calls.exists() else "x")
+    names = remote_names()
+    if "gdrive" not in names:
+        names.append("gdrive")
+    configured.write_text("\\n".join(names) + "\\n")
+elif command == "copyto":
+    if len(sys.argv) != 4 or sys.argv[3] != target:
+        print("unexpected copyto args", file=sys.stderr)
+        sys.exit(2)
+    shutil.copyfile(sys.argv[2], remote_zip)
+elif command == "lsl":
+    if len(sys.argv) != 3 or sys.argv[2] != target:
+        print("unexpected lsl args", file=sys.stderr)
+        sys.exit(2)
+    if not remote_zip.exists():
+        print("remote missing", file=sys.stderr)
+        sys.exit(3)
+    print(f"{{remote_zip.stat().st_size + size_delta}} 2026-07-08 00:00:00.000000000 wiki-export.zip")
+else:
+    print("unexpected command", file=sys.stderr)
+    sys.exit(2)
+""", encoding="utf-8")
+    path.chmod(0o755)
+    return path
+
+
 with tempfile.TemporaryDirectory(prefix="wiki-export-eval-") as td:
     root = Path(td)
     required_files = [
@@ -134,5 +196,104 @@ with tempfile.TemporaryDirectory(prefix="wiki-export-eval-") as td:
     else:
         results.record("verify-rejects-count-mismatch", False, "export zip was not created")
         results.record("verify-rejects-nested-export-path", False, "export zip was not created")
+
+with tempfile.TemporaryDirectory(prefix="wiki-export-upload-eval-") as td:
+    root = Path(td)
+    out = root / "wiki-export.zip"
+    out.write_bytes(b"backup")
+    rclone = fake_rclone(root, configured=True)
+    ok, errors = export_wiki.upload_rclone(
+        out, "gdrive:wiki-exports/wiki-export.zip", str(rclone)
+    )
+    remote = root / "remote.zip"
+    results.record(
+        "upload-rclone-copyto-and-size-verifies",
+        ok and remote.read_bytes() == b"backup",
+        f"upload should copy and verify exact byte size; ok={ok} errors={errors}",
+    )
+    results.record(
+        "upload-rclone-skips-config-when-remote-exists",
+        not (root / "config-calls.txt").exists(),
+        "an existing rclone remote should not be reconfigured",
+    )
+
+with tempfile.TemporaryDirectory(prefix="wiki-export-upload-first-run-eval-") as td:
+    root = Path(td)
+    out = root / "wiki-export.zip"
+    out.write_bytes(b"backup")
+    rclone = fake_rclone(root, configured=False)
+    ok, errors = export_wiki.upload_rclone(
+        out,
+        "gdrive:wiki-exports/wiki-export.zip",
+        str(rclone),
+        init_drive_remote="gdrive",
+    )
+    results.record(
+        "upload-rclone-inits-missing-drive-remote",
+        ok and (root / "config-calls.txt").read_text(encoding="utf-8") == "x",
+        f"missing Drive remote should trigger one config create; ok={ok} errors={errors}",
+    )
+
+with tempfile.TemporaryDirectory(prefix="wiki-export-upload-mismatch-eval-") as td:
+    root = Path(td)
+    out = root / "wiki-export.zip"
+    out.write_bytes(b"backup")
+    rclone = fake_rclone(root, size_delta=1, configured=True)
+    ok, errors = export_wiki.upload_rclone(
+        out, "gdrive:wiki-exports/wiki-export.zip", str(rclone)
+    )
+    results.record(
+        "upload-rclone-rejects-size-mismatch",
+        not ok and any("did not match local size" in e for e in errors),
+        f"upload must fail on remote/local size mismatch; ok={ok} errors={errors}",
+    )
+
+with tempfile.TemporaryDirectory(prefix="wiki-export-upload-missing-eval-") as td:
+    root = Path(td)
+    out = root / "wiki-export.zip"
+    out.write_bytes(b"backup")
+    ok, errors = export_wiki.upload_rclone(
+        out, "gdrive:wiki-exports/wiki-export.zip", str(root / "missing-rclone")
+    )
+    results.record(
+        "upload-rclone-requires-rclone",
+        not ok and any("not found" in e for e in errors),
+        f"missing rclone must fail loudly; ok={ok} errors={errors}",
+    )
+
+with tempfile.TemporaryDirectory(prefix="wiki-export-upload-invalid-eval-") as td:
+    root = Path(td)
+    out = root / "wiki-export.zip"
+    out.write_bytes(b"backup")
+    rclone = fake_rclone(root, configured=True)
+    ok, errors = export_wiki.upload_rclone(
+        out,
+        "other:wiki-exports/wiki-export.zip",
+        str(rclone),
+        init_drive_remote="gdrive",
+    )
+    results.record(
+        "upload-rclone-rejects-init-target-mismatch",
+        not ok and any("does not match" in e for e in errors),
+        f"init remote must match upload target remote; ok={ok} errors={errors}",
+    )
+
+proc = subprocess.run(
+    [
+        sys.executable,
+        str(EXPORT),
+        "--dry-run",
+        "--init-rclone-drive",
+        "gdrive",
+    ],
+    text=True,
+    capture_output=True,
+    check=False,
+)
+results.record(
+    "upload-init-requires-target",
+    proc.returncode == 1 and "--init-rclone-drive requires --upload-target" in proc.stderr,
+    f"exit {proc.returncode}; stdout: {proc.stdout!r}; stderr: {proc.stderr!r}",
+)
 
 sys.exit(results.finish())

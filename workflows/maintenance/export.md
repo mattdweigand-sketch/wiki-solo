@@ -1,6 +1,6 @@
 ---
 name: wiki-export
-description: Use this workflow when the user says "export the wiki" or wants a local corpus zip. Builds a zip of the template, wiki, and gitignored raw/ sources.
+description: Use this workflow when the user says "export the wiki" or wants a local corpus zip. Builds a zip of the template, wiki, and gitignored raw/ sources, with optional explicit rclone upload.
 ---
 
 # Export Workflow
@@ -31,8 +31,26 @@ description: Use this workflow when the user says "export the wiki" or wants a l
    ```
 
 3. Report the absolute path to the zip. Do not upload it anywhere unless the user explicitly gives a destination.
-4. No `wiki/log.md` entry. The export changes no wiki content; the zip in `tmp/` is a disposable artifact until the user moves it.
+
+4. Optional off-device upload uses `rclone` and requires an explicit target. Nothing is hardcoded into the template. A first-time Google Drive upload can initialize the user's local `rclone` remote and request browser or terminal auth:
+
+   ```bash
+   python3 scripts/export_wiki.py --date YYYY-MM-DD \
+     --upload-target gdrive:wiki-exports/wiki-export-YYYY-MM-DD.zip \
+     --init-rclone-drive gdrive
+   ```
+
+   After the remote exists, the init flag is no longer needed:
+
+   ```bash
+   python3 scripts/export_wiki.py --date YYYY-MM-DD \
+     --upload-target gdrive:wiki-exports/wiki-export-YYYY-MM-DD.zip
+   ```
+
+   The script runs `rclone copyto`, verifies the remote byte size with `rclone lsl`, and leaves credentials in the user's local `rclone` config. Do not commit credentials, tokens, or user-specific Drive targets.
+
+5. No `wiki/log.md` entry. The export changes no wiki content; the zip in `tmp/` is a disposable artifact until the user moves it.
 
 ## Privacy
 
-The corpus may contain sensitive organization data. Do not upload, email, or share an export without explicit user approval for the destination.
+The corpus may contain sensitive organization data. Do not upload, email, or share an export without explicit user approval for the destination. Passing `--upload-target` is explicit destination approval for that command invocation only.
