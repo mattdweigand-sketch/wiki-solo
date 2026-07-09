@@ -154,6 +154,11 @@ run_case(
     expect_code=1, expect=("index-stale", "concepts/missing.md"),
 )
 run_case(
+    "non-utf8-index-fails-cleanly",
+    lambda r: (r / "wiki" / "index.md").write_bytes(b"\xff"),
+    expect_code=1, expect=("index", "not valid UTF-8"),
+)
+run_case(
     "related-label-fires",
     lambda r: append(r, "wiki/concepts/alpha.md", "- Causes: [[delta-one]]\n"),
     expect_code=1, expect=("related-label", "'Causes:'"),
@@ -400,6 +405,11 @@ run_case(
     expect_code=1, expect=("encoding", "not valid UTF-8"),
 )
 run_case(
+    "non-utf8-glossary-fails-cleanly",
+    lambda r: (r / "wiki" / "glossary.md").write_bytes(b"# Glossary\n\n\xff"),
+    expect_code=1, expect=("glossary", "not valid UTF-8"),
+)
+run_case(
     "malformed-adjudication-json-fails-cleanly",
     lambda r: (r / "scripts/lint-adjudications.json").write_text("{not json"),
     expect_code=1, expect=("adjudication-file", "unreadable JSON"),
@@ -504,6 +514,14 @@ run_case(
     "unexpected-wiki-folder-fires",
     lambda r: (r / "wiki" / "misc").mkdir(),
     expect_code=1, expect=("wiki-structure", "unexpected wiki/ folder"),
+)
+run_case(
+    "nested-wiki-page-fires",
+    lambda r: (
+        (r / "wiki/concepts/nested").mkdir(),
+        (r / "wiki/concepts/nested/deep.md").write_text("# hidden\n"),
+    ),
+    expect_code=1, expect=("wiki-structure", "wiki/concepts/nested/deep.md"),
 )
 run_case(
     # code:eval-lint#2: the file branch of the wiki-structure check was never
@@ -1286,6 +1304,17 @@ run_case(
 
 # ---- Tier 1: structured stale-text sweep proof on new ingest log entries ----
 run_case(
+    "stale-sweep-impossible-log-date-fails-cleanly",
+    lambda r: write_log_text(
+        r,
+        "# Log\n\n## [2026-06-31] ingest | fixture source\n"
+        "Stale-text sweep: status=completed; "
+        "commands=[\"rg -n -i -- 'old wording' wiki/\"]; "
+        "hit_count=0; pages_fixed=[]; historical_no_change_hits=[]\n",
+    ),
+    expect_code=1, expect=("stale-sweep-proof", "real calendar date"),
+)
+run_case(
     "stale-sweep-completed-proof-passes-tier1",
     lambda r: write_log_text(
         r,
@@ -1474,7 +1503,38 @@ def check_raw_tracked_fires():
             print(f"  exit {proc.returncode}; stdout: {proc.stdout[:300]}")
 
 
+def check_raw_tracked_case_variant_fires():
+    """The raw no-commit guard must catch case variants such as Raw/ too:
+    default git pathspecs are case-sensitive even when core.ignorecase=true."""
+    with tempfile.TemporaryDirectory(prefix="wiki-rawtracked-case-") as td:
+        root = Path(td)
+        copy_fixture(root)
+        try:
+            subprocess.run(["git", "init", "-q"], cwd=root,
+                           check=True, capture_output=True)
+            subprocess.run(["git", "config", "core.ignorecase", "true"], cwd=root,
+                           check=True, capture_output=True)
+            (root / "Raw").mkdir()
+            (root / "Raw" / "leak.pdf").write_text("secret")
+            subprocess.run(["git", "add", "-f", "Raw/leak.pdf"], cwd=root,
+                           check=True, capture_output=True)
+        except (OSError, subprocess.SubprocessError) as e:
+            results.append(("raw-tracked-case-variant-fires", True))
+            print("SKIP raw-tracked-case-variant-fires (git unavailable: "
+                  f"{type(e).__name__})")
+            return
+        proc = subprocess.run([sys.executable, str(LINT), "--tier1"],
+                              cwd=root, text=True, capture_output=True)
+        ok = (proc.returncode == 1 and "raw-tracked" in proc.stdout
+              and "Raw/leak.pdf" in proc.stdout)
+        results.append(("raw-tracked-case-variant-fires", ok))
+        print(("PASS " if ok else "FAIL ") + "raw-tracked-case-variant-fires")
+        if not ok:
+            print(f"  exit {proc.returncode}; stdout: {proc.stdout[:300]}")
+
+
 check_raw_tracked_fires()
+check_raw_tracked_case_variant_fires()
 
 print()
 failed = [n for n, ok in results if not ok]

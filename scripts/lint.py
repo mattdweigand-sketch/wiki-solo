@@ -265,6 +265,23 @@ def check_folder_structure():
             if p.is_dir():
                 if name not in WIKI_ALLOWED_DIRS:
                     fails.append(("wiki-structure", rel, "unexpected wiki/ folder"))
+                else:
+                    for nested in sorted(p.rglob("*")):
+                        if len(nested.relative_to(p).parts) <= 1:
+                            continue
+                        nested_rel = str(nested)
+                        if nested.is_dir():
+                            fails.append(("wiki-structure", nested_rel,
+                                          "nested wiki/ directory; entity pages live directly under wiki/<entity-type>/"))
+                        elif nested.is_file() and nested.suffix == ".md":
+                            fails.append(("wiki-structure", nested_rel,
+                                          "nested wiki/ page escapes entity lint; move it directly under wiki/<entity-type>/"))
+                        elif nested.is_file():
+                            fails.append(("wiki-structure", nested_rel,
+                                          "unexpected nested wiki/ file"))
+                        else:
+                            fails.append(("wiki-structure", nested_rel,
+                                          "unexpected nested wiki/ entry type"))
             elif p.is_file():
                 if name not in WIKI_ALLOWED_FILES:
                     fails.append(("wiki-structure", rel, "unexpected wiki/ root file"))
@@ -334,7 +351,7 @@ def check_no_tracked_raw():
     to a temp dir)."""
     try:
         out = subprocess.run(
-            ["git", "ls-files", "-z", "--", "raw"],
+            ["git", "ls-files", "-z", "--", ":(icase)raw"],
             capture_output=True, timeout=10,
         )
     except (OSError, subprocess.SubprocessError):
@@ -342,9 +359,9 @@ def check_no_tracked_raw():
     if out.returncode != 0:
         return []  # not a git work tree; skip the guard
     fails = []
-    allowed = {"raw/.gitkeep", "raw/README.md"}
+    allowed = {"raw/.gitkeep", "raw/readme.md"}
     for path in out.stdout.decode("utf-8", "replace").split("\0"):
-        if path and path not in allowed:
+        if path and path.lower() not in allowed:
             fails.append(("raw-tracked", path,
                           "source artifact tracked in git; raw/ artifacts are "
                           "gitignored by default (only raw/.gitkeep and "
@@ -690,7 +707,13 @@ def check_stale_sweep_proof_entries():
     for entry in log_entries(text):
         if entry["type"] != "ingest":
             continue
-        entry_date = date.fromisoformat(entry["date"])
+        try:
+            entry_date = date.fromisoformat(entry["date"])
+        except ValueError:
+            fails.append(("stale-sweep-proof", str(path),
+                          f"line {entry['line']}: ingest entry date "
+                          f"{entry['date']} is not a real calendar date"))
+            continue
         if entry_date < STALE_SWEEP_PROOF_REQUIRED_FROM:
             continue
         proof_lines = [
@@ -712,6 +735,17 @@ def check_stale_sweep_proof_entries():
                 fails.append(("stale-sweep-proof", str(path),
                               f"line {line_no}: {err}"))
     return fails
+
+
+def check_glossary_utf8():
+    path = WIKI_ROOT / "glossary.md"
+    if not path.exists():
+        return []
+    try:
+        path.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        return [("glossary", str(path), f"not valid UTF-8: {e}")]
+    return []
 
 
 def read_adjudications():
@@ -1141,7 +1175,7 @@ TIER1_PAGE_CHECKS = (
 )
 
 
-def tier1(entity_pages, valid_slugs, index_targets, index_duplicates):
+def tier1(entity_pages, valid_slugs, index_targets, index_duplicates, index_read_fails=()):
     fails = []  # (check, page_relpath, detail)
     fails.extend(check_folder_structure())
     fails.extend(check_no_tracked_raw())
@@ -1149,6 +1183,8 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates):
     fails.extend(check_sourcing_queue_count_markers())
     fails.extend(check_log_entry_headers())
     fails.extend(check_stale_sweep_proof_entries())
+    fails.extend(check_glossary_utf8())
+    fails.extend(index_read_fails)
 
     def rel(p):
         return str(p.relative_to(WIKI_ROOT))
@@ -1196,17 +1232,20 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates):
         for check in TIER1_PAGE_CHECKS:
             fails.extend(check(ctx))
 
-    # index coverage (only for paths that name an entity folder)
-    for r in sorted(entity_relpaths - index_targets):
-        fails.append(("index-missing", r, "no row in index.md"))
-    for t in sorted(index_targets - entity_relpaths):
-        if "/" in t and t.split("/")[0] in FOLDER_TYPE:
-            fails.append(("index-stale", t, "index.md row points to missing page"))
-    # "one row per page" is two-sided: coverage above, uniqueness here. Duplicate
-    # rows have appeared under concurrent sessions and were invisible to lint.
-    for t in index_duplicates:
-        if "/" in t and t.split("/")[0] in FOLDER_TYPE:
-            fails.append(("index-duplicate", t, "multiple index.md rows point to this page"))
+    # index coverage (only for paths that name an entity folder). If index.md
+    # itself is unreadable, report that root cause instead of flooding the output
+    # with every page as index-missing.
+    if not index_read_fails:
+        for r in sorted(entity_relpaths - index_targets):
+            fails.append(("index-missing", r, "no row in index.md"))
+        for t in sorted(index_targets - entity_relpaths):
+            if "/" in t and t.split("/")[0] in FOLDER_TYPE:
+                fails.append(("index-stale", t, "index.md row points to missing page"))
+        # "one row per page" is two-sided: coverage above, uniqueness here. Duplicate
+        # rows have appeared under concurrent sessions and were invisible to lint.
+        for t in index_duplicates:
+            if "/" in t and t.split("/")[0] in FOLDER_TYPE:
+                fails.append(("index-duplicate", t, "multiple index.md rows point to this page"))
 
     # the adjudication file must parse and every entry must reference an
     # existing page; otherwise suppression silently turns off or a rename
@@ -1974,19 +2013,23 @@ def tier2(entity_pages, valid_slugs, adjudicated):
 # --------------------------- reporting ---------------------------
 
 def parse_index_targets():
-    """(targets, duplicates): every .md path index.md links, plus the paths
-    more than one row points to (the uniqueness half of "one row per page")."""
+    """(targets, duplicates, read_fails): every .md path index.md links, plus
+    the paths more than one row points to (the uniqueness half of "one row per
+    page"). read_fails carries root-cause file read problems."""
     idx = WIKI_ROOT / "index.md"
     if not idx.exists():
-        return set(), []
-    text = idx.read_text(encoding="utf-8")
+        return set(), [], []
+    try:
+        text = idx.read_text(encoding="utf-8")
+    except UnicodeDecodeError as e:
+        return set(), [], [("index", str(idx), f"not valid UTF-8: {e}")]
     targets = re.findall(r"\]\(([^)]+?\.md)\)", text)
     seen, dups = set(), set()
     for t in targets:
         if t in seen:
             dups.add(t)
         seen.add(t)
-    return seen, sorted(dups)
+    return seen, sorted(dups), []
 
 
 def main():
@@ -2002,11 +2045,12 @@ def main():
 
     entity_pages = get_entity_pages(WIKI_ROOT)
     valid_slugs = {p.stem for p in entity_pages} | META_PAGES
-    index_targets, index_duplicates = parse_index_targets()
+    index_targets, index_duplicates, index_read_fails = parse_index_targets()
 
     print(f"Wiki lint: {len(entity_pages)} entity pages\n")
 
-    t1 = tier1(entity_pages, valid_slugs, index_targets, index_duplicates)
+    t1 = tier1(entity_pages, valid_slugs, index_targets, index_duplicates,
+               index_read_fails)
     print("TIER 1  (deterministic; must fix)")
     if not t1:
         print("  all checks passed")

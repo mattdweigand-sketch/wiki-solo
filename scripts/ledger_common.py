@@ -2,9 +2,11 @@
 """Shared helpers for the approval ledger.
 
 The approval gate writes capture_approval and synthesis_approval records to one
-JSONL ledger. Idempotency is based on approval content identity, not hashes:
-historical records may still carry inert legacy identifier fields, but new
-records do not generate them and validators ignore them.
+JSONL ledger. Idempotency is based on canonical approval content identity:
+historical records may still carry inert legacy run_id fields, but new records
+do not generate legacy identifiers and validators ignore them. Measured capture
+records may carry draft_sha256 as durable content evidence; that hash remains
+part of the approval identity.
 
 Every approval record's primary_home must be included in pages_touched, so the
 main approved destination is always part of the explicit editable scope.

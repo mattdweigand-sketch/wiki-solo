@@ -28,10 +28,10 @@ Determinism: the gate anchors on checkable facts, not only declared flags.
 - synthesis approval displays the reviewed --drafts content and full edit scope
   before durable synthesis changes proceed.
 
-Measurement scope: only word_count is measured (from --path); the measured file
-is recorded as word_count_path. synthesized_pages is a declared value, never
-measured; validate_capture_runs.py re-checks that declared number for the
-3-page analysis qualification.
+Measurement scope: word_count and draft_sha256 are measured from --path; the
+measured file is recorded as word_count_path. synthesized_pages is a declared
+value, never measured; validate_capture_runs.py re-checks that declared number
+for the 3-page analysis qualification.
 
 Exit codes:
   0: approved route is allowed to proceed
@@ -43,6 +43,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import posixpath
 import re
 import sys
@@ -58,7 +59,8 @@ from ledger_common import (
 from validate_capture_runs import validate_approval
 
 
-DEFAULT_APPROVAL_LEDGER = "scripts/capture-runs.jsonl"
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_APPROVAL_LEDGER = str(REPO_ROOT / "scripts" / "capture-runs.jsonl")
 SYNTHESIS_DEFAULT_HOME = "wiki/synthesis.md"
 
 LEDGER_SCHEMA_DESCRIPTION = (
@@ -198,16 +200,25 @@ def real_destinations(home: str, pages_touched: str) -> list[str]:
     return out
 
 
-def measure_word_count(path: str) -> int | None:
-    """Count word tokens in the drafted artifact, or None if it can't be read."""
+def measure_draft(path: str) -> tuple[int, str] | None:
+    """Measure word count and bytes hash, or None if the draft can't be read."""
     p = Path(path)
     if not p.is_file():
         return None
     try:
-        text = p.read_text(encoding="utf-8")
+        data = p.read_bytes()
+        text = data.decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return None
-    return len(re.findall(r"\w+", text))
+    return len(re.findall(r"\w+", text)), hashlib.sha256(data).hexdigest()
+
+
+def measure_word_count(path: str) -> int | None:
+    """Count word tokens in the drafted artifact, or None if it can't be read."""
+    measured = measure_draft(path)
+    if measured is None:
+        return None
+    return measured[0]
 
 
 def classify_accepted(args: argparse.Namespace, word_count: int) -> tuple[str, str, str]:
@@ -282,8 +293,9 @@ def out_of_root_destinations(args: argparse.Namespace, home: str) -> list[str]:
 
 
 def capture_approval_record(args: argparse.Namespace, route: str, home: str, scope: list[str],
-                            word_count: int, word_count_source: str) -> dict[str, object]:
-    return {
+                            word_count: int, word_count_source: str,
+                            draft_sha256: str = "") -> dict[str, object]:
+    record: dict[str, object] = {
         "record_type": "capture_approval",
         "schema_version": 1,
         "approval_status": "approved",
@@ -301,6 +313,9 @@ def capture_approval_record(args: argparse.Namespace, route: str, home: str, sco
         "domain_context": args.domain_context,
         "triggers": sorted(args.trigger),
     }
+    if draft_sha256:
+        record["draft_sha256"] = draft_sha256
+    return record
 
 
 def synthesis_approval_record(args: argparse.Namespace, home: str, scope: list[str]) -> dict[str, object]:
@@ -522,11 +537,12 @@ def run_capture(args: argparse.Namespace) -> int:
     # would misclassify the run as chat-only and report the wrong problem.
     word_count = 0
     word_count_source = "unmeasured"
+    draft_sha256 = ""
     if args.path:
-        measured = measure_word_count(args.path)
+        measured = measure_draft(args.path)
         if measured is None:
             return blocked(f"--path {args.path!r} is not a readable file.", args)
-        word_count = measured
+        word_count, draft_sha256 = measured
         word_count_source = "measured"
 
     if args.synthesized_pages < 0:
@@ -577,7 +593,8 @@ def run_capture(args: argparse.Namespace) -> int:
 
     if args.approved:
         record = capture_approval_record(args, route, home, scope,
-                                         word_count, word_count_source)
+                                         word_count, word_count_source,
+                                         draft_sha256)
         problems = validate_approval(record)
         if problems:
             return blocked("refusing to write an approval record its own validator "

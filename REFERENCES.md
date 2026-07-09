@@ -56,13 +56,14 @@ The main control mechanisms are:
 | Schema and citations | `wiki/SCHEMA.md` defines page types, frontmatter, source types, confidence values, authority metadata, and citation rules. Specific facts cite `wiki/sources/` pages. |
 | Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`. |
 | Deterministic lint | `scripts/lint.py --tier1` catches structural failures and malformed proof. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, stale-text sweep proof, log rotation, review due, and wrapper parity. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, stale-text sweep proof, log rotation, review due, wrapper parity, schema-doc parity, and wiki-swarm guardrails. |
 | Outcome review | `scripts/review_due.py` surfaces due `review_by` checkpoints; `workflows/maintenance/review.md` records what happened and whether confidence changes. |
 | Sourcing queue | `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers. `workflows/maintenance/refresh-sourcing-queue.md` can reprioritize it when needed. |
 | Approval gate | `scripts/capture_gate.py` guards analysis capture, artifact-promotion apply routes, and reviewed synthesis promotion (`--kind=synthesis`), then records approved boundaries in `scripts/capture-runs.jsonl`. |
 | Synthesis ledger | `wiki/synthesis.md` orients future synthesis runs; cite source pages, not the ledger, when making claims. |
 | Export | `scripts/export_wiki.py` builds a local backup that includes gitignored `raw/` sources. |
 | Thin wrappers | `.claude/commands/` and `.codex/skills/` expose shortcuts but do not own canonical behavior. |
+| Wiki-swarm overlay | `scripts/wiki_swarm.py` owns the explicit trigger boundary and packet validation for high-rigor research runs. |
 
 ---
 
@@ -72,6 +73,7 @@ Use `[[filename-without-extension]]` for all internal links.
 
 In `## Related pages`, use typed relationship labels when the relationship is clear:
 
+<!-- parity:enum key=related-labels -->
 | Label | Meaning |
 |---|---|
 | `Supports` | This page strengthens, evidences, or confirms the linked page |
@@ -81,7 +83,7 @@ In `## Related pages`, use typed relationship labels when the relationship is cl
 | `Part of` | This page is a component of the linked larger system, project, or framework |
 | `Related` | Meaningful connection, but no stronger typed relationship fits |
 
-Format each item as `- Label: [[page]]`. The canonical label set is enforced by `RELATED_LABELS` in `scripts/lint.py`; `AGENTS.md` and `wiki/SCHEMA.md` document the same six labels. Do not invent new labels casually. To add one, update `RELATED_LABELS` and those docs together. Existing untyped related links remain valid, but new or touched pages should prefer labels where they add signal.
+Format each item as `- Label: [[page]]`. The canonical label set is enforced by `RELATED_LABELS` in `scripts/lint.py`; `AGENTS.md` and `wiki/SCHEMA.md` document the same six labels. Do not invent new labels casually. To add one, update `RELATED_LABELS` and this table together; the `schema-docs` eval suite enforces the duplicated vocabulary. Existing untyped related links remain valid, but new or touched pages should prefer labels where they add signal.
 
 When stating a specific fact, append `(source: [[source-filename]])`. When stating an opinion or inference, prefix with `Inference:` or `Hypothesis:`.
 
@@ -108,6 +110,8 @@ When stating a specific fact, append `(source: [[source-filename]])`. When stati
 | `raw/README.md` | Source-artifact handling note for the ignored `raw/` corpus |
 | `scripts/raw-buckets.json` | Tracked raw bucket taxonomy read by Tier-1 lint |
 | `scripts/lint-adjudications.json` | Settled Tier-2 lint judgments with reasons and dates; lint suppresses what it lists |
+| `scripts/check_schema_doc_parity.py` | Verifies duplicated schema vocabulary docs stay in parity with `scripts/lint.py` constants |
+| `scripts/wiki_swarm.py` | Deterministic preflight and packet validator for the wiki-swarm research overlay |
 | `scripts/fixtures/` | Fixture data for live tooling evals |
 
 ## Capture Boundary

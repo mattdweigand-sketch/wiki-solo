@@ -10,12 +10,14 @@ validate against validate_capture_runs.py.
 from __future__ import annotations
 
 import json
+import hashlib
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
 from eval_lib import Results
+from validate_capture_runs import validate_approval
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 GATE = REPO_ROOT / "scripts" / "capture_gate.py"
@@ -34,6 +36,10 @@ SANDBOX = Path(TMP.name) / "sandbox-repo"
 (SANDBOX / "wiki" / "analyses" / "existing-eval.md").write_text("existing analysis page\n")
 
 results = Results()
+
+
+def file_sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def run_case(name, args, expect_code, expect=(), absent=(), cwd=None):
@@ -83,6 +89,19 @@ def approval_records(record_type):
         return []
     out = []
     for line in APPROVAL_LEDGER.read_text().splitlines():
+        if not line.strip():
+            continue
+        record = json.loads(line)
+        if record.get("record_type") == record_type:
+            out.append(record)
+    return out
+
+
+def approval_records_from(path: Path, record_type: str):
+    if not path.exists():
+        return []
+    out = []
+    for line in path.read_text().splitlines():
         if not line.strip():
             continue
         record = json.loads(line)
@@ -164,6 +183,121 @@ def check_workflow_contract() -> None:
     results.record("synthesize-workflow-requires-gate", ok, "missing: " + ", ".join(missing))
 
 
+def capture_record_fixture(**updates):
+    record = {
+        "record_type": "capture_approval",
+        "schema_version": 1,
+        "approval_status": "approved",
+        "approved_at": "2026-07-08T00:00:00Z",
+        "artifact": "eval fixture",
+        "route": "analysis-capture",
+        "phase": "accepted",
+        "primary_home": "wiki/analyses/eval.md",
+        "pages_touched": ["wiki/analyses/eval.md", "wiki/log.md"],
+        "source_path": "",
+        "synthesized_pages": 3,
+        "word_count": 350,
+        "word_count_source": "measured",
+        "word_count_path": str(DRAFT),
+        "domain_context": True,
+        "triggers": [],
+    }
+    record.update(updates)
+    return record
+
+
+def check_validator_draft_hash_rules() -> None:
+    missing_errors = validate_approval(capture_record_fixture())
+    malformed_errors = validate_approval(capture_record_fixture(
+        approved_at="2026-07-08T00:00:00Z",
+        draft_sha256="ABC",
+    ))
+    pre_cutoff_errors = validate_approval(capture_record_fixture(
+        approved_at="2026-07-07T23:59:59Z",
+    ))
+    post_cutoff_unmeasured_errors = validate_approval(capture_record_fixture(
+        route="promotion-audit",
+        primary_home="wiki/concepts/foo.md",
+        pages_touched=["wiki/concepts/foo.md"],
+        synthesized_pages=0,
+        word_count=0,
+        word_count_source="unmeasured",
+        word_count_path="",
+        domain_context=False,
+        triggers=["existing_page_update"],
+    ))
+    ok = (
+        any("draft_sha256" in error for error in missing_errors)
+        and any("draft_sha256" in error for error in malformed_errors)
+        and pre_cutoff_errors == []
+        and post_cutoff_unmeasured_errors == []
+    )
+    detail = (
+        f"missing: {missing_errors!r}; malformed: {malformed_errors!r}; "
+        f"pre_cutoff: {pre_cutoff_errors!r}; "
+        f"post_cutoff_unmeasured: {post_cutoff_unmeasured_errors!r}"
+    )
+    results.record("capture-validator-enforces-commissioned-draft-sha", ok, detail)
+
+
+def check_changed_draft_hash_identity() -> None:
+    ledger = Path(TMP.name) / "changed-draft-capture-runs.jsonl"
+    draft = Path(TMP.name) / "changed-draft.md"
+    draft.write_text("same " * 350)
+    args = [
+        sys.executable,
+        str(GATE),
+        "--artifact",
+        "changed draft fixture",
+        "--approval-ledger",
+        str(ledger),
+        "--phase",
+        "accepted",
+        "--synthesized-pages",
+        "3",
+        "--domain-context",
+        "yes",
+        "--primary-home",
+        "wiki/analyses/changed-draft.md",
+        "--pages-touched",
+        "wiki/analyses/changed-draft.md,wiki/log.md",
+        "--path",
+        str(draft),
+        "--approved",
+    ]
+    first_hash = file_sha256(draft)
+    first = subprocess.run(args, text=True, capture_output=True, check=False)
+    first_records = approval_records_from(ledger, "capture_approval")
+    second = subprocess.run(args, text=True, capture_output=True, check=False)
+    second_records = approval_records_from(ledger, "capture_approval")
+    draft.write_text("changed " * 350)
+    changed_hash = file_sha256(draft)
+    third = subprocess.run(args, text=True, capture_output=True, check=False)
+    third_records = approval_records_from(ledger, "capture_approval")
+
+    ok = (
+        first.returncode == 0
+        and second.returncode == 0
+        and third.returncode == 0
+        and len(first_records) == 1
+        and first_records[0].get("draft_sha256") == first_hash
+        and len(second_records) == 1
+        and "already present" in second.stdout
+        and len(third_records) == 2
+        and {record.get("draft_sha256") for record in third_records}
+        == {first_hash, changed_hash}
+        and "appended" in third.stdout
+    )
+    detail = (
+        f"exits: {first.returncode}, {second.returncode}, {third.returncode}; "
+        f"counts: {len(first_records)}, {len(second_records)}, {len(third_records)}; "
+        f"hashes: {[record.get('draft_sha256') for record in third_records]!r}; "
+        f"second stdout: {second.stdout.replace(chr(10), ' | ')}; "
+        f"third stdout: {third.stdout.replace(chr(10), ' | ')}"
+    )
+    results.record("changed-measured-draft-appends-new-approval", ok, detail)
+
+
 # Approval-required capture routes: exit 2 until --approved, then 0.
 run_case("analysis-requires-approval", ANALYSIS, 2,
          expect=("analysis-capture", "APPROVAL REQUIRED",
@@ -175,9 +309,11 @@ run_case("analysis-approved-proceeds", ANALYSIS + ["--approved"], 0,
          expect=("Approval: confirmed", "Structured approval record: appended", "APPROVAL CONFIRMED"),
          absent=("APPROVAL REQUIRED",))
 check_record_count("approved-analysis-writes-structured-record", "capture_approval", 1)
+check_validator_draft_hash_rules()
 run_case("analysis-approved-idempotent", ANALYSIS + ["--approved"], 0,
          expect=("Structured approval record: already present", "APPROVAL CONFIRMED"))
 check_record_count("approved-analysis-record-stays-idempotent", "capture_approval", 1)
+check_changed_draft_hash_identity()
 run_case("promotion-requires-approval", PROMO, 2,
          expect=("promotion-audit", "APPROVAL REQUIRED",
                  "Durable action: Apply an artifact promotion to the wiki.",
@@ -339,10 +475,12 @@ run_case("short-draft-promotion-into-analyses-approvable",
 def check_analysis_record_measurement_provenance():
     records = [r for r in approval_records("capture_approval")
                if r.get("route") == "analysis-capture"]
+    expected_hash = file_sha256(DRAFT)
     ok = (
         len(records) == 1
         and records[0].get("word_count_path") == str(DRAFT)
         and records[0].get("word_count_source") == "measured"
+        and records[0].get("draft_sha256") == expected_hash
     )
     results.record("analysis-record-carries-measurement-provenance", ok,
                    "records: " + repr(records))

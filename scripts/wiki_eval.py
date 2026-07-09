@@ -28,6 +28,8 @@ SUITES = {
     "stale-text-sweep": [sys.executable, "scripts/wiki_eval_stale_text_sweep.py"],
     "ledger-validators": [sys.executable, "scripts/wiki_eval_ledgers.py"],
     "wrapper-parity": [sys.executable, "scripts/wiki_eval_wrappers.py"],
+    "schema-docs": [sys.executable, "scripts/wiki_eval_schema_docs.py"],
+    "wiki-swarm": [sys.executable, "scripts/wiki_eval_swarm.py"],
     "tier1": [sys.executable, "scripts/lint.py", "--tier1"],
 }
 

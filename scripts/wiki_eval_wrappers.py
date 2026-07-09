@@ -4,9 +4,9 @@
 Negative controls: a minimal parity-clean fixture tree is seeded with each
 problem class the checker claims to catch (missing skill, extra wiki-* wrapper,
 two-script-ref wrapper, numbered-step wrapper, dangling workflows/*.md
-reference) and each must fail with the corresponding message, so the checker
-cannot silently go vacuous. Positive controls: the clean fixture and the live
-tracked wrapper surfaces both pass.
+reference, wrong existing workflow route) and each must fail with the
+corresponding message, so the checker cannot silently go vacuous. Positive
+controls: the clean fixture and the live tracked wrapper surfaces both pass.
 """
 
 from __future__ import annotations
@@ -16,7 +16,11 @@ import sys
 import tempfile
 from pathlib import Path
 
-from check_wrapper_parity import EXPECTED_SKILLS, wrapper_parity_problems
+from check_wrapper_parity import (
+    EXPECTED_SKILLS,
+    EXPECTED_WORKFLOW_REFS,
+    wrapper_parity_problems,
+)
 from eval_lib import Results
 
 results = Results()
@@ -25,14 +29,16 @@ results = Results()
 def build_clean_tree(root: Path) -> None:
     """A minimal parity-clean wrapper tree: every EXPECTED_SKILLS name on both
     surfaces, one script hint at most, no numbered steps, one real workflow ref."""
-    (root / "workflows" / "maintenance").mkdir(parents=True)
-    (root / "workflows" / "maintenance" / "lint.md").write_text(
-        "# fixture workflow\n", encoding="utf-8")
+    for refs in EXPECTED_WORKFLOW_REFS.values():
+        for ref in refs:
+            path = root / ref
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("# fixture workflow\n", encoding="utf-8")
     commands = root / ".claude" / "commands"
     commands.mkdir(parents=True)
     for name in EXPECTED_SKILLS:
-        body = (f"# {name}\n\nThin pointer: follow "
-                "workflows/maintenance/lint.md in this repo.\n")
+        refs = EXPECTED_WORKFLOW_REFS.get(name, ("workflows/maintenance/lint.md",))
+        body = f"# {name}\n\nThin pointer: follow {refs[0]} in this repo.\n"
         (commands / f"{name}.md").write_text(body, encoding="utf-8")
         skill = root / ".codex" / "skills" / name
         skill.mkdir(parents=True)
@@ -84,6 +90,15 @@ case("dangling-workflow-ref-fires",
          "# wiki-export\n\nFollow workflows/maintenance/does-not-exist.md.\n",
          encoding="utf-8"),
      "workflow path workflows/maintenance/does-not-exist.md does not exist")
+case("wrong-route-ref-fires",
+     lambda r: (
+         (r / "workflows" / "maintenance" / "export.md").write_text(
+             "# fixture export workflow\n", encoding="utf-8"),
+         (r / ".claude" / "commands" / "wiki-capture.md").write_text(
+             "# wiki-capture\n\nFollow workflows/maintenance/export.md.\n",
+             encoding="utf-8"),
+     ),
+     "missing required workflow route workflows/maintenance/capture.md")
 
 # Positive control on the real repo: the live tracked surfaces are in parity.
 live_problems = wrapper_parity_problems()

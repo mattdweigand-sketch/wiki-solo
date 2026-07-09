@@ -40,7 +40,7 @@ After setup, run the repo checks:
 Report changed files, check results, and any remaining setup choices.
 ```
 
-The repo has seven common workflow shortcuts. Claude Code and Codex expose them as slash commands; other agents use the same routes through `CONTEXT.md`.
+The repo has eight common workflow shortcuts. Claude Code and Codex expose them as slash commands; other agents use the same routes through `CONTEXT.md`.
 
 | Command | Use it to |
 |---|---|
@@ -51,6 +51,7 @@ The repo has seven common workflow shortcuts. Claude Code and Codex expose them 
 | `/wiki-eval` | Verify that the wiki tools and guardrails still work. |
 | `/wiki-synthesize` | Draft corpus distillations for review and approved promotion. |
 | `/wiki-export` | Build a local zip export of the wiki, including raw sources. |
+| `/wiki-swarm` | Run high-rigor wiki research with a checked review packet. |
 
 Research answers can stay in chat or become durable analyses when they are worth saving.
 
@@ -82,7 +83,7 @@ The checks and guardrails that protect the corpus:
 | Evidence review | Full `/wiki-lint` adds sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Approval gate and ledger | `scripts/capture_gate.py` makes the agent ask before filing analyses, applying artifact promotions, or approving synthesis; `scripts/capture-runs.jsonl` records what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, stale-text sweep proof, the unified approval gate, ledger validation, export, log rotation, review due checks, wrapper parity, and Tier-1 lint over the live corpus. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, stale-text sweep proof, the unified approval gate, ledger validation, export, log rotation, review due checks, wrapper parity, schema-doc parity, wiki-swarm guardrails, and Tier-1 lint over the live corpus. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 

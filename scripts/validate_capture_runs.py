@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,25 @@ VALID_TRIGGERS = {
     "future_agent_behavior",
     "existing_page_update",
 }
+DRAFT_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+DRAFT_SHA256_REQUIRED_FROM = "2026-07-08T00:00:00Z"
+
+
+def parse_utc_timestamp(value: Any) -> datetime | None:
+    if not is_nonempty_string(value):
+        return None
+    normalized = value.removesuffix("Z") + "+00:00" if value.endswith("Z") else value
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+DRAFT_SHA256_REQUIRED_FROM_DT = parse_utc_timestamp(DRAFT_SHA256_REQUIRED_FROM)
+assert DRAFT_SHA256_REQUIRED_FROM_DT is not None
 
 
 def parser() -> argparse.ArgumentParser:
@@ -68,15 +89,13 @@ def validate_capture_approval(record: dict[str, Any]) -> list[str]:
     errors.extend(_validate_pages(record))
 
     timestamp_error = validate_timestamp(record.get("approved_at"))
+    approved_at = parse_utc_timestamp(record.get("approved_at"))
     if timestamp_error:
         errors.append(timestamp_error)
 
     synthesized_pages = record.get("synthesized_pages")
     word_count = record.get("word_count")
     domain_context = record.get("domain_context")
-    if domain_context is None and "life_context" in record:
-        # Legacy alias from an older personal-wiki gate spelling.
-        domain_context = record.get("life_context")
     triggers = record.get("triggers")
     if not isinstance(synthesized_pages, int) or synthesized_pages < 0:
         errors.append("synthesized_pages must be a non-negative integer")
@@ -85,6 +104,21 @@ def validate_capture_approval(record: dict[str, Any]) -> list[str]:
     # Measurement provenance; optional because historical records predate it.
     if "word_count_path" in record and not isinstance(record.get("word_count_path"), str):
         errors.append("word_count_path must be a string when present")
+    if "draft_sha256" in record:
+        draft_sha256 = record.get("draft_sha256")
+        if not isinstance(draft_sha256, str) or not DRAFT_SHA256_RE.fullmatch(draft_sha256):
+            errors.append("draft_sha256 must be 64 lowercase hex characters when present")
+    if (
+        approved_at is not None
+        and approved_at >= DRAFT_SHA256_REQUIRED_FROM_DT
+        and record.get("word_count_source") == "measured"
+        and is_nonempty_string(record.get("word_count_path"))
+        and "draft_sha256" not in record
+    ):
+        errors.append(
+            "draft_sha256 is required for measured capture approvals "
+            f"commissioned from {DRAFT_SHA256_REQUIRED_FROM}"
+        )
     if not isinstance(domain_context, bool):
         errors.append("domain_context must be a boolean")
     if not isinstance(triggers, list) or not all(trigger in VALID_TRIGGERS for trigger in triggers):

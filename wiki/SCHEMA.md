@@ -6,6 +6,7 @@ Reference spec for entity types, page format, and source-type summary templates.
 
 ## Entity Types
 
+<!-- parity:enum key=entity-table-folders -->
 | Type | Location | Purpose |
 |---|---|---|
 | **Source** | `wiki/sources/` | Summary of a raw document — key facts, quotes, metadata, what it informs |
@@ -27,16 +28,21 @@ Reference spec for entity types, page format, and source-type summary templates.
 
 Every entity page (any page inside a `wiki/<entity-type>/` folder) must have this YAML frontmatter. `scripts/lint.py` checks the full entity-page contract there. Meta pages at the `wiki/` root, such as `index.md`, `log.md`, `overview.md`, `glossary.md`, `primer.md`, `sourcing-queue.md`, `contradictions.md`, `design-notes.md`, `SCHEMA.md`, and `synthesis.md`, are infrastructure and may use their own lightweight frontmatter with descriptive `type` values outside the entity enum.
 
+The parity-marker comments shown in this reference are doc-tooling markers, not page template content. Omit them when authoring page frontmatter.
+
 ```yaml
 ---
 title: <page title>
+<!-- parity:enum key=entity-type -->
 type: source | product | feature | persona | customer | competitor | concept | initiative | decision | metric | person | analysis
 created: YYYY-MM-DD
 updated: YYYY-MM-DD
 review_by: YYYY-MM-DD         # OPTIONAL — outcome-review checkpoint, especially for decisions
 sources: [list of raw source filenames or "experience: <brief description>" entries that informed this page]
+<!-- parity:enum key=source-type -->
 source_type: help-doc | slack-thread | call-transcript | exec-memo | deck | crm-export | strategy-doc | release-note | press | analyst-report | competitor-collateral | sales-battlecard | product-spec | board-doc | synthesis | other  # SOURCE PAGES ONLY — describes the underlying raw artifact
 tags: [relevant tags]
+<!-- parity:enum key=confidence -->
 confidence: high | medium | low | contested   # how well-sourced this page is; "contested" means active disagreement across sources
 agent_use_cases:                  # which downstream-agent questions this page is meant to answer
   - <e.g., "answering buyer-side product questions">
@@ -52,8 +58,10 @@ agent_use_cases:                  # which downstream-agent questions this page i
 
 Optional authority metadata:
 
+<!-- parity:enum key=authority-kind -->
 - `authority_kind: raw-source | source-page | owner-page | external-url | local-resource | mixed | none`
 - `authority_ref: <repo-relative path, URL, or short prose for mixed/local-resource>`
+<!-- parity:enum key=authority-freshness -->
 - `authority_freshness: immutable-source | stable-meaning | current-state | event-log | predictive | deprecated`
 - `verify_before_action: true | false`
 - `last_verified: YYYY-MM-DD`
@@ -64,6 +72,7 @@ Optional authority metadata:
 
 Freshness defaults guide authoring; lint does not infer them. Write `authority_freshness` only when the page differs from its type default, acts as the owner for live/current state, or is explicitly predictive/deprecated.
 
+<!-- parity:enum key=freshness-defaults -->
 | authority_freshness | Default for |
 |---|---|
 | `immutable-source` | `sources/` pages |
@@ -161,6 +170,7 @@ Do not mechanically backfill every existing related link. Add labels when touchi
 
 When ingesting a source, the summary in `wiki/sources/` should be shaped by what that source can be trusted for:
 
+<!-- parity:enum key=source-type-table -->
 | `source_type` | Trustworthy for | Treat with care | Summary should emphasize |
 |---|---|---|---|
 | `help-doc` | product surface, terminology | strategy, pricing, customers | feature inventory, user workflows |
@@ -178,11 +188,13 @@ When ingesting a source, the summary in `wiki/sources/` should be shaped by what
 | `product-spec` | engineering ground truth | GTM framing | requirements, constraints, edge cases |
 | `board-doc` | strategic priorities, metric targets | day-to-day truth | priorities, targets, board asks |
 | `synthesis` | LLM-synthesized analysis integrating multiple sources | source integration methodology not transparent; may embed interpreter bias | main findings, high-level synthesis, caveats on sources |
+| `other` | source-specific evidence not covered by a narrower type | overgeneralizing from an uncategorized source | why the source matters and what it can safely support |
 
 ---
 
 ## Confidence Values
 
+<!-- parity:enum key=confidence-values -->
 - `high` — multiple sources agree, or an authoritative internal source (spec, exec statement, official doc)
 - `medium` — single source, or strong inference from consistent signals
 - `low` — speculation, early hypothesis, or single off-hand mention

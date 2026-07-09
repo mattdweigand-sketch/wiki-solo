@@ -6,15 +6,17 @@ The live convenience surfaces are .claude/commands/wiki-*.md and
 and every wrapper must stay a thin pointer: at most one scripts/*.py command
 hint, no numbered-step procedure (canonical behavior lives in workflows/, per
 the wrapper contract in workflows/maintenance/eval.md), and every
-workflows/*.md path it names must exist.
+workflows/*.md path it names must exist. For shortcuts with a single canonical
+task workflow, the wrapper must also name that workflow so a command cannot
+silently route to the wrong existing file.
 
 Run directly, or via the wrapper-parity suite in scripts/wiki_eval.py (which
 also runs seeded negative cases from scripts/wiki_eval_wrappers.py):
     python3 scripts/check_wrapper_parity.py
 
-This is the current wrapper checker. The old duplicate-global cleanup machinery
-for pre-repo-local installs under ~/.codex/skills was a one-time migration and
-was retired 2026-07-01.
+(This replaces sync_codex_skills.py. The old --check/--remove-global modes
+existed to clean up pre-repo-local global installs under ~/.codex/skills; that
+one-time migration is complete and the machinery was retired 2026-07-01.)
 """
 
 from __future__ import annotations
@@ -33,8 +35,19 @@ EXPECTED_SKILLS = (
     "wiki-ingest",
     "wiki-lint",
     "wiki-promote",
+    "wiki-swarm",
     "wiki-synthesize",
 )
+
+EXPECTED_WORKFLOW_REFS = {
+    "wiki-capture": ("workflows/maintenance/capture.md",),
+    "wiki-eval": ("workflows/maintenance/eval.md",),
+    "wiki-export": ("workflows/maintenance/export.md",),
+    "wiki-ingest": ("workflows/ingest/CONTEXT.md",),
+    "wiki-lint": ("workflows/maintenance/lint.md",),
+    "wiki-promote": ("workflows/maintenance/artifact-promotion.md",),
+    "wiki-synthesize": ("workflows/maintenance/synthesize.md",),
+}
 
 # The two live tracked wrapper surfaces, relative to the repo root so the
 # checker can run against fixture trees too. Each must cover the same
@@ -50,8 +63,8 @@ WRAPPER_SURFACES = (
 # reference or a numbered-step list means procedure has leaked into the wrapper.
 SCRIPT_REF_RE = re.compile(r"scripts/[A-Za-z0-9_./-]*\.py")
 NUMBERED_STEP_RE = re.compile(r"^\s*[0-9]+\.\s")
-# A wrapper is a pointer, so what it points at must exist: every workflows/*.md
-# path in a wrapper body is checked against the tree.
+# A wrapper is a pointer, so what it points at must exist, and common shortcuts
+# must point at their canonical task workflow rather than another existing task.
 WORKFLOW_REF_RE = re.compile(r"workflows/[A-Za-z0-9_./-]*\.md")
 
 
@@ -66,6 +79,8 @@ def wrapper_parity_problems(repo_root: Path = REPO_ROOT) -> list[str]:
         numbered-step list (procedure leaking into a thin pointer),
       - a wrapper body naming a workflows/*.md path that does not exist
         (a pointer at nothing).
+      - a wrapper body missing the canonical workflow route for its wiki-*
+        shortcut (a pointer at the wrong existing workflow).
     """
     problems: list[str] = []
     expected = set(EXPECTED_SKILLS)
@@ -111,6 +126,11 @@ def wrapper_parity_problems(repo_root: Path = REPO_ROOT) -> list[str]:
                 if not (repo_root / ref).is_file():
                     problems.append(
                         f"{label}/{name}: workflow path {ref} does not exist"
+                    )
+            for ref in EXPECTED_WORKFLOW_REFS.get(name, ()):
+                if ref not in text:
+                    problems.append(
+                        f"{label}/{name}: missing required workflow route {ref}"
                     )
 
     return problems

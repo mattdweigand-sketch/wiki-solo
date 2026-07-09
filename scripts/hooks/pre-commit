@@ -7,7 +7,7 @@
 # What raw/ paths would this commit leave tracked? ls-files --cached reflects
 # the staged index (additions present, deletions gone), independent of HEAD, so
 # untracking raw/ is allowed while any added/remaining raw/ artifact is blocked.
-staged_raw=$(git ls-files --cached -- raw | grep -Ev '^raw/(\.gitkeep|README\.md)$')
+staged_raw=$(git ls-files --cached -- ':(icase)raw' | grep -Evi '^raw/(\.gitkeep|README\.md)$')
 if [ -n "$staged_raw" ]; then
   echo "pre-commit: refusing to commit raw/ source artifacts." >&2
   echo "raw/ source artifacts are never committed; only raw/.gitkeep and raw/README.md are tracked. Offending paths:" >&2
