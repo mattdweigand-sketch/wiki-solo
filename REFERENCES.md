@@ -109,6 +109,7 @@ When stating a specific fact, append `(source: [[source-filename]])`. When stati
 |---|---|
 | `raw/README.md` | Source-artifact handling note for the ignored `raw/` corpus |
 | `scripts/raw-buckets.json` | Tracked raw bucket taxonomy read by Tier-1 lint |
+| `scripts/current-state-owners.json` | Optional current-state owner registry used by wiki-swarm packet validation; default template value is an empty list |
 | `scripts/lint-adjudications.json` | Settled Tier-2 lint judgments with reasons and dates; lint suppresses what it lists |
 | `scripts/check_schema_doc_parity.py` | Verifies duplicated schema vocabulary docs stay in parity with `scripts/lint.py` constants |
 | `scripts/wiki_swarm.py` | Deterministic preflight and packet validator for the wiki-swarm research overlay |

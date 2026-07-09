@@ -52,7 +52,7 @@ Raw verification must not narrow the compiled-page scope. A raw spot-check can v
 
 This overlay may read raw sources for one purpose: verifying that consulted source pages still match the raw artifacts their frontmatter provenance names. It is a spot-check of compiled claims, not a parallel evidence layer.
 
-The planner decides whether the question warrants raw verification and says so either way. Explicit completeness or primary-source demands warrant it. Sensitive-category facts (property, legal, financial, insurance, medical) warrant it only when the question also demands completeness, reconstruction, or conflict resolution. Simple lookups and orientation questions never do. Check up to the runtime-owned raw-file maximum, only files named in consulted-page provenance, using reproducible text extraction. Record every file and method under `Raw sources checked` and every gap, unreadable region, or unavailable tool under `Raw extraction limits`. If verification was skipped, say why on the `Raw sources checked` line.
+The planner decides whether the question warrants raw verification and says so either way. Explicit completeness or primary-source demands warrant it. Facts in the runtime-owned sensitive categories warrant it only when the question also demands completeness, reconstruction, or conflict resolution. Simple lookups and orientation questions never do. Check up to the runtime-owned raw-file maximum, only files named in consulted-page provenance, using reproducible text extraction. Record every file and method under `Raw sources checked` and every gap, unreadable region, or unavailable tool under `Raw extraction limits`. If verification was skipped, say why on the `Raw sources checked` line.
 
 Cite only wiki pages in `Supported facts` and `Answer`; raw paths appear only in `Raw sources checked`. Label claims as wiki-backed, raw-verified, or inference. Do not claim completeness the raw coverage does not support.
 
@@ -86,7 +86,7 @@ Promotion audit:
 
 Keep `Checks actually run` factual. Do not list proposed checks as if they were completed.
 
-`validate-packet` enforces the checkable part of this contract. For any non-`STOP` packet, include `[[index]]` and `[[primer]]` in `Pages consulted`, cite at least one consulted wiki page in both `Supported facts` and `Answer`, and list `preflight` under `Checks actually run`.
+`validate-packet` enforces the checkable part of this contract. For any non-`STOP` packet, include `[[index]]` and `[[primer]]` in `Pages consulted`, cite at least one consulted wiki page in both `Supported facts` and `Answer`, and list `preflight` under `Checks actually run`. It also verifies consulted pages exist in the corpus, that every file in `Raw sources checked` is named in a consulted page's frontmatter provenance, that swarm-verdict packets report every manifest lane under `Lane results`, and that every non-`STOP` packet states the raw-verification decision.
 
 For current-state, status, maintenance, or contradiction-sensitive packets, consult `[[contradictions]]` and cite it in `Contradictions or stale areas`. Do not use bare dismissal language such as "none found" or "not applicable"; if the register has no material conflict for the answer, say that as a relevance-qualified note after checking `[[contradictions]]`.
 

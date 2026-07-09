@@ -39,12 +39,53 @@ def packet_path(body: str) -> Path:
     return path
 
 
+def build_fixture_root() -> Path:
+    """Hermetic mini-corpus so corpus-aware packet checks never depend on the
+    live wiki's configuration."""
+    root = Path(tempfile.mkdtemp(prefix="wiki-swarm-eval-corpus-"))
+    (root / "wiki" / "customers").mkdir(parents=True)
+    (root / "wiki" / "sources").mkdir()
+    (root / "scripts").mkdir()
+
+    def page(rel: str, frontmatter: str, body: str) -> None:
+        (root / "wiki" / rel).write_text(
+            f"---\n{frontmatter}\n---\n\n{body}\n", encoding="utf-8"
+        )
+
+    page("index.md", "title: Index\ntype: meta", "Corpus index fixture.")
+    page("primer.md", "title: Primer\ntype: meta", "Corpus primer fixture.")
+    page("contradictions.md", "title: Contradictions\ntype: meta", "Register fixture.")
+    page(
+        "customers/customer-status.md",
+        "title: Customer Status\ntype: customer",
+        "Customer status fixture.",
+    )
+    page(
+        "sources/kitchen-binder.md",
+        "title: Kitchen Binder\ntype: source\n"
+        "sources: [raw/records/kitchen-binder.pdf, raw/records/one.pdf, "
+        "raw/records/two.pdf, raw/records/three.pdf, raw/records/four.pdf]",
+        "Source page fixture for raw provenance checks.",
+    )
+    (root / "scripts" / "current-state-owners.json").write_text(
+        json.dumps(["customers/customer-status.md"]) + "\n", encoding="utf-8"
+    )
+    return root
+
+
+FIXTURE_ROOT = build_fixture_root()
+
+
+def validate_packet(path_str: str) -> subprocess.CompletedProcess[str]:
+    return run_swarm("validate-packet", "--packet", path_str, "--root", str(FIXTURE_ROOT))
+
+
 GOOD_PACKET = """WIKI-SWARM PACKET
 Verdict: SINGLE-AGENT SWARM
 Question: /wiki-swarm What does the wiki say?
 Source scope: wiki/index.md, wiki/primer.md, selected pages
 Pages consulted: [[index]], [[primer]]
-Lane results: Planner scoped the question; Page Scout tagged page relevance; Reviewer completed scope-retention review; helper lanes returned notes only.
+Lane results: Planner scoped the question; Page Scout tagged page relevance; Evidence Extractor pulled cited facts; Raw Evidence Extractor reported a qualified skip; Contradiction Staleness Checker surfaced open conflicts; Synthesizer drafted the answer; Reviewer completed scope-retention review; helper lanes returned notes only.
 Supported facts: Facts are cited to [[index]].
 Inferences: Inferences are labeled.
 Contradictions or stale areas: none found
@@ -134,6 +175,16 @@ def check_manifest() -> None:
         and "none - no raw-only findings" in data.get("raw_only_qualified_none_markers", [])
         and "re-ingest" in data.get("raw_only_reingest_markers", [])
         and data.get("max_raw_files") == 3
+        and data.get("sensitive_raw_categories") == [
+            "property",
+            "legal",
+            "financial",
+            "insurance",
+            "medical",
+        ]
+        and "current" in data.get("contradiction_page_required_when", [])
+        and "customer" in data.get("contradiction_page_required_when", [])
+        and data.get("current_state_owner_registry") == "scripts/current-state-owners.json"
         and len(lanes) == 7
         and any(lane.get("name") == "raw-evidence-extractor" for lane in lanes)
         and "scope-retention risks" in planner.get("allowed_outputs", [])
@@ -150,10 +201,25 @@ def check_manifest() -> None:
     )
     results.record("manifest-pins-read-only-lanes", ok, proc.stdout + proc.stderr)
 
+    fixture_manifest = run_swarm("manifest", "--json", "--root", str(FIXTURE_ROOT))
+    try:
+        fixture_data = json.loads(fixture_manifest.stdout)
+    except json.JSONDecodeError:
+        fixture_data = {}
+    fixture_markers = fixture_data.get("contradiction_page_required_when", [])
+    results.record(
+        "contradiction-markers-derive-from-current-state-registry",
+        fixture_manifest.returncode == 0
+        and "customer-status" in fixture_markers
+        and "customer status" in fixture_markers
+        and "current" in fixture_markers,
+        fixture_manifest.stdout + fixture_manifest.stderr,
+    )
+
 
 def check_packet_validation() -> None:
     good = packet_path(GOOD_PACKET)
-    proc = run_swarm("validate-packet", "--packet", str(good))
+    proc = validate_packet(str(good))
     results.record(
         "valid-packet-passes",
         proc.returncode == 0 and "valid" in proc.stdout,
@@ -161,7 +227,7 @@ def check_packet_validation() -> None:
     )
 
     missing = packet_path(GOOD_PACKET.replace("Promotion audit: none\n", ""))
-    proc = run_swarm("validate-packet", "--packet", str(missing))
+    proc = validate_packet(str(missing))
     results.record(
         "missing-section-fails",
         proc.returncode == 1 and "missing packet section: Promotion audit" in proc.stdout,
@@ -172,7 +238,7 @@ def check_packet_validation() -> None:
         "Verdict: SINGLE-AGENT SWARM",
         "Verdict:",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(empty_verdict))
+    proc = validate_packet(str(empty_verdict))
     results.record(
         "empty-verdict-fails",
         proc.returncode == 1 and "invalid verdict" in proc.stdout,
@@ -183,7 +249,7 @@ def check_packet_validation() -> None:
         "Checks actually run: preflight, packet validation",
         "Checks actually run: proposed lint and planned packet validation",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(proposed))
+    proc = validate_packet(str(proposed))
     results.record(
         "proposed-check-claim-fails",
         proc.returncode == 1 and "proposed or planned" in proc.stdout,
@@ -194,7 +260,7 @@ def check_packet_validation() -> None:
         "helper lanes returned notes only",
         "helper lanes edited files and returned notes",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(helper_write))
+    proc = validate_packet(str(helper_write))
     results.record(
         "helper-write-claim-fails",
         proc.returncode == 1 and "read-only" in proc.stdout,
@@ -205,7 +271,7 @@ def check_packet_validation() -> None:
         "helper lanes returned notes only",
         "helper lanes returned notes only; no durable write was requested",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(negated_helper_write))
+    proc = validate_packet(str(negated_helper_write))
     results.record(
         "negated-helper-write-claim-passes",
         proc.returncode == 0 and "valid" in proc.stdout,
@@ -216,7 +282,7 @@ def check_packet_validation() -> None:
         "Reviewer completed scope-retention review; ",
         "",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(missing_scope_review))
+    proc = validate_packet(str(missing_scope_review))
     results.record(
         "missing-scope-retention-review-fails",
         proc.returncode == 1 and "scope-retention review" in proc.stdout,
@@ -227,7 +293,7 @@ def check_packet_validation() -> None:
         "Durable-write status: chat-only; no durable write",
         "Durable-write status: filed analysis by direct write",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(bypass))
+    proc = validate_packet(str(bypass))
     results.record(
         "durable-bypass-claim-fails",
         proc.returncode == 1 and "analysis-capture" in proc.stdout,
@@ -238,7 +304,7 @@ def check_packet_validation() -> None:
         "Durable-write status: chat-only; no durable write",
         "Durable-write status: filed analysis through workflows/research/CONTEXT.md#analysis-capture",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(durable_route_without_proof))
+    proc = validate_packet(str(durable_route_without_proof))
     results.record(
         "durable-route-without-proof-fails",
         proc.returncode == 1
@@ -254,7 +320,7 @@ def check_packet_validation() -> None:
         "approval record in scripts/capture-runs.jsonl; validate_capture_runs.py passed; "
         "primary home wiki/analyses/example.md",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(durable_proof))
+    proc = validate_packet(str(durable_proof))
     results.record(
         "durable-proof-packet-passes",
         proc.returncode == 0 and "valid" in proc.stdout,
@@ -265,7 +331,7 @@ def check_packet_validation() -> None:
         "Pages consulted: [[index]], [[primer]]",
         "Pages consulted: [[agent-harness]]",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(missing_index_primer))
+    proc = validate_packet(str(missing_index_primer))
     results.record(
         "missing-index-primer-fails",
         proc.returncode == 1
@@ -278,7 +344,7 @@ def check_packet_validation() -> None:
         "Answer: concise answer from [[primer]]",
         "Answer: concise answer with no citation",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(uncited_answer))
+    proc = validate_packet(str(uncited_answer))
     results.record(
         "uncited-answer-fails",
         proc.returncode == 1 and "Answer must include at least one wiki citation" in proc.stdout,
@@ -289,7 +355,7 @@ def check_packet_validation() -> None:
         "Supported facts: Facts are cited to [[index]].",
         "Supported facts: Facts are not cited.",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(uncited_facts))
+    proc = validate_packet(str(uncited_facts))
     results.record(
         "uncited-supported-facts-fail",
         proc.returncode == 1 and "Supported facts must include at least one wiki citation" in proc.stdout,
@@ -300,7 +366,7 @@ def check_packet_validation() -> None:
         "Answer: concise answer from [[primer]]",
         "Answer: concise answer from [[context-as-moat]]",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(unconsulted_citation))
+    proc = validate_packet(str(unconsulted_citation))
     results.record(
         "unconsulted-citation-fails",
         proc.returncode == 1 and "cites pages not listed in Pages consulted: context-as-moat" in proc.stdout,
@@ -311,7 +377,7 @@ def check_packet_validation() -> None:
         "Answer: concise answer from [[primer]]",
         "Answer: concise answer from [[primer]], but the citation may not support every claim.",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(self_disclaimed_citation))
+    proc = validate_packet(str(self_disclaimed_citation))
     results.record(
         "self-disclaimed-citation-support-fails",
         proc.returncode == 1 and "must not disclaim or weaken its own citation support" in proc.stdout,
@@ -331,7 +397,7 @@ def check_packet_validation() -> None:
         "Contradictions or stale areas: none found",
         "Contradictions or stale areas: none found",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(smoothed_contradiction))
+    proc = validate_packet(str(smoothed_contradiction))
     results.record(
         "contradiction-sensitive-packet-requires-contradictions-check",
         proc.returncode == 1 and "must consult [[contradictions]]" in proc.stdout,
@@ -351,7 +417,7 @@ def check_packet_validation() -> None:
         "Answer: concise answer from [[primer]]",
         "Answer: current status answer from [[customer-status]]",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(not_applicable_contradiction_bypass))
+    proc = validate_packet(str(not_applicable_contradiction_bypass))
     results.record(
         "contradiction-not-applicable-bypass-fails",
         proc.returncode == 1
@@ -373,12 +439,64 @@ def check_packet_validation() -> None:
         "Answer: concise answer from [[primer]]",
         "Answer: current status answer from [[customer-status]]",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(contradiction_register_smoothed))
+    proc = validate_packet(str(contradiction_register_smoothed))
     results.record(
         "contradiction-register-smoothing-fails",
         proc.returncode == 1
         and "must cite [[contradictions]]" in proc.stdout
         and "must not dismiss" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    missing_lane_report = packet_path(GOOD_PACKET.replace(
+        "Synthesizer drafted the answer; ",
+        "",
+    ))
+    proc = validate_packet(str(missing_lane_report))
+    results.record(
+        "missing-lane-report-fails",
+        proc.returncode == 1
+        and "Lane results must report the synthesizer lane" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    normal_research_lanes = packet_path(GOOD_PACKET.replace(
+        "Verdict: SINGLE-AGENT SWARM",
+        "Verdict: NORMAL RESEARCH",
+    ).replace(
+        "Lane results: Planner scoped the question; Page Scout tagged page relevance; "
+        "Evidence Extractor pulled cited facts; Raw Evidence Extractor reported a qualified skip; "
+        "Contradiction Staleness Checker surfaced open conflicts; Synthesizer drafted the answer; "
+        "Reviewer completed scope-retention review; helper lanes returned notes only.",
+        "Lane results: Reviewer completed scope-retention review; helper lanes returned notes only.",
+    ))
+    proc = validate_packet(str(normal_research_lanes))
+    results.record(
+        "normal-research-verdict-skips-lane-reporting",
+        proc.returncode == 0 and "valid" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    blank_raw_decision = packet_path(GOOD_PACKET.replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked:",
+    ))
+    proc = validate_packet(str(blank_raw_decision))
+    results.record(
+        "blank-raw-decision-fails",
+        proc.returncode == 1
+        and "Raw sources checked must state checked files or a qualified skip" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    entity_marker_trigger = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[customer-status]]",
+    ))
+    proc = validate_packet(str(entity_marker_trigger))
+    results.record(
+        "consulted-current-state-page-requires-contradictions-check",
+        proc.returncode == 1 and "must consult [[contradictions]]" in proc.stdout,
         proc.stdout + proc.stderr,
     )
 
@@ -389,7 +507,7 @@ def check_packet_validation() -> None:
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: none",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_required_bare_none))
+    proc = validate_packet(str(raw_required_bare_none))
     results.record(
         "raw-required-bare-none-fails",
         proc.returncode == 1 and "Raw sources checked must list checked raw files" in proc.stdout,
@@ -403,7 +521,7 @@ def check_packet_validation() -> None:
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: not triggered - consulted source page is already the durable truth for this ordinary lookup",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_required_qualified_skip))
+    proc = validate_packet(str(raw_required_qualified_skip))
     results.record(
         "raw-required-qualified-skip-passes",
         proc.returncode == 0 and "valid" in proc.stdout,
@@ -414,13 +532,16 @@ def check_packet_validation() -> None:
         "Question: /wiki-swarm What does the wiki say?",
         "Question: /wiki-swarm tell me the complete history of the kitchen remodel",
     ).replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[kitchen-binder]]",
+    ).replace(
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
     ).replace(
         "Raw extraction limits: not triggered - no raw verification performed",
         "Raw extraction limits: no unreadable regions found in the extracted text",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_checked))
+    proc = validate_packet(str(raw_checked))
     results.record(
         "raw-checked-with-limits-passes",
         proc.returncode == 0 and "valid" in proc.stdout,
@@ -428,6 +549,9 @@ def check_packet_validation() -> None:
     )
 
     too_many_raw_files = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[kitchen-binder]]",
+    ).replace(
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: raw/records/one.pdf via pdftotext; "
         "raw/records/two.pdf via pdftotext; raw/records/three.pdf via pdftotext; "
@@ -436,7 +560,7 @@ def check_packet_validation() -> None:
         "Raw extraction limits: not triggered - no raw verification performed",
         "Raw extraction limits: no unreadable regions found in extracted text",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(too_many_raw_files))
+    proc = validate_packet(str(too_many_raw_files))
     results.record(
         "too-many-raw-files-fails",
         proc.returncode == 1 and "no more than 3 raw/ paths" in proc.stdout,
@@ -444,13 +568,16 @@ def check_packet_validation() -> None:
     )
 
     raw_checked_empty_limits = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[kitchen-binder]]",
+    ).replace(
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
     ).replace(
         "Raw extraction limits: not triggered - no raw verification performed",
         "Raw extraction limits:",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_checked_empty_limits))
+    proc = validate_packet(str(raw_checked_empty_limits))
     results.record(
         "raw-checked-empty-limits-fails",
         proc.returncode == 1 and "Raw extraction limits must be stated" in proc.stdout,
@@ -461,7 +588,7 @@ def check_packet_validation() -> None:
         "Answer: concise answer from [[primer]]",
         "Answer: concise answer from [[primer]] and raw/records/kitchen-binder.pdf",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_path_in_answer))
+    proc = validate_packet(str(raw_path_in_answer))
     results.record(
         "raw-path-in-answer-fails",
         proc.returncode == 1 and "Answer must not include raw/ paths" in proc.stdout,
@@ -472,7 +599,7 @@ def check_packet_validation() -> None:
         "Supported facts: Facts are cited to [[index]].",
         "Supported facts: Facts are cited to [[index]] and raw/records/kitchen-binder.pdf.",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_path_in_supported_facts))
+    proc = validate_packet(str(raw_path_in_supported_facts))
     results.record(
         "raw-path-in-supported-facts-fails",
         proc.returncode == 1 and "Supported facts must not include raw/ paths" in proc.stdout,
@@ -486,7 +613,7 @@ def check_packet_validation() -> None:
         "Answer: concise answer from [[primer]]",
         "Answer: concise answer from [[foo]]",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_path_laundering))
+    proc = validate_packet(str(raw_path_laundering))
     results.record(
         "raw-path-page-mention-laundering-fails",
         proc.returncode == 1 and "cites pages not listed in Pages consulted: foo" in proc.stdout,
@@ -494,6 +621,9 @@ def check_packet_validation() -> None:
     )
 
     raw_only_finding = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[kitchen-binder]]",
+    ).replace(
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
     ).replace(
@@ -503,7 +633,7 @@ def check_packet_validation() -> None:
         "Raw-only findings: none - no raw-only findings",
         "Raw-only findings: raw-only finding: binder has an omitted invoice detail; recommend re-ingest and update source page before durable use.",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_only_finding))
+    proc = validate_packet(str(raw_only_finding))
     results.record(
         "raw-only-finding-with-recommendation-passes",
         proc.returncode == 0 and "valid" in proc.stdout,
@@ -511,6 +641,9 @@ def check_packet_validation() -> None:
     )
 
     raw_only_without_recommendation = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[kitchen-binder]]",
+    ).replace(
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
     ).replace(
@@ -520,7 +653,7 @@ def check_packet_validation() -> None:
         "Raw-only findings: none - no raw-only findings",
         "Raw-only findings: raw-only finding: binder has an omitted invoice detail.",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_only_without_recommendation))
+    proc = validate_packet(str(raw_only_without_recommendation))
     results.record(
         "raw-only-finding-without-recommendation-fails",
         proc.returncode == 1 and "Raw-only findings must recommend" in proc.stdout,
@@ -531,7 +664,7 @@ def check_packet_validation() -> None:
         "Raw-only findings: none - no raw-only findings",
         "Raw-only findings: raw-only finding: omitted invoice detail; recommend re-ingest and update source page before durable use.",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_only_without_raw_path))
+    proc = validate_packet(str(raw_only_without_raw_path))
     results.record(
         "raw-only-finding-without-raw-check-fails",
         proc.returncode == 1 and "Raw-only findings require at least one raw file" in proc.stdout,
@@ -539,6 +672,9 @@ def check_packet_validation() -> None:
     )
 
     raw_only_with_durable_filing = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[kitchen-binder]]",
+    ).replace(
         "Raw sources checked: not triggered - ordinary lookup",
         "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
     ).replace(
@@ -553,10 +689,40 @@ def check_packet_validation() -> None:
         "approval record in scripts/capture-runs.jsonl; validate_capture_runs.py passed; "
         "primary home wiki/analyses/example.md",
     ))
-    proc = run_swarm("validate-packet", "--packet", str(raw_only_with_durable_filing))
+    proc = validate_packet(str(raw_only_with_durable_filing))
     results.record(
         "raw-only-finding-with-durable-filing-fails",
         proc.returncode == 1 and "raw-only findings must not claim an analysis was filed" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    unknown_consulted_page = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[ghost-page]]",
+    ))
+    proc = validate_packet(str(unknown_consulted_page))
+    results.record(
+        "unknown-consulted-page-fails",
+        proc.returncode == 1
+        and "Pages consulted lists pages not in the wiki corpus: ghost-page" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_outside_provenance = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], [[kitchen-binder]]",
+    ).replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: raw/records/unrelated.pdf via pdftotext -layout",
+    ).replace(
+        "Raw extraction limits: not triggered - no raw verification performed",
+        "Raw extraction limits: no unreadable regions found in the extracted text",
+    ))
+    proc = validate_packet(str(raw_outside_provenance))
+    results.record(
+        "raw-file-outside-consulted-provenance-fails",
+        proc.returncode == 1
+        and "raw/records/unrelated.pdf which is not named in any consulted page's provenance" in proc.stdout,
         proc.stdout + proc.stderr,
     )
 
@@ -623,6 +789,12 @@ def check_docs_contract() -> None:
         "runtime-owned raw-file maximum" in swarm_text
         and "at most three raw files" not in swarm_text,
         "swarm workflow should defer the raw-file cap to scripts/wiki_swarm.py manifest",
+    )
+    results.record(
+        "swarm-doc-uses-runtime-sensitive-categories",
+        "runtime-owned sensitive categories" in swarm_text
+        and "property, legal, financial, insurance, medical" not in swarm_text,
+        "swarm workflow should defer sensitive categories to scripts/wiki_swarm.py manifest",
     )
     forbidden_script_duplications = (
         "scripts/capture_gate.py",

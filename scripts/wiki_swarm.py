@@ -15,6 +15,11 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from _wiki_parse import frontmatter_block
+
+
+DEFAULT_ROOT = Path(__file__).resolve().parents[1]
+
 
 TRIGGER_PHRASES = (
     "/wiki-swarm",
@@ -65,6 +70,16 @@ SCOPE_RETENTION_REVIEW_MARKERS = (
 )
 
 MAX_RAW_FILES = 3
+
+SENSITIVE_RAW_CATEGORIES = (
+    "property",
+    "legal",
+    "financial",
+    "insurance",
+    "medical",
+)
+
+CURRENT_STATE_OWNERS = Path("scripts") / "current-state-owners.json"
 
 
 @dataclass(frozen=True)
@@ -164,10 +179,11 @@ PACKET_SECTIONS = (
 )
 
 VALID_VERDICTS = ("NORMAL RESEARCH", "SINGLE-AGENT SWARM", "SPLIT LANES", "STOP")
+SWARM_VERDICTS = ("SINGLE-AGENT SWARM", "SPLIT LANES")
 SECTION_RE = re.compile(r"^([A-Z][A-Za-z -]+):\s*(.*)$")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 PATH_PAGE_RE = re.compile(r"(?:wiki/)?(?:[a-z0-9-]+/)*([a-z0-9-]+)\.md")
-RAW_PATH_RE = re.compile(r"\braw/[^\s),;]+")
+RAW_PATH_RE = re.compile(r"\braw/[^\s),;\]]+")
 REQUIRED_CONSULTED_PAGES = {
     "index": ("[[index]]", "wiki/index.md"),
     "primer": ("[[primer]]", "wiki/primer.md"),
@@ -202,7 +218,7 @@ RAW_ONLY_REINGEST_MARKERS = (
     "sourcing-queue",
 )
 CONTRADICTION_PAGE_MARKERS = ("[[contradictions]]", "wiki/contradictions.md", "contradictions.md")
-CONTRADICTION_REQUIRED_MARKERS = (
+CONTRADICTION_GENERIC_MARKERS = (
     "current",
     "current-state",
     "open priorities",
@@ -317,6 +333,58 @@ def page_mentions(text: str) -> set[str]:
     return mentions
 
 
+def current_state_entity_markers(root: Path) -> tuple[str, ...]:
+    """Entity markers derived from the current-state owner registry.
+
+    Each owned page contributes its slug and first-three-token prefix, in
+    hyphen and space forms. Domain-specific names stay in data; only this
+    derivation rule lives in code.
+    """
+    registry_path = root / CURRENT_STATE_OWNERS
+    if not registry_path.is_file():
+        return ()
+    try:
+        entries = json.loads(registry_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return ()
+    markers: dict[str, None] = {}
+    for entry in entries:
+        if not isinstance(entry, str):
+            continue
+        slug = Path(entry).stem.lower()
+        prefix = "-".join(slug.split("-")[:3])
+        for candidate in (slug, prefix):
+            if candidate:
+                markers.setdefault(candidate)
+                markers.setdefault(candidate.replace("-", " "))
+    return tuple(markers)
+
+
+def contradiction_required_markers(root: Path) -> tuple[str, ...]:
+    return CONTRADICTION_GENERIC_MARKERS + current_state_entity_markers(root)
+
+
+def wiki_corpus(root: Path) -> dict[str, list[Path]] | None:
+    """Map normalized page slug to page paths under root/wiki."""
+    wiki_dir = root / "wiki"
+    if not wiki_dir.is_dir():
+        return None
+    corpus: dict[str, list[Path]] = {}
+    for page in wiki_dir.rglob("*.md"):
+        corpus.setdefault(normalize(page.stem), []).append(page)
+    return corpus
+
+
+def consulted_provenance_paths(consulted: set[str], corpus: dict[str, list[Path]]) -> set[str]:
+    """Raw paths named in frontmatter provenance of consulted pages."""
+    provenance: set[str] = set()
+    for slug in consulted:
+        for page in corpus.get(slug, []):
+            block = frontmatter_block(page.read_text(encoding="utf-8"))
+            provenance.update(raw_paths(block))
+    return provenance
+
+
 def has_self_disclaimed_citation_support(text: str) -> bool:
     return has_marker(text, CITATION_INTEGRITY_FAILURE_MARKERS)
 
@@ -370,7 +438,7 @@ def is_standalone_swarm(question: str) -> bool:
     return bool(re.search(r"\bswarm\b", text)) and not has_explicit_trigger(question)
 
 
-def registry() -> dict[str, object]:
+def registry(root: Path = DEFAULT_ROOT) -> dict[str, object]:
     return {
         "trigger_phrases": TRIGGER_PHRASES,
         "non_trigger_examples": NON_TRIGGER_EXAMPLES,
@@ -388,9 +456,11 @@ def registry() -> dict[str, object]:
         "raw_only_qualified_none_markers": RAW_ONLY_QUALIFIED_NONE_MARKERS,
         "raw_only_reingest_markers": RAW_ONLY_REINGEST_MARKERS,
         "max_raw_files": MAX_RAW_FILES,
+        "sensitive_raw_categories": SENSITIVE_RAW_CATEGORIES,
         "citation_integrity_failure_markers": CITATION_INTEGRITY_FAILURE_MARKERS,
         "contradiction_page_markers": CONTRADICTION_PAGE_MARKERS,
-        "contradiction_page_required_when": CONTRADICTION_REQUIRED_MARKERS,
+        "contradiction_page_required_when": contradiction_required_markers(root),
+        "current_state_owner_registry": str(CURRENT_STATE_OWNERS),
         "contradiction_dismissal_markers": CONTRADICTION_DISMISSAL_MARKERS,
         "durable_write_claim_markers": DURABLE_CLAIM_MARKERS,
         "durable_write_approval_proof_markers": DURABLE_APPROVAL_PROOF_MARKERS,
@@ -400,9 +470,9 @@ def registry() -> dict[str, object]:
     }
 
 
-def print_manifest(*, json_mode: bool = False) -> None:
+def print_manifest(*, root: Path = DEFAULT_ROOT, json_mode: bool = False) -> None:
     if json_mode:
-        print(json.dumps(registry(), indent=2, sort_keys=True))
+        print(json.dumps(registry(root), indent=2, sort_keys=True))
         return
     print("WIKI-SWARM MANIFEST")
     print("Trigger phrases:")
@@ -421,6 +491,9 @@ def print_manifest(*, json_mode: bool = False) -> None:
     for target in SCOPE_RETENTION_OUTPUT_TARGETS:
         print(f"- {target}")
     print(f"Max raw files: {MAX_RAW_FILES}")
+    print("Sensitive raw categories:")
+    for category in SENSITIVE_RAW_CATEGORIES:
+        print(f"- {category}")
     print("Lanes:")
     for lane in LANES:
         print(f"- {lane.name}: read_only={str(lane.read_only).lower()}; {lane.responsibility}")
@@ -476,15 +549,15 @@ def non_stop_verdict(verdict: str) -> bool:
     return bool(verdict) and verdict != "STOP"
 
 
-def needs_contradiction_page(sections: dict[str, str]) -> bool:
+def needs_contradiction_page(sections: dict[str, str], root: Path) -> bool:
     combined = " ".join(
         sections.get(section, "")
         for section in ("Question", "Source scope", "Pages consulted", "Answer")
     )
-    return has_marker(combined, CONTRADICTION_REQUIRED_MARKERS)
+    return has_marker(combined, contradiction_required_markers(root))
 
 
-def validate_packet_text(text: str) -> list[str]:
+def validate_packet_text(text: str, root: Path = DEFAULT_ROOT) -> list[str]:
     problems: list[str] = []
     stripped = text.lstrip()
     if not stripped.startswith("WIKI-SWARM PACKET"):
@@ -513,6 +586,16 @@ def validate_packet_text(text: str) -> list[str]:
             if not has_marker(pages, markers):
                 problems.append(f"Pages consulted must include [[{page_name}]] for non-STOP packets")
 
+        corpus = wiki_corpus(root)
+        if corpus is None:
+            problems.append(f"wiki corpus not found under {root}")
+        else:
+            unknown_pages = sorted(slug for slug in consulted_pages if slug not in corpus)
+            if unknown_pages:
+                problems.append(
+                    f"Pages consulted lists pages not in the wiki corpus: {', '.join(unknown_pages)}"
+                )
+
         for section in CITATION_REQUIRED_SECTIONS:
             section_text = sections.get(section, "")
             if raw_paths(section_text):
@@ -529,7 +612,7 @@ def validate_packet_text(text: str) -> list[str]:
                 problems.append(f"{section} must not disclaim or weaken its own citation support")
 
         contradictions = sections.get("Contradictions or stale areas", "")
-        if needs_contradiction_page(sections):
+        if needs_contradiction_page(sections, root):
             if not has_marker(pages, CONTRADICTION_PAGE_MARKERS):
                 problems.append(
                     "current-state, status, maintenance, or contradiction-sensitive packets must consult [[contradictions]]"
@@ -547,12 +630,23 @@ def validate_packet_text(text: str) -> list[str]:
         raw_limits = sections.get("Raw extraction limits", "")
         raw_only = sections.get("Raw-only findings", "")
         checked_raw_paths = raw_paths(raw_checked)
+        if not raw_checked.strip():
+            problems.append(
+                "Raw sources checked must state checked files or a qualified skip for non-STOP packets"
+            )
         if raw_check_required(sections) and not checked_raw_paths and not has_qualified_raw_skip(raw_checked):
             problems.append(
                 "Raw sources checked must list checked raw files or a qualified skip when the question asks for completeness or primary-source reconstruction"
             )
         if len(checked_raw_paths) > MAX_RAW_FILES:
             problems.append(f"Raw sources checked must list no more than {MAX_RAW_FILES} raw/ paths")
+        if checked_raw_paths and corpus is not None:
+            provenance = consulted_provenance_paths(consulted_pages, corpus)
+            for checked_path in checked_raw_paths:
+                if checked_path not in provenance:
+                    problems.append(
+                        f"Raw sources checked lists {checked_path} which is not named in any consulted page's provenance"
+                    )
         if checked_raw_paths and not raw_limits.strip():
             problems.append("Raw extraction limits must be stated when raw sources are checked")
         if has_raw_only_finding(raw_only):
@@ -566,6 +660,12 @@ def validate_packet_text(text: str) -> list[str]:
     lane_results = normalize(sections.get("Lane results", ""))
     if non_stop_verdict(verdict) and not has_marker(lane_results, SCOPE_RETENTION_REVIEW_MARKERS):
         problems.append("Lane results must include a scope-retention review for non-STOP packets")
+    if verdict in SWARM_VERDICTS:
+        for lane in LANES:
+            if not has_marker(lane_results, (lane.name, lane.name.replace("-", " "))):
+                problems.append(
+                    f"Lane results must report the {lane.name} lane for swarm-verdict packets"
+                )
     if has_unnegated_phrase(
         lane_results,
         (
@@ -600,9 +700,9 @@ def validate_packet_text(text: str) -> list[str]:
     return problems
 
 
-def run_validate_packet(path: Path, *, json_mode: bool = False) -> int:
+def run_validate_packet(path: Path, *, root: Path = DEFAULT_ROOT, json_mode: bool = False) -> int:
     text = path.read_text(encoding="utf-8")
-    problems = validate_packet_text(text)
+    problems = validate_packet_text(text, root)
     if json_mode:
         print(json.dumps({"ok": not problems, "problems": problems}, indent=2, sort_keys=True))
     elif problems:
@@ -619,6 +719,12 @@ def parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command", required=True)
 
     manifest = sub.add_parser("manifest", help="Print canonical swarm policy.")
+    manifest.add_argument(
+        "--root",
+        type=Path,
+        default=DEFAULT_ROOT,
+        help="Repo root holding the current-state owner registry (default: this repo).",
+    )
     manifest.add_argument("--json", action="store_true", help="Emit JSON.")
 
     preflight = sub.add_parser("preflight", help="Check whether a request explicitly invokes wiki-swarm.")
@@ -627,6 +733,12 @@ def parser() -> argparse.ArgumentParser:
 
     validate = sub.add_parser("validate-packet", help="Validate a completed WIKI-SWARM PACKET.")
     validate.add_argument("--packet", required=True, type=Path)
+    validate.add_argument(
+        "--root",
+        type=Path,
+        default=DEFAULT_ROOT,
+        help="Repo root holding the wiki corpus to validate against (default: this repo).",
+    )
     validate.add_argument("--json", action="store_true", help="Emit JSON.")
     return p
 
@@ -634,12 +746,12 @@ def parser() -> argparse.ArgumentParser:
 def main() -> int:
     args = parser().parse_args()
     if args.command == "manifest":
-        print_manifest(json_mode=args.json)
+        print_manifest(root=args.root, json_mode=args.json)
         return 0
     if args.command == "preflight":
         return run_preflight(args.question, json_mode=args.json)
     if args.command == "validate-packet":
-        return run_validate_packet(args.packet, json_mode=args.json)
+        return run_validate_packet(args.packet, root=args.root, json_mode=args.json)
     raise AssertionError(f"unknown command {args.command}")
 
 
