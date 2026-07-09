@@ -48,6 +48,9 @@ Lane results: Planner scoped the question; Page Scout found pages; helper lanes 
 Supported facts: Facts are cited to [[index]].
 Inferences: Inferences are labeled.
 Contradictions or stale areas: none found
+Raw sources checked: not triggered - ordinary lookup
+Raw extraction limits: not triggered - no raw verification performed
+Raw-only findings: none - no raw-only findings
 Answer: concise answer from [[primer]]
 What not to say: do not overclaim
 Checks actually run: preflight, packet validation
@@ -96,7 +99,12 @@ def check_manifest() -> None:
         and "capture-runs.jsonl" in data.get("durable_write_approval_proof_markers", [])
         and "validate_capture_runs.py" in data.get("durable_write_validation_proof_markers", [])
         and "wiki/analyses/" in data.get("durable_write_destination_markers", [])
-        and len(lanes) == 6
+        and "complete history" in data.get("raw_check_required_markers", [])
+        and "not triggered" in data.get("raw_qualified_skip_markers", [])
+        and "none - no raw-only findings" in data.get("raw_only_qualified_none_markers", [])
+        and "re-ingest" in data.get("raw_only_reingest_markers", [])
+        and len(lanes) == 7
+        and any(lane.get("name") == "raw-evidence-extractor" for lane in lanes)
         and all(lane.get("read_only") is True for lane in lanes)
         and all(lane.get("may_edit_files") is False for lane in lanes)
         and all(lane.get("may_run_durable_writes") is False for lane in lanes)
@@ -323,6 +331,168 @@ def check_packet_validation() -> None:
         proc.returncode == 1
         and "must cite [[contradictions]]" in proc.stdout
         and "must not dismiss" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_required_bare_none = packet_path(GOOD_PACKET.replace(
+        "Question: /wiki-swarm What does the wiki say?",
+        "Question: /wiki-swarm tell me the complete history of the kitchen remodel",
+    ).replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: none",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_required_bare_none))
+    results.record(
+        "raw-required-bare-none-fails",
+        proc.returncode == 1 and "Raw sources checked must list checked raw files" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_required_qualified_skip = packet_path(GOOD_PACKET.replace(
+        "Question: /wiki-swarm What does the wiki say?",
+        "Question: /wiki-swarm tell me the complete history of the kitchen remodel",
+    ).replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: not triggered - consulted source page is already the durable truth for this ordinary lookup",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_required_qualified_skip))
+    results.record(
+        "raw-required-qualified-skip-passes",
+        proc.returncode == 0 and "valid" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_checked = packet_path(GOOD_PACKET.replace(
+        "Question: /wiki-swarm What does the wiki say?",
+        "Question: /wiki-swarm tell me the complete history of the kitchen remodel",
+    ).replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
+    ).replace(
+        "Raw extraction limits: not triggered - no raw verification performed",
+        "Raw extraction limits: no unreadable regions found in the extracted text",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_checked))
+    results.record(
+        "raw-checked-with-limits-passes",
+        proc.returncode == 0 and "valid" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_checked_empty_limits = packet_path(GOOD_PACKET.replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
+    ).replace(
+        "Raw extraction limits: not triggered - no raw verification performed",
+        "Raw extraction limits:",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_checked_empty_limits))
+    results.record(
+        "raw-checked-empty-limits-fails",
+        proc.returncode == 1 and "Raw extraction limits must be stated" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_path_in_answer = packet_path(GOOD_PACKET.replace(
+        "Answer: concise answer from [[primer]]",
+        "Answer: concise answer from [[primer]] and raw/records/kitchen-binder.pdf",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_path_in_answer))
+    results.record(
+        "raw-path-in-answer-fails",
+        proc.returncode == 1 and "Answer must not include raw/ paths" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_path_in_supported_facts = packet_path(GOOD_PACKET.replace(
+        "Supported facts: Facts are cited to [[index]].",
+        "Supported facts: Facts are cited to [[index]] and raw/records/kitchen-binder.pdf.",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_path_in_supported_facts))
+    results.record(
+        "raw-path-in-supported-facts-fails",
+        proc.returncode == 1 and "Supported facts must not include raw/ paths" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_path_laundering = packet_path(GOOD_PACKET.replace(
+        "Pages consulted: [[index]], [[primer]]",
+        "Pages consulted: [[index]], [[primer]], raw/videos/foo.md",
+    ).replace(
+        "Answer: concise answer from [[primer]]",
+        "Answer: concise answer from [[foo]]",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_path_laundering))
+    results.record(
+        "raw-path-page-mention-laundering-fails",
+        proc.returncode == 1 and "cites pages not listed in Pages consulted: foo" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_only_finding = packet_path(GOOD_PACKET.replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
+    ).replace(
+        "Raw extraction limits: not triggered - no raw verification performed",
+        "Raw extraction limits: no unreadable regions found in the extracted text",
+    ).replace(
+        "Raw-only findings: none - no raw-only findings",
+        "Raw-only findings: raw-only finding: binder has an omitted invoice detail; recommend re-ingest and update source page before durable use.",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_only_finding))
+    results.record(
+        "raw-only-finding-with-recommendation-passes",
+        proc.returncode == 0 and "valid" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_only_without_recommendation = packet_path(GOOD_PACKET.replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
+    ).replace(
+        "Raw extraction limits: not triggered - no raw verification performed",
+        "Raw extraction limits: no unreadable regions found in the extracted text",
+    ).replace(
+        "Raw-only findings: none - no raw-only findings",
+        "Raw-only findings: raw-only finding: binder has an omitted invoice detail.",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_only_without_recommendation))
+    results.record(
+        "raw-only-finding-without-recommendation-fails",
+        proc.returncode == 1 and "Raw-only findings must recommend" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_only_without_raw_path = packet_path(GOOD_PACKET.replace(
+        "Raw-only findings: none - no raw-only findings",
+        "Raw-only findings: raw-only finding: omitted invoice detail; recommend re-ingest and update source page before durable use.",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_only_without_raw_path))
+    results.record(
+        "raw-only-finding-without-raw-check-fails",
+        proc.returncode == 1 and "Raw-only findings require at least one raw file" in proc.stdout,
+        proc.stdout + proc.stderr,
+    )
+
+    raw_only_with_durable_filing = packet_path(GOOD_PACKET.replace(
+        "Raw sources checked: not triggered - ordinary lookup",
+        "Raw sources checked: raw/records/kitchen-binder.pdf via pdftotext -layout",
+    ).replace(
+        "Raw extraction limits: not triggered - no raw verification performed",
+        "Raw extraction limits: no unreadable regions found in the extracted text",
+    ).replace(
+        "Raw-only findings: none - no raw-only findings",
+        "Raw-only findings: raw-only finding: omitted invoice detail; recommend re-ingest and update source page before durable use.",
+    ).replace(
+        "Durable-write status: chat-only; no durable write",
+        "Durable-write status: filed analysis through workflows/research/CONTEXT.md#analysis-capture; "
+        "approval record in scripts/capture-runs.jsonl; validate_capture_runs.py passed; "
+        "primary home wiki/analyses/example.md",
+    ))
+    proc = run_swarm("validate-packet", "--packet", str(raw_only_with_durable_filing))
+    results.record(
+        "raw-only-finding-with-durable-filing-fails",
+        proc.returncode == 1 and "raw-only findings must not claim an analysis was filed" in proc.stdout,
         proc.stdout + proc.stderr,
     )
 

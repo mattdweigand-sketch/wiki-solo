@@ -59,6 +59,20 @@ LANES = (
         allowed_outputs=("cited facts", "source-backed notes"),
     ),
     Lane(
+        name="raw-evidence-extractor",
+        responsibility=(
+            "When triggered, spot-check targeted raw files named in consulted-page provenance; "
+            "otherwise report a qualified skip."
+        ),
+        allowed_outputs=(
+            "raw files checked",
+            "extraction methods",
+            "extraction limits",
+            "raw-only findings",
+            "qualified skip",
+        ),
+    ),
+    Lane(
         name="contradiction-staleness-checker",
         responsibility="Check relevant contradictions and stale/current-state claims.",
         allowed_outputs=("contradictions", "stale areas", "open conflicts"),
@@ -84,6 +98,9 @@ PACKET_SECTIONS = (
     "Supported facts",
     "Inferences",
     "Contradictions or stale areas",
+    "Raw sources checked",
+    "Raw extraction limits",
+    "Raw-only findings",
     "Answer",
     "What not to say",
     "Checks actually run",
@@ -95,11 +112,40 @@ VALID_VERDICTS = ("NORMAL RESEARCH", "SINGLE-AGENT SWARM", "SPLIT LANES", "STOP"
 SECTION_RE = re.compile(r"^([A-Z][A-Za-z -]+):\s*(.*)$")
 WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 PATH_PAGE_RE = re.compile(r"(?:wiki/)?(?:[a-z0-9-]+/)*([a-z0-9-]+)\.md")
+RAW_PATH_RE = re.compile(r"\braw/[^\s),;]+")
 REQUIRED_CONSULTED_PAGES = {
     "index": ("[[index]]", "wiki/index.md"),
     "primer": ("[[primer]]", "wiki/primer.md"),
 }
 CITATION_REQUIRED_SECTIONS = ("Supported facts", "Answer")
+RAW_CHECK_REQUIRED_MARKERS = (
+    "complete history",
+    "full record",
+    "primary source",
+    "reconstruct",
+    "all documents",
+    "every invoice",
+    "exact timeline",
+)
+RAW_QUALIFIED_SKIP_MARKERS = (
+    "not triggered",
+    "not required",
+    "no raw verification",
+    "compiled-only",
+    "ordinary lookup",
+    "simple lookup",
+    "orientation question",
+)
+RAW_ONLY_QUALIFIED_NONE_MARKERS = (
+    "none - no raw-only findings",
+    "no raw-only findings",
+    "not triggered - no raw verification performed",
+)
+RAW_ONLY_REINGEST_MARKERS = (
+    "re-ingest",
+    "update source page",
+    "sourcing-queue",
+)
 CONTRADICTION_PAGE_MARKERS = ("[[contradictions]]", "wiki/contradictions.md", "contradictions.md")
 CONTRADICTION_REQUIRED_MARKERS = (
     "current",
@@ -199,9 +245,20 @@ def wikilinks(text: str) -> set[str]:
     return {canonical_page_name(match.group(1)) for match in WIKILINK_RE.finditer(text)}
 
 
+def raw_paths(text: str) -> list[str]:
+    paths: list[str] = []
+    for match in RAW_PATH_RE.finditer(text):
+        paths.append(match.group(0).rstrip(".,:"))
+    return paths
+
+
 def page_mentions(text: str) -> set[str]:
     mentions = set(wikilinks(text))
-    mentions.update(normalize(match.group(1)) for match in PATH_PAGE_RE.finditer(text))
+    raw_spans = [match.span() for match in RAW_PATH_RE.finditer(text)]
+    for match in PATH_PAGE_RE.finditer(text):
+        if any(match.start() >= start and match.end() <= end for start, end in raw_spans):
+            continue
+        mentions.add(normalize(match.group(1)))
     return mentions
 
 
@@ -213,6 +270,22 @@ def has_unqualified_contradiction_dismissal(text: str) -> bool:
     if has_marker(text, CONTRADICTION_QUALIFIED_CLEAR_MARKERS):
         return False
     return has_marker(text, CONTRADICTION_DISMISSAL_MARKERS)
+
+
+def raw_check_required(sections: dict[str, str]) -> bool:
+    return has_marker(sections.get("Question", ""), RAW_CHECK_REQUIRED_MARKERS)
+
+
+def has_qualified_raw_skip(text: str) -> bool:
+    return has_marker(text, RAW_QUALIFIED_SKIP_MARKERS)
+
+
+def has_qualified_raw_only_none(text: str) -> bool:
+    return has_marker(text, RAW_ONLY_QUALIFIED_NONE_MARKERS)
+
+
+def has_raw_only_finding(text: str) -> bool:
+    return bool(text.strip()) and not has_qualified_raw_only_none(text)
 
 
 def is_negated(prefix: str) -> bool:
@@ -251,6 +324,10 @@ def registry() -> dict[str, object]:
         "valid_verdicts": VALID_VERDICTS,
         "required_consulted_pages": tuple(REQUIRED_CONSULTED_PAGES),
         "citation_required_sections": CITATION_REQUIRED_SECTIONS,
+        "raw_check_required_markers": RAW_CHECK_REQUIRED_MARKERS,
+        "raw_qualified_skip_markers": RAW_QUALIFIED_SKIP_MARKERS,
+        "raw_only_qualified_none_markers": RAW_ONLY_QUALIFIED_NONE_MARKERS,
+        "raw_only_reingest_markers": RAW_ONLY_REINGEST_MARKERS,
         "citation_integrity_failure_markers": CITATION_INTEGRITY_FAILURE_MARKERS,
         "contradiction_page_markers": CONTRADICTION_PAGE_MARKERS,
         "contradiction_page_required_when": CONTRADICTION_REQUIRED_MARKERS,
@@ -368,6 +445,8 @@ def validate_packet_text(text: str) -> list[str]:
 
         for section in CITATION_REQUIRED_SECTIONS:
             section_text = sections.get(section, "")
+            if raw_paths(section_text):
+                problems.append(f"{section} must not include raw/ paths")
             cited_pages = wikilinks(section_text)
             if not cited_pages:
                 problems.append(f"{section} must include at least one wiki citation")
@@ -394,6 +473,24 @@ def validate_packet_text(text: str) -> list[str]:
                     "Contradictions or stale areas must not dismiss a contradiction-sensitive packet as none or not applicable without a relevance-qualified register note"
                 )
 
+        raw_checked = sections.get("Raw sources checked", "")
+        raw_limits = sections.get("Raw extraction limits", "")
+        raw_only = sections.get("Raw-only findings", "")
+        checked_raw_paths = raw_paths(raw_checked)
+        if raw_check_required(sections) and not checked_raw_paths and not has_qualified_raw_skip(raw_checked):
+            problems.append(
+                "Raw sources checked must list checked raw files or a qualified skip when the question asks for completeness or primary-source reconstruction"
+            )
+        if checked_raw_paths and not raw_limits.strip():
+            problems.append("Raw extraction limits must be stated when raw sources are checked")
+        if has_raw_only_finding(raw_only):
+            if not checked_raw_paths:
+                problems.append("Raw-only findings require at least one raw file in Raw sources checked")
+            if not has_marker(raw_only, RAW_ONLY_REINGEST_MARKERS):
+                problems.append(
+                    "Raw-only findings must recommend re-ingest, source-page update, or sourcing-queue follow-up"
+                )
+
     lane_results = normalize(sections.get("Lane results", ""))
     if has_unnegated_phrase(
         lane_results,
@@ -413,6 +510,8 @@ def validate_packet_text(text: str) -> list[str]:
 
     durable = normalize(sections.get("Durable-write status", ""))
     if has_unnegated_phrase(durable, DURABLE_CLAIM_MARKERS):
+        if has_raw_only_finding(sections.get("Raw-only findings", "")):
+            problems.append("packets with raw-only findings must not claim an analysis was filed")
         if "analysis-capture" not in durable and "workflows/research/context.md#analysis-capture" not in durable:
             problems.append("durable analysis filing must route through normal research analysis-capture")
         if not has_marker(durable, DURABLE_APPROVAL_PROOF_MARKERS):
