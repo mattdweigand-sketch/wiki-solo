@@ -9,13 +9,14 @@ validate against validate_capture_runs.py.
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+from capture_gate import DEFAULT_APPROVAL_LEDGER
 from eval_lib import Results
 from validate_capture_runs import validate_approval
 
@@ -36,6 +37,12 @@ SANDBOX = Path(TMP.name) / "sandbox-repo"
 (SANDBOX / "wiki" / "analyses" / "existing-eval.md").write_text("existing analysis page\n")
 
 results = Results()
+
+results.record(
+    "default-approval-ledger-anchored-to-repo",
+    Path(DEFAULT_APPROVAL_LEDGER) == REPO_ROOT / "scripts" / "capture-runs.jsonl",
+    f"default ledger: {DEFAULT_APPROVAL_LEDGER!r}",
+)
 
 
 def file_sha256(path: Path) -> str:

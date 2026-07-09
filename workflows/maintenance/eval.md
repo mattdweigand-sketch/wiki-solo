@@ -16,7 +16,7 @@ Canonical procedure belongs in `workflows/`. A wrapper is only a thin pointer: c
 - no wrapper carries more than one `scripts/*.py` reference
 - no wrapper carries a numbered-step list
 - every `workflows/*.md` path a wrapper names exists in the tree
-- single-task shortcuts name their canonical workflow route, so a wrapper cannot silently point at the wrong existing task file
+- every shortcut with a single canonical task workflow names that route; `EXPECTED_WORKFLOW_REFS` in `scripts/check_wrapper_parity.py` is the authoritative route registry (`wiki-swarm` is deliberately absent because the swarm suite separately pins both swarm wrappers to route through the root)
 
 It deliberately does not limit how many `workflows/` paths a wrapper names, because naming a workspace `CONTEXT.md` plus the routed task file is the legitimate thin-pointer pattern. It also cannot catch content drift between a wrapper and its twin (one surface carrying a guidance sentence the other lacks); keep wrapper bodies pointer-only so there is nothing to drift.
 
