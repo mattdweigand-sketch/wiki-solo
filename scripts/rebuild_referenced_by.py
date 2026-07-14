@@ -1,147 +1,164 @@
 #!/usr/bin/env python3
+"""Rebuild generated ``## Referenced by`` sections for wiki entity pages.
+
+The rebuild is deliberately planned from one immutable UTF-8 snapshot. Every
+page is read and transformed before the first write, so unreadable input or a
+failed transformation cannot leave a predictable partial rebuild. Generated
+sections and code spans never feed the reverse link graph back into itself.
 """
-Rebuild "## Referenced by" sections across all wiki entity pages.
 
-For each entity page, scans every other entity page for [[slug]] mentions,
-groups the inbound links by directory, and inserts/replaces a
-"## Referenced by" section immediately before "## Related pages".
+from __future__ import annotations
 
-Vendor-neutral: stdlib only, no dependencies. Run from the repo root:
-    python3 scripts/rebuild_referenced_by.py
-
-Idempotent: re-running rewrites the generated sections in place and converges
-on the first pass. Previously generated "## Referenced by" blocks are stripped
-before scanning, so only authored links (body prose and "## Related pages")
-count as references; generated output never feeds back into the graph. Meta
-pages (index, log, glossary, etc.) are never targets and are not counted as
-link sources, so the catalog/index does not create noise.
-"""
-import re
 import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 
-from _wiki_parse import (
-    LINK_RE,
-    REFERENCED_BY_SECTION_RE,
-    get_entity_pages,
-    mask_code_spans,
-    strip_code_spans,
-    strip_referenced_by,
-)
+from _wiki_parse import LINK_RE, authored_link_view, get_entity_pages, section_spans
+
 
 WIKI_ROOT = Path("wiki")
 
-if not WIKI_ROOT.exists():
-    print(
-        "Error: 'wiki/' directory not found. Run this script from the repo root.\n"
-        f"  Current directory: {Path.cwd()}",
-        file=sys.stderr,
-    )
-    sys.exit(1)
+
+class RebuildError(RuntimeError):
+    """A controlled read, transform, or write failure."""
 
 
-def load_authored_texts(all_pages):
-    """Read every page once and return {path: authored link-scan text}: the
-    generated "## Referenced by" sections are stripped so they never feed back
-    into the graph, and code spans are blanked so a [[link]] written as a syntax
-    example inside code is not counted as a real inbound reference (the same
-    rule lint's dangling and outbound scans apply via _wiki_parse).
-
-    Composition order matters: code spans are blanked FIRST, so a fenced
-    "## Referenced by" example cannot start a section strip that would eat its
-    own closing fence and the authored links after it."""
-    texts = {}
-    for p in all_pages:
+def load_page_texts(all_pages: list[Path]) -> dict[Path, str]:
+    """Read every target exactly once as UTF-8, before any page is written."""
+    snapshot: dict[Path, str] = {}
+    for page in all_pages:
         try:
-            texts[p] = strip_referenced_by(strip_code_spans(p.read_text(encoding="utf-8")))
-        except Exception as exc:
-            print(f"Warning: skipping unreadable page as a link source: {p} ({exc})",
-                  file=sys.stderr)
-            continue
-    return texts
+            snapshot[page] = page.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise RebuildError(f"cannot read {page} as UTF-8: {exc}") from exc
+    return snapshot
 
 
-def find_references(slug, authored_texts, target_path):
-    """Return {directory_label: [link_text, ...]} for pages whose authored text mentions [[slug]].
-
-    Uses the shared LINK_RE to extract every wikilink slug (bare [[slug]],
-    path-qualified [[dir/slug]], or aliased [[dir/slug|text]]) so the link-graph
-    grammar matches lint.py exactly."""
-    refs = defaultdict(list)
-    for p, text in authored_texts.items():
-        if p == target_path:
-            continue
-        if slug in LINK_RE.findall(text):
-            parts = p.relative_to(WIKI_ROOT).parts
-            dir_label = parts[0] if len(parts) > 1 else "wiki root"
-            refs[dir_label].append(f"[[{p.stem}]]")
-    return refs
+def authored_texts(snapshot: dict[Path, str]) -> dict[Path, str]:
+    """Return pure link-scan views with code and generated regions masked."""
+    return {page: authored_link_view(text) for page, text in snapshot.items()}
 
 
-def build_referenced_by_block(refs):
+def build_reverse_index(
+    scan_texts: dict[Path, str], wiki_root: Path = WIKI_ROOT
+) -> dict[str, dict[str, list[Path]]]:
+    """Build ``slug -> directory label -> source pages`` in one pure pass."""
+    index: dict[str, dict[str, list[Path]]] = {}
+    for page, text in scan_texts.items():
+        parts = page.relative_to(wiki_root).parts
+        directory_label = parts[0] if len(parts) > 1 else "wiki root"
+        for slug in set(LINK_RE.findall(text)):
+            index.setdefault(slug, {}).setdefault(directory_label, []).append(page)
+    return index
+
+
+def find_references(
+    slug: str,
+    reverse_index: dict[str, dict[str, list[Path]]],
+    target_path: Path,
+) -> dict[str, list[str]]:
+    """Renderable inbound references, excluding a target's self-reference."""
+    refs: defaultdict[str, list[str]] = defaultdict(list)
+    for directory_label, pages in reverse_index.get(slug, {}).items():
+        for page in pages:
+            if page != target_path:
+                refs[directory_label].append(f"[[{page.stem}]]")
+    return {label: links for label, links in refs.items() if links}
+
+
+def build_referenced_by_block(refs: dict[str, list[str]]) -> str:
+    """Render one canonical generated section."""
     if not refs:
         return "## Referenced by\n\n_No inbound links yet._\n"
     lines = ["## Referenced by\n"]
-    for dir_label in sorted(refs):
-        links = ", ".join(sorted(refs[dir_label]))
-        lines.append(f"\n**{dir_label}/**  {links}\n")
+    for directory_label in sorted(refs):
+        links = ", ".join(sorted(refs[directory_label]))
+        lines.append(f"\n**{directory_label}/**  {links}\n")
     return "\n".join(lines) + "\n"
 
 
-def update_page(path, new_block):
-    text = path.read_text(encoding="utf-8")
-    # All section LOCATION happens on the length-preserving code mask, so a
-    # fenced "## Referenced by" example documenting the convention is never
-    # mistaken for the real generated section (nor a fenced "## Related pages"
-    # for the insertion anchor); spans map 1:1 back onto the raw text.
-    masked = mask_code_spans(text)
+def render_page(authored_page: str, new_block: str) -> str:
+    """Purely replace, collapse, or insert the generated section in one page."""
+    generated = section_spans(authored_page, "Referenced by")
+    if generated:
+        parts: list[str] = []
+        last = 0
+        for index, (start, end) in enumerate(generated):
+            parts.append(authored_page[last:start])
+            if index == 0:
+                parts.append(new_block.rstrip("\n") + "\n")
+            last = end
+        parts.append(authored_page[last:])
+        rendered = "".join(parts)
+        if not rendered.endswith("\n"):
+            rendered += "\n"
+        return rendered
 
-    matches = list(REFERENCED_BY_SECTION_RE.finditer(masked))
-    if matches:
-        # Replace the first "## Referenced by" section (up to next ## heading
-        # or EOF) and drop any duplicates a hand edit may have introduced.
-        parts, last = [], 0
-        for i, m in enumerate(matches):
-            parts.append(text[last:m.start()])
-            if i == 0:
-                parts.append(new_block.rstrip('\n'))
-            last = m.end()
-        parts.append(text[last:])
-        new_text = "".join(parts)
-        # When the replaced section reaches EOF the match swallowed the final
-        # newline; restore it so the first pass converges byte-identically
-        # with the append path.
-        if not new_text.endswith("\n"):
-            new_text += "\n"
-    elif text.startswith(("## Related pages", "## Related Pages")):
-        # Page begins with the Related section at byte 0: prepend, don't append.
-        # Single newline joint matches the replace path's fixed point above.
-        new_text = new_block.rstrip('\n') + '\n' + text
-    else:
-        # Insert before "## Related pages" / "## Related Pages" if present, else append
-        related_re = re.compile(r'\n## Related [Pp]ages')
-        anchor = related_re.search(masked)
-        if anchor:
-            i = anchor.start()
-            new_text = text[:i] + '\n\n' + new_block.rstrip('\n') + text[i:]
-        else:
-            new_text = text.rstrip('\n') + '\n\n' + new_block.rstrip('\n') + '\n'
+    related = section_spans(authored_page, "Related pages")
+    related_start = related[0][0] if related else None
+    if related_start == 0:
+        return new_block.rstrip("\n") + "\n" + authored_page
+    if related_start is not None:
+        prefix = authored_page[:related_start].rstrip("\n")
+        return (
+            prefix
+            + "\n\n"
+            + new_block.rstrip("\n")
+            + "\n"
+            + authored_page[related_start:]
+        )
+    return authored_page.rstrip("\n") + "\n\n" + new_block.rstrip("\n") + "\n"
 
-    path.write_text(new_text, encoding="utf-8")
+
+def build_plan(
+    snapshot: dict[Path, str], wiki_root: Path = WIKI_ROOT
+) -> tuple[dict[Path, str], dict[Path, int]]:
+    """Compute changed outputs and inbound counts from the original snapshot."""
+    reverse_index = build_reverse_index(authored_texts(snapshot), wiki_root)
+    changed: dict[Path, str] = {}
+    inbound_counts: dict[Path, int] = {}
+    for page, original in snapshot.items():
+        refs = find_references(page.stem, reverse_index, page)
+        inbound_counts[page] = sum(len(links) for links in refs.values())
+        rendered = render_page(original, build_referenced_by_block(refs))
+        if rendered != original:
+            changed[page] = rendered
+    return changed, inbound_counts
+
+
+def apply_plan(changed_only: dict[Path, str]) -> None:
+    """Write only changed outputs after the complete plan has succeeded."""
+    for page, text in changed_only.items():
+        try:
+            page.write_text(text, encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise RebuildError(f"cannot write {page}: {exc}") from exc
+
+
+def main() -> int:
+    if not WIKI_ROOT.exists():
+        print(
+            "Error: 'wiki/' directory not found. Run this script from the repo root.\n"
+            f"  Current directory: {Path.cwd()}",
+            file=sys.stderr,
+        )
+        return 1
+
+    all_pages = get_entity_pages(WIKI_ROOT)
+    print(f"Found {len(all_pages)} entity pages.")
+    try:
+        snapshot = load_page_texts(all_pages)
+        changed, inbound_counts = build_plan(snapshot)
+        apply_plan(changed)
+    except (RebuildError, ValueError) as exc:
+        print(f"Error: backlink rebuild failed: {exc}", file=sys.stderr)
+        return 1
+
+    for page in all_pages:
+        print(f"  {page}  ({inbound_counts[page]} inbound links)")
+    print(f"\nDone. Processed {len(all_pages)} pages; changed {len(changed)}.")
+    return 0
 
 
 if __name__ == "__main__":
-    all_pages = get_entity_pages(WIKI_ROOT)
-    print(f"Found {len(all_pages)} entity pages.")
-    # Authored texts are snapshotted once up front; pages mutated during the
-    # loop can't feed their regenerated sections back into later scans.
-    authored_texts = load_authored_texts(all_pages)
-    for page in all_pages:
-        slug = page.stem
-        refs = find_references(slug, authored_texts, page)
-        block = build_referenced_by_block(refs)
-        update_page(page, block)
-        inbound = sum(len(v) for v in refs.values())
-        print(f"  {page}  ({inbound} inbound links)")
-    print(f"\nDone. Processed {len(all_pages)} pages.")
+    sys.exit(main())

@@ -33,18 +33,25 @@ from datetime import date
 from itertools import combinations
 from pathlib import Path
 
+from _repo_paths import HTTP_URL_RE, EXISTING_FILE, RepoPathError, is_http_url, resolve_repo_path
 from _wiki_parse import (
+    FrontmatterError,
     LINK_RE,
     META_PAGES,
+    authored_body_view,
+    authored_link_view,
     dangling_slugs,
+    evidentiary_view,
     frontmatter_block,
     get_entity_pages,
     parse_log_entry_date,
     parse_log_entry_type,
+    section_body,
+    status_review_view,
+    strip_body_sections,
+    strip_sections,
     split_frontmatter,
     split_quoted_csv,
-    strip_code_spans,
-    strip_referenced_by,
 )
 from review_due import collect as collect_review_due
 
@@ -125,7 +132,13 @@ SOURCING_QUEUE_COUNT_MARKER_INTENT_RE = re.compile(
     r"<!--(?=[^>]*\blint\s*:\s*entity-counts?\b)[\s\S]*?-->"
 )
 SOURCING_QUEUE_COUNT_ATTR_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*)=([^\s]+)")
-
+RAW_REPO_TOKEN_RE = re.compile(
+    r"(?<![-A-Za-z0-9_./:\x00\x5c])raw/[^\s,\]\"')]+"
+)
+WIKI_REPO_TOKEN_RE = re.compile(
+    r"(?<![-A-Za-z0-9_./:\x00\x5c])"
+    r"wiki/[^\s,\])]+?\.md(?=$|[\s,\])}>\"'|]|[.;:](?=$|\s))"
+)
 # Entity classes required to enroll in the review_by outcome-review loop. The
 # template makes decisions mandatory because they carry choices that should be
 # revisited; analyses stay opt-in because many are reusable models rather than
@@ -133,6 +146,7 @@ SOURCING_QUEUE_COUNT_ATTR_RE = re.compile(r"([A-Za-z_][A-Za-z0-9_-]*)=([^\s]+)")
 REVIEW_BY_REQUIRED_FOLDERS = ("decisions",)
 KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-")
+URI_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 
 STOPWORDS = {
     "the", "and", "that", "this", "with", "from", "into", "your", "you",
@@ -166,13 +180,24 @@ def block_list_has_items(fm_text, key):
 
 
 def authored_body(body):
-    """Body up to the first generated/link section, for content checks."""
-    cut = len(body)
-    for marker in ("## Referenced by", "## Related pages", "## Related Pages"):
-        i = body.find(marker)
-        if i != -1:
-            cut = min(cut, i)
-    return body[:cut]
+    """Body with generated and curated link sections removed."""
+    return strip_body_sections(body, "Referenced by", "Related pages")
+
+
+def nonblocking_frontmatter(text):
+    """Tier-2 parse view; Tier 1 reports malformed leading frontmatter."""
+    try:
+        return split_frontmatter(text)
+    except FrontmatterError:
+        return None, ""
+
+
+def nonblocking_frontmatter_block(text):
+    """Raw Tier-2 frontmatter view without duplicating a malformed error."""
+    try:
+        return frontmatter_block(text)
+    except FrontmatterError:
+        return ""
 
 
 def tokens(text):
@@ -220,6 +245,92 @@ def source_items(fm_block):
     return items
 
 
+def _mask_http_urls(text):
+    chars = list(text)
+    for match in HTTP_URL_RE.finditer(text):
+        for index in range(*match.span()):
+            chars[index] = "\x00"
+    return "".join(chars)
+
+
+def _unsafe_source_path_expressions(item, safe_spans):
+    """Path-shaped raw/wiki expressions not accepted by the canonical regexes."""
+    scan = _mask_http_urls(item)
+    out = []
+    for match in re.finditer(r"(?:raw|wiki)[\\/]", scan, re.IGNORECASE):
+        if any(start <= match.start() < end for start, end in safe_spans):
+            continue
+        start = match.start()
+        while start > 0 and not scan[start - 1].isspace() and scan[start - 1] not in ",])}|":
+            start -= 1
+        end = match.end()
+        while end < len(scan) and not scan[end].isspace() and scan[end] not in ",])}|":
+            end += 1
+        expression = item[start:end].strip("([{<\"'")
+        entry = (match.group(0)[0:3].lower() if match.group(0).lower().startswith("raw") else "wiki",
+                 expression)
+        if expression and entry not in out:
+            out.append(entry)
+    return out
+
+
+def source_repo_references(item, *, repo_root=None):
+    """Resolve canonical raw/wiki refs in one sources: item.
+
+    Returns ``(references, errors)`` where references are ``(kind, path)``
+    tuples. The same classifier feeds Tier 1 existence checks and Tier 2 quote
+    haystacks, so a path rejected by the guard can never be read as evidence.
+    """
+    root = Path.cwd() if repo_root is None else Path(repo_root)
+    if SOURCE_NONSLUG_PREFIX_RE.match(item) or is_http_url(item):
+        return [], []
+
+    raw_matches = list(RAW_REPO_TOKEN_RE.finditer(item))
+    wiki_matches = list(WIKI_REPO_TOKEN_RE.finditer(item))
+    safe_spans = [match.span() for match in (*raw_matches, *wiki_matches)]
+    errors = [
+        f"unsafe {family} repository path expression: {expression!r}"
+        for family, expression in _unsafe_source_path_expressions(item, safe_spans)
+    ]
+    if not raw_matches and not wiki_matches and not errors and (
+        "/" in item
+        or "\\" in item
+        or item.startswith((".", "~"))
+        or (not any(char.isspace() for char in item) and Path(item).suffix)
+    ):
+        errors.append(f"unsafe provenance path expression: {item!r}")
+    references = []
+    for match in raw_matches:
+        raw_ref = match.group(0).rstrip(".,:")
+        canonical_input = raw_ref[:-1] if raw_ref.endswith("/") else raw_ref
+        try:
+            canonical = resolve_repo_path(
+                canonical_input,
+                repo_root=root,
+                allowed_prefixes=("raw",),
+                mode=EXISTING_FILE,
+                require_regular_file=False,
+            )
+        except RepoPathError:
+            errors.append(f"'{raw_ref}' does not exist or is unsafe")
+        else:
+            references.append(("raw", canonical))
+    for match in wiki_matches:
+        wiki_ref = match.group(0)
+        try:
+            canonical = resolve_repo_path(
+                wiki_ref,
+                repo_root=root,
+                allowed_prefixes=("wiki",),
+                mode=EXISTING_FILE,
+            )
+        except RepoPathError:
+            errors.append(f"'{wiki_ref}' does not exist or is unsafe")
+        else:
+            references.append(("wiki", canonical))
+    return references, errors
+
+
 def inline_list_items(value):
     """Parse a simple inline YAML scalar or list (the tags: shape) into item
     strings, via the shared split_quoted_csv grammar."""
@@ -234,6 +345,53 @@ def fm_scalar(value):
     if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
         value = value[1:-1].strip()
     return value
+
+
+def read_raw_buckets_registry():
+    """Load the governed raw-folder taxonomy, even when raw/ is absent.
+
+    A malformed or empty registry must not disable membership checks by making
+    the raw tree temporarily empty. Returns ``(bucket_names, error)``.
+    """
+    path = Path("scripts/raw-buckets.json")
+    if not path.exists():
+        return None, "raw bucket taxonomy file is missing"
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return None, f"unreadable JSON: {exc}"
+    if not isinstance(raw, dict):
+        return None, "top level must be a JSON object"
+    description = raw.get("description")
+    if not isinstance(description, str) or not fm_scalar(description):
+        return None, "must contain a nonempty string 'description'"
+    buckets = raw.get("buckets")
+    if not isinstance(buckets, dict):
+        return None, "must contain a 'buckets' object"
+    if not buckets:
+        return None, "'buckets' must be a nonempty object"
+    for key, value in buckets.items():
+        if not isinstance(key, str) or not KEBAB_RE.fullmatch(key):
+            return None, f"bucket key {key!r} is not kebab-case"
+        if not isinstance(value, str) or not fm_scalar(value):
+            return None, f"bucket {key!r} needs a nonempty string description"
+    return set(buckets), None
+
+
+def check_meta_utf8():
+    """Read every present governed wiki-root Markdown page as UTF-8."""
+    fails = []
+    for name in sorted(META_PAGES):
+        path = WIKI_ROOT / f"{name}.md"
+        if not path.exists():
+            continue
+        try:
+            path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:
+            fails.append(("meta-encoding", str(path), f"not valid UTF-8: {exc}"))
+        except OSError as exc:
+            fails.append(("meta-encoding", str(path), f"could not read: {exc}"))
+    return fails
 
 
 # --------------------------- Tier 1 ---------------------------
@@ -266,51 +424,40 @@ def check_folder_structure():
                 if name not in WIKI_ALLOWED_DIRS:
                     fails.append(("wiki-structure", rel, "unexpected wiki/ folder"))
                 else:
-                    for nested in sorted(p.rglob("*")):
-                        if len(nested.relative_to(p).parts) <= 1:
+                    # Entity pages are exactly one level deep. Report a direct
+                    # bad entry once; descendants of an already-invalid direct
+                    # directory add no useful information.
+                    for entry in sorted(p.iterdir()):
+                        entry_rel = str(entry)
+                        if entry.is_symlink():
+                            fails.append(("wiki-structure", entry_rel,
+                                          "unexpected direct special entry in entity folder"))
+                        elif entry.is_dir():
+                            fails.append(("wiki-structure", entry_rel,
+                                          "direct directory in entity folder; pages must be direct .md files"))
+                        elif entry.is_file() and entry.name == ".gitkeep":
+                            # Fresh template clones retain empty entity folders
+                            # with tracked placeholders until setup creates pages.
                             continue
-                        nested_rel = str(nested)
-                        if nested.is_dir():
-                            fails.append(("wiki-structure", nested_rel,
-                                          "nested wiki/ directory; entity pages live directly under wiki/<entity-type>/"))
-                        elif nested.is_file() and nested.suffix == ".md":
-                            fails.append(("wiki-structure", nested_rel,
-                                          "nested wiki/ page escapes entity lint; move it directly under wiki/<entity-type>/"))
-                        elif nested.is_file():
-                            fails.append(("wiki-structure", nested_rel,
-                                          "unexpected nested wiki/ file"))
-                        else:
-                            fails.append(("wiki-structure", nested_rel,
-                                          "unexpected nested wiki/ entry type"))
+                        elif entry.is_file() and entry.suffix != ".md":
+                            fails.append(("wiki-structure", entry_rel,
+                                          "direct non-.md file in entity folder"))
+                        elif not entry.is_file():
+                            fails.append(("wiki-structure", entry_rel,
+                                          "unexpected direct special entry in entity folder"))
             elif p.is_file():
                 if name not in WIKI_ALLOWED_FILES:
                     fails.append(("wiki-structure", rel, "unexpected wiki/ root file"))
             else:
                 fails.append(("wiki-structure", rel, "unexpected wiki/ entry type"))
 
+    raw_buckets_path = Path("scripts/raw-buckets.json")
+    raw_allowed_dirs, raw_registry_error = read_raw_buckets_registry()
+    if raw_registry_error:
+        fails.append(("raw-buckets", str(raw_buckets_path), raw_registry_error))
+
     raw_root = Path("raw")
     if raw_root.exists():
-        # raw/ bucket taxonomy lives in a tracked non-raw file so the allowlist
-        # survives raw/ being gitignored and never committed. Loaded only when a
-        # raw/ tree exists, so environments without one (e.g. lint fixtures) do
-        # not require it. None => taxonomy unavailable, skip the per-folder check.
-        raw_allowed_dirs = None
-        raw_buckets_path = Path("scripts/raw-buckets.json")
-        if not raw_buckets_path.exists():
-            fails.append(("raw-buckets", str(raw_buckets_path),
-                          "raw bucket taxonomy file is missing"))
-        else:
-            try:
-                buckets = json.loads(raw_buckets_path.read_text(encoding="utf-8")).get("buckets")
-            except (json.JSONDecodeError, UnicodeDecodeError) as e:
-                buckets = None
-                fails.append(("raw-buckets", str(raw_buckets_path), f"unreadable JSON: {e}"))
-            if isinstance(buckets, dict):
-                raw_allowed_dirs = set(buckets)
-            elif buckets is not None:
-                fails.append(("raw-buckets", str(raw_buckets_path),
-                              "must contain a 'buckets' object"))
-
         for p in sorted(raw_root.iterdir()):
             name = p.name
             rel = str(p)
@@ -349,15 +496,43 @@ def check_no_tracked_raw():
     tracked raw/ path. No-ops when git is unavailable or this is not a work
     tree, so lint still runs outside a git context (e.g. eval fixtures copied
     to a temp dir)."""
+    cwd = Path.cwd().resolve()
+    has_git_metadata = any(
+        (candidate / ".git").exists() for candidate in (cwd, *cwd.parents)
+    )
+    try:
+        worktree = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        if has_git_metadata:
+            return [("raw-tracked", "raw/",
+                     f"git worktree check failed; invariant blocked: {exc}")]
+        return []
+    if worktree.returncode != 0 or worktree.stdout.strip() != b"true":
+        if has_git_metadata:
+            stderr = worktree.stderr.decode("utf-8", "replace").strip()
+            detail = "git worktree check failed inside apparent worktree"
+            if stderr:
+                detail += f": {stderr}"
+            return [("raw-tracked", "raw/", detail)]
+        return []
+
     try:
         out = subprocess.run(
             ["git", "ls-files", "-z", "--", ":(icase)raw"],
             capture_output=True, timeout=10,
         )
-    except (OSError, subprocess.SubprocessError):
-        return []  # git not available; skip the guard
+    except (OSError, subprocess.SubprocessError) as exc:
+        return [("raw-tracked", "raw/",
+                 f"git ls-files failed inside worktree; invariant blocked: {exc}")]
     if out.returncode != 0:
-        return []  # not a git work tree; skip the guard
+        stderr = out.stderr.decode("utf-8", "replace").strip()
+        detail = f"git ls-files failed inside worktree (exit {out.returncode})"
+        if stderr:
+            detail += f": {stderr}"
+        return [("raw-tracked", "raw/", detail)]
     fails = []
     allowed = {"raw/.gitkeep", "raw/readme.md"}
     for path in out.stdout.decode("utf-8", "replace").split("\0"):
@@ -389,11 +564,24 @@ def check_stray_tool_tags():
     fails = []
     if not WIKI_ROOT.exists():
         return fails
-    for p in sorted(WIKI_ROOT.rglob("*.md")):
+    pages = set(get_entity_pages(WIKI_ROOT))
+    pages.update(
+        WIKI_ROOT / f"{name}.md"
+        for name in META_PAGES
+        if (WIKI_ROOT / f"{name}.md").exists()
+    )
+    for p in sorted(pages):
+        # check_folder_structure reports symlinks, directories, FIFOs, and
+        # other direct entity specials. This content scan must not dereference
+        # or open them before the structural failure can be reported.
+        if p.is_symlink() or not p.is_file():
+            continue
         try:
             text = p.read_text(encoding="utf-8")
         except UnicodeDecodeError:
             continue  # the per-page UTF-8 check reports encoding failures
+        except OSError:
+            continue  # the owning path/meta read reports regular-file errors
         rel = str(p.relative_to(WIKI_ROOT))
         for i, line in enumerate(text.splitlines(), 1):
             stripped = line.strip()
@@ -435,13 +623,37 @@ def parse_sourcing_queue_count_markers():
 
     for match in SOURCING_QUEUE_COUNT_MARKER_RE.finditer(text):
         line = text.count("\n", 0, match.start()) + 1
-        attrs = {
-            key: value
-            for key, value in SOURCING_QUEUE_COUNT_ATTR_RE.findall(match.group("attrs"))
-        }
-        folder = attrs.get("folder")
-        count_text = attrs.get("count")
+        attrs_text = match.group("attrs")
+        attr_matches = list(SOURCING_QUEUE_COUNT_ATTR_RE.finditer(attrs_text))
+        pairs = [(item.group(1), item.group(2)) for item in attr_matches]
         valid = True
+
+        cursor = 0
+        for item in attr_matches:
+            if attrs_text[cursor:item.start()].strip():
+                valid = False
+            cursor = item.end()
+        if attrs_text[cursor:].strip():
+            valid = False
+        if not valid:
+            fails.append(("sourcing-queue-count-marker", str(path),
+                          f"line {line}: malformed attribute text"))
+
+        values = {}
+        for key, value in pairs:
+            if key not in {"folder", "count"}:
+                fails.append(("sourcing-queue-count-marker", str(path),
+                              f"line {line}: unknown attribute '{key}'"))
+                valid = False
+            elif key in values:
+                fails.append(("sourcing-queue-count-marker", str(path),
+                              f"line {line}: duplicate attribute '{key}'"))
+                valid = False
+            else:
+                values[key] = value
+
+        folder = values.get("folder")
+        count_text = values.get("count")
 
         if not folder:
             fails.append(("sourcing-queue-count-marker", str(path),
@@ -737,17 +949,6 @@ def check_stale_sweep_proof_entries():
     return fails
 
 
-def check_glossary_utf8():
-    path = WIKI_ROOT / "glossary.md"
-    if not path.exists():
-        return []
-    try:
-        path.read_text(encoding="utf-8")
-    except UnicodeDecodeError as e:
-        return [("glossary", str(path), f"not valid UTF-8: {e}")]
-    return []
-
-
 def read_adjudications():
     """Parse and shape-validate the adjudication file.
 
@@ -823,6 +1024,7 @@ class PageContext:
     instead of each re-deriving it."""
 
     __slots__ = ("path", "rel", "stem", "folder", "text", "fm", "fm_block",
+                 "frontmatter_error",
                  "valid_slugs", "source_slugs")
 
     def __init__(self, path, text, valid_slugs, source_slugs):
@@ -831,8 +1033,14 @@ class PageContext:
         self.stem = path.stem
         self.folder = path.parent.name if path.parent != WIKI_ROOT else None
         self.text = text
-        self.fm, _ = split_frontmatter(text)
-        self.fm_block = frontmatter_block(text)
+        self.frontmatter_error = None
+        try:
+            self.fm, _ = split_frontmatter(text)
+            self.fm_block = frontmatter_block(text)
+        except FrontmatterError as exc:
+            self.fm = None
+            self.fm_block = ""
+            self.frontmatter_error = str(exc)
         self.valid_slugs = valid_slugs
         self.source_slugs = source_slugs
 
@@ -866,6 +1074,14 @@ def check_required_keys(ctx):
     missing = sorted(required - set(ctx.fm))
     if missing:
         fails.append(("frontmatter", ctx.rel, "missing keys: " + ", ".join(missing)))
+
+    required_scalars = {"title", "type", "created", "updated", "confidence"}
+    if ctx.folder == "sources":
+        required_scalars.add("source_type")
+    for key in sorted(required_scalars & set(ctx.fm)):
+        if not fm_scalar(ctx.fm[key]):
+            fails.append(("frontmatter", ctx.rel,
+                          f"{key} must be a nonempty scalar"))
 
     # agent_use_cases must carry list items, not just the bare key. Use the
     # shared ctx.fm_block (frontmatter_block) the context already computed rather
@@ -994,45 +1210,78 @@ def check_authority_ref_shape(ctx):
     if not ref:
         return fails  # authority-ref-required reports the missing value.
 
+    def contained(prefixes, *, require_regular_file=True):
+        try:
+            resolve_repo_path(
+                ref,
+                repo_root=Path.cwd(),
+                allowed_prefixes=prefixes,
+                mode=EXISTING_FILE,
+                require_regular_file=require_regular_file,
+            )
+        except RepoPathError:
+            return False
+        return True
+
     if kind == "raw-source":
-        if not ref.startswith("raw/"):
+        if not contained(("raw",), require_regular_file=False):
             fails.append(("authority-ref-shape", ctx.rel,
-                          f"raw-source authority_ref '{ref}' must start with raw/"))
-        elif not Path(ref).exists():
-            fails.append(("authority-ref-shape", ctx.rel,
-                          f"raw-source authority_ref '{ref}' does not exist"))
+                          f"raw-source authority_ref '{ref}' must be a contained existing raw/ path"))
     elif kind == "source-page":
-        if not (ref.startswith("wiki/sources/") and ref.endswith(".md")):
+        if not ref.endswith(".md") or not contained(("wiki/sources",)):
             fails.append(("authority-ref-shape", ctx.rel,
-                          f"source-page authority_ref '{ref}' must be wiki/sources/*.md"))
-        elif not Path(ref).exists():
-            fails.append(("authority-ref-shape", ctx.rel,
-                          f"source-page authority_ref '{ref}' does not exist"))
+                          f"source-page authority_ref '{ref}' must be a contained existing wiki/sources/*.md file"))
     elif kind == "owner-page":
-        if not (ref.startswith("wiki/") and ref.endswith(".md")):
+        if not ref.endswith(".md") or not contained(("wiki",)):
             fails.append(("authority-ref-shape", ctx.rel,
-                          f"owner-page authority_ref '{ref}' must be wiki/*.md"))
+                          f"owner-page authority_ref '{ref}' must be a contained existing wiki/*.md file"))
         elif ref.startswith("wiki/sources/"):
             fails.append(("authority-ref-shape", ctx.rel,
                           f"owner-page authority_ref '{ref}' must not be under wiki/sources/"))
-        elif not Path(ref).exists():
-            fails.append(("authority-ref-shape", ctx.rel,
-                          f"owner-page authority_ref '{ref}' does not exist"))
     elif kind == "external-url":
-        if not (ref.startswith("http://") or ref.startswith("https://")):
+        if not is_http_url(ref):
             fails.append(("authority-ref-shape", ctx.rel,
-                          f"external-url authority_ref '{ref}' must start with http:// or https://"))
+                          f"external-url authority_ref '{ref}' must be exactly one http:// or https:// URL"))
     elif kind == "local-resource":
-        candidate = Path(ref)
         if ref.lower().startswith("source:"):
             return fails
-        if candidate.is_absolute() or ".." in candidate.parts or not candidate.exists():
+        try:
+            resolve_repo_path(
+                ref,
+                repo_root=Path.cwd(),
+                allowed_prefixes=tuple(sorted(ROOT_ALLOWED_DIRS - {".git"})),
+                allowed_root_files=ROOT_ALLOWED_FILES,
+                mode=EXISTING_FILE,
+                require_regular_file=False,
+            )
+        except RepoPathError:
             fails.append(("authority-ref-shape", ctx.rel,
                           f"local-resource authority_ref '{ref}' must exist under the repo root or start with source:"))
     elif kind == "mixed":
-        # Non-empty is the first-build contract; authority-ref-required already
-        # checked that, and deeper parsing is intentionally deferred.
-        return fails
+        # Mixed prose stays terminal only when explicitly classified. Any
+        # path-shaped value still crosses the shared containment boundary.
+        if ref.lower().startswith("source:") or is_http_url(ref):
+            return fails
+        path_shaped = (
+            "/" in ref
+            or "\\" in ref
+            or ref.startswith((".", "~"))
+            or ref in ROOT_ALLOWED_FILES
+            or (not any(char.isspace() for char in ref) and Path(ref).suffix)
+        )
+        if path_shaped:
+            try:
+                resolve_repo_path(
+                    ref,
+                    repo_root=Path.cwd(),
+                    allowed_prefixes=tuple(sorted(ROOT_ALLOWED_DIRS - {".git"})),
+                    allowed_root_files=ROOT_ALLOWED_FILES,
+                    mode=EXISTING_FILE,
+                    require_regular_file=False,
+                )
+            except RepoPathError:
+                fails.append(("authority-ref-shape", ctx.rel,
+                              f"mixed authority_ref '{ref}' is an unsafe repository path"))
     return fails
 
 
@@ -1070,16 +1319,18 @@ def check_source_refs(ctx):
     if not ctx.fm_block:
         return fails
     for item in source_items(ctx.fm_block):
-        for raw_ref in re.findall(r"raw/[^\s,\]\"']+", item):
-            if not Path(raw_ref).exists():
-                fails.append(("source-ref", ctx.rel, f"'{raw_ref}' does not exist"))
-        if (item.startswith("raw/")
-                or SOURCE_NONSLUG_PREFIX_RE.match(item)
-                or "://" in item or item.startswith("http")):
+        if SOURCE_NONSLUG_PREFIX_RE.match(item) or is_http_url(item):
+            continue
+        references, errors = source_repo_references(item)
+        fails.extend(("source-ref", ctx.rel, error) for error in errors)
+        if references or errors:
             continue
         if KEBAB_RE.match(item) and item not in ctx.source_slugs:
             fails.append(("source-ref", ctx.rel,
                           f"source '{item}' matches no wiki/sources/ page"))
+        elif not KEBAB_RE.match(item):
+            fails.append(("source-ref", ctx.rel,
+                          f"unclassified provenance reference: {item!r}"))
     return fails
 
 
@@ -1087,8 +1338,32 @@ def check_dangling_links(ctx):
     """Wikilinks resolve to a real page. Code spans are stripped (a [[link]]
     inside a code example is not a failure); the shared dangling_slugs helper
     keeps this in lockstep with the Tier-2 meta-page dangling check."""
+    if ctx.frontmatter_error:
+        return []
     return [("dangling-link", ctx.rel, f"[[{slug}]] resolves to nothing")
             for slug in dangling_slugs(ctx.text, ctx.valid_slugs)]
+
+
+def check_synthesis_not_cited(ctx):
+    """The synthesis ledger is orientation, never provenance: synthesis claims
+    cite original pages, not the ledger (the rule wiki/synthesis.md states in
+    prose; promoted from the ledger's 2026-06-10 standing question on
+    2026-07-09). Flags [[synthesis]] or a bare `synthesis` slug among the
+    sources: items, and "(source: [[synthesis]])"-style citations in the
+    authored body. A plain [[synthesis]] link stays legal: in the body it is
+    orientation, not provenance, and Related pages / Referenced by sit past
+    the authored_body cut."""
+    fails = []
+    if ctx.fm_block:
+        for item in source_items(ctx.fm_block):
+            if item == "synthesis" or "[[synthesis]]" in item:
+                fails.append(("synthesis-as-source", ctx.rel,
+                              "sources: cites the synthesis ledger; cite the original pages"))
+    scan = evidentiary_view(ctx.text)
+    for _ in re.finditer(r"\(sources?:[^)]*\[\[synthesis\]\]", scan, re.I):
+        fails.append(("synthesis-as-source", ctx.rel,
+                      "body cites [[synthesis]] as a source; cite the original pages"))
+    return fails
 
 
 def check_related_labels(ctx):
@@ -1099,9 +1374,9 @@ def check_related_labels(ctx):
     ...", a page-to-create) is permitted by SCHEMA and is not an attempted
     typed label."""
     fails = []
-    rp = re.search(r"## Related [Pp]ages\n(.*?)(?=\n## |\Z)", ctx.text, re.DOTALL)
-    if rp:
-        for line in rp.group(1).splitlines():
+    related = section_body(ctx.text, "Related pages")
+    if related is not None:
+        for line in related.splitlines():
             lm = re.match(r"^-\s+([A-Za-z][A-Za-z ]*?):\s", line)
             if lm and "[[" in line and lm.group(1) not in RELATED_LABELS:
                 fails.append(("related-label", ctx.rel,
@@ -1170,6 +1445,7 @@ TIER1_PAGE_CHECKS = (
     check_predictive_review_enrollment,
     check_source_refs,
     check_dangling_links,
+    check_synthesis_not_cited,
     check_related_labels,
     check_open_questions,
     check_confidence_restate,
@@ -1180,23 +1456,31 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates, index_read
     fails = []  # (check, page_relpath, detail)
     fails.extend(check_folder_structure())
     fails.extend(check_no_tracked_raw())
+    fails.extend(check_meta_utf8())
     fails.extend(check_stray_tool_tags())
     fails.extend(check_sourcing_queue_count_markers())
     fails.extend(check_log_entry_headers())
     fails.extend(check_stale_sweep_proof_entries())
-    fails.extend(check_glossary_utf8())
     fails.extend(index_read_fails)
 
     def rel(p):
         return str(p.relative_to(WIKI_ROOT))
 
+    # Structural lint owns special entries. Never dereference a symlink or
+    # open a FIFO/device merely because its name ends in .md.
+    regular_entity_pages = [
+        p for p in entity_pages if not p.is_symlink() and p.is_file()
+    ]
+
     # wikilinks resolve by bare stem, so two pages sharing one is an
     # ambiguous link target and a miscounted inbound graph
     by_stem = {}
-    for p in entity_pages:
+    for p in regular_entity_pages:
         by_stem.setdefault(p.stem, []).append(p)
     # source-page slugs, for resolving bare-slug provenance refs
-    source_slugs = {p.stem for p in entity_pages if p.parent.name == "sources"}
+    source_slugs = {
+        p.stem for p in regular_entity_pages if p.parent.name == "sources"
+    }
 
     # meta-page dangling links are a hard failure too: a broken [[link]] in
     # index/overview/glossary/synthesis is as deterministic as one on an entity
@@ -1210,13 +1494,16 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates, index_read
                 fails.append(("duplicate-stem", rel(p), f"stem '{stem}' is shared by: {others}"))
 
     entity_relpaths = set()
-    for p in entity_pages:
+    for p in regular_entity_pages:
         r = rel(p)
         entity_relpaths.add(r)
         try:
             text = p.read_text(encoding="utf-8")
         except UnicodeDecodeError as e:
             fails.append(("encoding", r, f"not valid UTF-8: {e}"))
+            continue
+        except OSError as e:
+            fails.append(("encoding", r, f"could not read: {e}"))
             continue
 
         ctx = PageContext(p, text, valid_slugs, source_slugs)
@@ -1226,7 +1513,10 @@ def tier1(entity_pages, valid_slugs, index_targets, index_duplicates, index_read
             fails.extend(check(ctx))
 
         if ctx.fm is None:
-            fails.append(("frontmatter", r, "missing or malformed frontmatter"))
+            detail = "missing or malformed frontmatter"
+            if ctx.frontmatter_error:
+                detail += f": {ctx.frontmatter_error}"
+            fails.append(("frontmatter", r, detail))
             continue
 
         # frontmatter-dependent per-page checks, in registry order.
@@ -1350,7 +1640,7 @@ def quote_mismatches(entity_pages, adjudicated_quotes, used=None):
         except UnicodeDecodeError:
             continue  # tier1 reports it
         rel = str(p.relative_to(WIKI_ROOT))
-        _, body = split_frontmatter(text)
+        _, body = nonblocking_frontmatter(text)
         for m in QUOTED_CITATION_RE.finditer(authored_body(body)):
             quote_raw, cite_blob = m.group(1), m.group(2)
             frags = quote_fragments(quote_raw)
@@ -1369,22 +1659,26 @@ def quote_mismatches(entity_pages, adjudicated_quotes, used=None):
                 except UnicodeDecodeError:
                     continue  # non-UTF8 cited page; tier1 reports it
                 haystacks.append(normalize_quote(cited_text))
-                cited_fm = frontmatter_block(cited_text)
+                cited_fm = nonblocking_frontmatter_block(cited_text)
                 if cited_fm:
-                    for raw_ref in re.findall(r"raw/[^\s,\]\"']+", cited_fm):
-                        rp = Path(raw_ref)
-                        if rp.is_file():
-                            try:
-                                haystacks.append(normalize_quote(
-                                    rp.read_text(encoding="utf-8")))
-                            except (OSError, UnicodeDecodeError):
-                                pass
+                    for item in source_items(cited_fm):
+                        references, _errors = source_repo_references(item)
+                        for kind, canonical in references:
+                            if kind != "raw":
+                                continue
+                            rp = Path.cwd().joinpath(*canonical.split("/"))
+                            if rp.is_file():
+                                try:
+                                    haystacks.append(normalize_quote(
+                                        rp.read_text(encoding="utf-8")))
+                                except (OSError, UnicodeDecodeError):
+                                    pass
             if not haystacks:
                 continue
-            found = all(any(f in h for h in haystacks) for f in frags)
+            found = any(all(f in h for f in frags) for h in haystacks)
             if found:
                 continue
-            key = (rel, normalize_quote(quote_raw)[:80])
+            key = (rel, normalize_quote(quote_raw))
             if key in adjudicated_quotes:
                 if used is not None:
                     used.add(key)
@@ -1449,7 +1743,7 @@ def load_adjudications():
         "pairs": {frozenset(e["pair"]) for e in raw.get("skipped_crossref_pairs", [])},
         "confidence": {e["page"] for e in raw.get("reviewed_confidence_low", [])},
         "duplicates": {frozenset(e["pair"]) for e in raw.get("reviewed_near_duplicates", [])},
-        "quotes": {(e["page"], normalize_quote(e["quote"])[:80])
+        "quotes": {(e["page"], normalize_quote(e["quote"]))
                    for e in raw.get("reviewed_quotes", [])},
         "recompile": {(e["pair"][0], e["pair"][1])
                       for e in raw.get("reviewed_recompile_candidates", [])},
@@ -1465,7 +1759,11 @@ def latest_status_date(text):
     # Strip code spans first so a **Status (date)** written as a format example
     # inside a code fence is not read as a real status note.
     out = []
-    for value in STATUS_RE.findall(strip_code_spans(text)):
+    try:
+        view = status_review_view(text)
+    except FrontmatterError:
+        return None
+    for value in STATUS_RE.findall(view):
         try:
             out.append(date.fromisoformat(value))
         except ValueError:
@@ -1555,11 +1853,14 @@ class Tier2Context:
         for p in pages:
             try:
                 text = p.read_text(encoding="utf-8")
-            except UnicodeDecodeError:
+            except (OSError, UnicodeDecodeError):
                 # tier1 reports the encoding failure; skip for candidate signals
                 text = ""
-            fm, body = split_frontmatter(text)
-            ab = authored_body(body)
+            fm, _ = nonblocking_frontmatter(text)
+            try:
+                ab = evidentiary_view(text)
+            except FrontmatterError:
+                ab = ""
             status_date = latest_status_date(text)
             dates = [d for d in (frontmatter_updated_date(fm), status_date)
                      if d is not None]
@@ -1570,9 +1871,9 @@ class Tier2Context:
                 "tokens": tokens(ab),
                 "words": len(re.findall(r"\w+", ab)),
                 # A [[link]] inside a code example is not a citation.
-                "body_links": bool(LINK_RE.search(strip_code_spans(ab))),
+                "body_links": bool(LINK_RE.search(ab)),
                 # Raw-block parse so block-style sources: lists count as cited.
-                "source_items": source_items(frontmatter_block(text)),
+                "source_items": source_items(nonblocking_frontmatter_block(text)),
             }
             # Outbound links must be authored; generated "Referenced by" blocks
             # would echo inbound links back and fabricate a bidirectional graph,
@@ -1580,8 +1881,11 @@ class Tier2Context:
             # (the same rule the dangling scan and the rebuild apply). Fences
             # are blanked before the section strip so a fenced "## Referenced
             # by" example cannot swallow authored links after it.
-            self.outbound[p] = set(
-                LINK_RE.findall(strip_referenced_by(strip_code_spans(text))))
+            try:
+                link_view = authored_link_view(text)
+            except FrontmatterError:
+                link_view = ""
+            self.outbound[p] = set(LINK_RE.findall(link_view))
 
         stems = {p.stem: p for p in pages}
         for p in pages:
@@ -1688,6 +1992,8 @@ def signal_missing_related(ctx):
     means "nothing worth reviewing"."""
     cocite, suppressed = [], 0
     for a, b in combinations(ctx.pages, 2):
+        if a.parent.name == "sources" and b.parent.name == "sources":
+            continue
         shared = ctx.outbound[a] & ctx.outbound[b]
         shared.discard(a.stem)
         shared.discard(b.stem)
@@ -2080,7 +2386,10 @@ def main():
               file=sys.stderr)
         return 2
 
-    entity_pages = get_entity_pages(WIKI_ROOT)
+    entity_pages = [
+        path for path in get_entity_pages(WIKI_ROOT)
+        if not path.is_symlink() and path.is_file()
+    ]
     valid_slugs = {p.stem for p in entity_pages} | META_PAGES
     index_targets, index_duplicates, index_read_fails = parse_index_targets()
 

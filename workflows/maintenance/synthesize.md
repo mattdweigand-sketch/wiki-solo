@@ -135,7 +135,7 @@ Never silently overwrite verified content. Additions to an existing page go in c
      --trigger ranking_or_framework
    ```
 
-   If it prints `APPROVAL REQUIRED`, show the request and stop. Re-run with `--approved` only after the user approves that displayed action, destination, and file scope.
+   On `APPROVAL REQUIRED`, follow `AGENTS.md` (stop, plain-language approval, `--approved` rerun). Other approved synthesis draft edits that neither file a new analysis nor cross the synthesis-promotion boundary in Step 2 are routine page updates and skip the capture gate.
 
 2. For synthesis promotion, ledger updates, durable core-page drafts, or confidence/status flips, run `scripts/capture_gate.py --kind=synthesis` before the durable change crosses the promotion boundary:
 
@@ -148,18 +148,19 @@ Never silently overwrite verified content. Additions to an existing page go in c
      --pages-touched "<full approval edit scope>"
    ```
 
-   The synthesis branch defaults `--primary-home` to `wiki/synthesis.md`; every run must include its `--primary-home` in `--pages-touched`, so a pass that does not touch the ledger must set `--primary-home` to the edited page and include that page in the scope. If it prints `APPROVAL REQUIRED`, show the request and stop. Re-run with `--approved` only after the user approves the displayed synthesis and scope. This appends or confirms the idempotent record in `scripts/capture-runs.jsonl`; then run `python3 scripts/validate_capture_runs.py`, which must pass.
+   The synthesis branch defaults `--primary-home` to `wiki/synthesis.md`; every run must include its `--primary-home` in `--pages-touched`, so a pass that does not touch the ledger must set `--primary-home` to the edited page and include that page in the scope. On `APPROVAL REQUIRED`, follow `AGENTS.md`; the approved rerun appends or confirms the idempotent record in `scripts/capture-runs.jsonl`, then run the fenced verification commands below. Ledger validation must pass.
 
 3. Make only the approved edits. New synthesized content lands at `confidence: low` (restated in the body) and `status: draft` on meta pages unless the user explicitly graded that exact text. New pages get an `index.md` row.
 
 4. Run:
 
    ```bash
+   python3 scripts/validate_capture_runs.py
    python3 scripts/rebuild_referenced_by.py
    python3 scripts/lint.py --tier1
    ```
 
-   Both must pass.
+   All three must pass.
 
 5. Update `wiki/synthesis.md` only as part of the approved scope: refresh Current state digest lines that changed, append a run-ledger entry, and bump `updated:`.
 

@@ -35,7 +35,6 @@ EXPECTED_SKILLS = (
     "wiki-ingest",
     "wiki-lint",
     "wiki-promote",
-    "wiki-research",
     "wiki-synthesize",
 )
 
@@ -62,10 +61,47 @@ WRAPPER_SURFACES = (
 # one canonical command hint and no multi-step procedure. A second scripts/*.py
 # reference or a numbered-step list means procedure has leaked into the wrapper.
 SCRIPT_REF_RE = re.compile(r"scripts/[A-Za-z0-9_./-]*\.py")
-NUMBERED_STEP_RE = re.compile(r"^\s*[0-9]+\.\s")
+NUMBERED_STEP_RE = re.compile(r"^\s*[0-9]+[.)]\s")
 # A wrapper is a pointer, so what it points at must exist, and common shortcuts
 # must point at their canonical task workflow rather than another existing task.
 WORKFLOW_REF_RE = re.compile(r"workflows/[A-Za-z0-9_./-]*\.md")
+
+
+def _frontmatter_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+        value = value[1:-1].strip()
+    return value
+
+
+def codex_frontmatter_problems(name: str, text: str) -> list[str]:
+    """Validate strict leading identity metadata for one Codex SKILL.md."""
+    lines = text.splitlines()
+    if not lines or lines[0] != "---":
+        return ["must begin with strict frontmatter"]
+    try:
+        end = lines.index("---", 1)
+    except ValueError:
+        return ["leading frontmatter has no exact closing --- line"]
+    fields: dict[str, str] = {}
+    problems: list[str] = []
+    for line in lines[1:end]:
+        match = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_-]*):\s*(.*)", line)
+        if not match:
+            problems.append(f"malformed frontmatter line {line!r}")
+            continue
+        key, value = match.groups()
+        if key in fields:
+            problems.append(f"duplicate frontmatter key {key!r}")
+        fields[key] = _frontmatter_scalar(value)
+    declared_name = fields.get("name")
+    if declared_name != name:
+        problems.append(
+            f"frontmatter name {declared_name!r} must equal directory {name!r}"
+        )
+    if not fields.get("description"):
+        problems.append("frontmatter description must be nonempty")
+    return problems
 
 
 def wrapper_parity_problems(repo_root: Path = REPO_ROOT) -> list[str]:
@@ -107,6 +143,11 @@ def wrapper_parity_problems(repo_root: Path = REPO_ROOT) -> list[str]:
                 problems.append(f"{label}: missing wrapper file {wrapper}")
                 continue
             text = wrapper.read_text(encoding="utf-8")
+            if label == "codex-skills":
+                problems.extend(
+                    f"{label}/{name}: {problem}"
+                    for problem in codex_frontmatter_problems(name, text)
+                )
             script_refs = SCRIPT_REF_RE.findall(text)
             if len(script_refs) > 1:
                 problems.append(

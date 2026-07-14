@@ -8,9 +8,9 @@ Put source documents in `raw/`. Agents turn them into structured, cited, interli
 
 ## Why This Exists
 
-Most AI workflows retrieve context on every query. The work does not compound.
+Most AI workflows repeatedly retrieve and reassemble context. Prior organization and interpretation rarely carry forward.
 
-This repo turns context into maintained memory. A source is read once, integrated into durable pages, and kept traceable through citations, links, contradiction tracking, and synthesis.
+This repo compiles stable, source-backed meaning so future work starts from an organized map instead of cold. Compiled pages are the orientation and reuse layer; current facts still come from their owner or source at runtime, and consequential, contradicted, or stale-sensitive claims return to raw evidence. Compounding means reusing prior organization and interpretation, not eliminating verification.
 
 ---
 
@@ -40,7 +40,7 @@ After setup, run the repo checks:
 Report changed files, check results, and any remaining setup choices.
 ```
 
-The repo has eight common workflow shortcuts. Claude Code and Codex expose them as slash commands; other agents use the same routes through `CONTEXT.md`.
+The repo has seven common workflow shortcuts. Claude Code and Codex expose them as slash commands; other agents use the same routes through `CONTEXT.md`.
 
 | Command | Use it to |
 |---|---|
@@ -51,7 +51,6 @@ The repo has eight common workflow shortcuts. Claude Code and Codex expose them 
 | `/wiki-eval` | Verify that the wiki tools and guardrails still work. |
 | `/wiki-synthesize` | Draft corpus distillations for review and approved promotion. |
 | `/wiki-export` | Build a local zip export of the wiki, including raw sources; optionally upload to an explicit `rclone` target. |
-| `/wiki-research` | Run high-rigor wiki research with a checked review packet. |
 
 Research answers can stay in chat or become durable analyses when they are worth saving.
 
@@ -83,7 +82,7 @@ The checks and guardrails that protect the corpus:
 | Evidence review | Full `/wiki-lint` adds sampled citation checks so claims are tested against their cited source pages and raw evidence. |
 | Lint adjudications | `scripts/lint-adjudications.json` records reviewed false positives and accepted exceptions so the same candidates are not re-litigated every lint run. |
 | Approval gate and ledger | `scripts/capture_gate.py` makes the agent ask before filing analyses, applying artifact promotions, or approving synthesis; `scripts/capture-runs.jsonl` records what was approved afterward. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, stale-text sweep proof, the unified approval gate, ledger validation, export, log rotation, review due checks, wrapper parity, schema-doc parity, wiki-research guardrails, and Tier-1 lint over the live corpus. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py` to test shared parsing, backlinks, lint fixtures, stale-text sweep proof, the unified approval gate, ledger validation, export, log rotation, review due checks, wrapper parity, schema-doc parity, and Tier-1 lint over the live corpus. |
 
 Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task instructions live under [`workflows/`](workflows/).
 
@@ -109,6 +108,7 @@ Detailed workflow ownership lives in [`REFERENCES.md`](REFERENCES.md); task inst
 |-- scripts/                   # Deterministic gates, lint, evals, export, link helpers
 |-- .github/workflows/         # CI for deterministic wiki checks
 |
+|-- archive/                   # Tracked rotated wiki logs
 |-- raw/                       # Immutable source artifacts
 |-- deliverables/              # Gitignored one-off outputs built from wiki content
 |-- tmp/                       # Gitignored scratch space

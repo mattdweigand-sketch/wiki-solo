@@ -1,38 +1,23 @@
 # <Organization> Wiki - Task Router
 
-`AGENTS.md` is canonical: it holds the folder map, conventions, and hard rules. This file routes a task to the right workspace. Do not read everything; find the task, open the workflow entry, and load only what it says to load.
+`AGENTS.md` is canonical: it holds the folder map, conventions, and hard rules. This file routes a task to the right workspace. Do not read everything; find the task family, open the workspace entry, and load only what it says to load.
 
-Works with any agent. Claude Code, ChatGPT, Codex, Cursor, or a raw API harness all use the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the workflow for the task. The files under `.claude/commands/` are tracked Claude Code wrappers for `/wiki-ingest`, `/wiki-capture`, `/wiki-lint`, `/wiki-eval`, `/wiki-promote`, `/wiki-synthesize`, `/wiki-export`, and `/wiki-research`. Codex skill wrappers are tracked under `.codex/skills/`; current Codex discovers them repo-locally while working here. Do not also install identical global `~/.codex/skills/wiki-*` copies, because that can create duplicate slash-command entries. Nothing here depends on any wrapper surface.
+Works with any agent. Every agent uses the same path: read `AGENTS.md`, check `wiki/domain.md` for setup status, read this file, then open the selected workspace `CONTEXT.md`. Wrapper details live in `AGENTS.md`; nothing here depends on a wrapper surface.
 
-Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer, plus the explicit wiki-research overlay), and **maintenance** (lint, rotate-log, eval, artifact promotion, capture, sourcing queue, synthesize, review, export). Each workspace's `CONTEXT.md` is its entry point and scopes exactly what to load.
+Workflows are grouped into three workspaces under `workflows/`: **ingest** (raw -> pages), **research** (question -> answer), and **maintenance** (hygiene, audits, tooling, capture, synthesis, review, and export). This file chooses the workspace; each workspace `CONTEXT.md` owns task-level routing and scopes exactly what to load.
 
-Ordinary source ingest proceeds directly through `workflows/ingest/CONTEXT.md`; no separate route preflight runs.
-
-Analysis capture, artifact promotion, and synthesis promotion share one executable approval gate: `python3 scripts/capture_gate.py`. Its job is approval rather than routing: it derives a mode and primary home from its inputs, then blocks durable analysis/promotion/synthesis edits until the user approves them. Ordinary source ingest does not require this approval gate. If it prints `APPROVAL REQUIRED`, show the full output and wait for approval before editing files. Approved reruns write or confirm `scripts/capture-runs.jsonl`.
-
-Synthesis promotion uses `python3 scripts/capture_gate.py --kind=synthesis`. Run it before updating `wiki/synthesis.md`, flipping synthesis draft status/confidence, or logging a synthesis promotion. Approved reruns write or confirm synthesis approval records in `scripts/capture-runs.jsonl`.
+Analysis capture, artifact promotion, and synthesis promotion share one executable approval gate, `python3 scripts/capture_gate.py`; the canonical boundary is in `AGENTS.md`. Nothing else routes through the gate.
 
 ---
 
 ## Routing
 
-| Task | Workspace entry |
+| Task family | Workspace entry |
 |---|---|
 | Configure a fresh clone | [`SETUP.md`](SETUP.md) |
 | Ingest a source (`raw/` -> wiki page) | [`workflows/ingest/CONTEXT.md`](workflows/ingest/CONTEXT.md) |
-| Answer a question from the wiki | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
-| Run high-rigor wiki research with a review packet after `scripts/wiki_research.py preflight` accepts | [`workflows/research/wiki-research.md`](workflows/research/wiki-research.md) |
-| Compare entities | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
-| Lint the wiki | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |
-| Review compiled pages against newer cited source pages | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`lint.md`](workflows/maintenance/lint.md) |
-| Rotate `wiki/log.md` when `log_rotation_due` fires | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`rotate-log.md`](workflows/maintenance/rotate-log.md) |
-| Run the wiki tooling evals | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`eval.md`](workflows/maintenance/eval.md) |
-| Promote a useful artifact into durable wiki memory | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`artifact-promotion.md`](workflows/maintenance/artifact-promotion.md) |
-| Capture a decision, observation, field note, or lived context | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`capture.md`](workflows/maintenance/capture.md) |
-| Refresh the sourcing queue | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`refresh-sourcing-queue.md`](workflows/maintenance/refresh-sourcing-queue.md) |
-| Synthesize the corpus | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`synthesize.md`](workflows/maintenance/synthesize.md) |
-| Review due pages or grade dated predictions/decisions | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`review.md`](workflows/maintenance/review.md) |
-| Export a backup zip of the corpus | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) -> [`export.md`](workflows/maintenance/export.md) |
+| Answer a wiki question or compare entities | [`workflows/research/CONTEXT.md`](workflows/research/CONTEXT.md) |
+| Maintain or audit the wiki, verify tooling, capture context, synthesize, review outcomes, or export | [`workflows/maintenance/CONTEXT.md`](workflows/maintenance/CONTEXT.md) |
 | Browse what's in the wiki | [`wiki/index.md`](wiki/index.md) |
 
-Each workflow opens with its own Load / Skip list. Follow that list instead of pulling the whole wiki into context.
+The workspace `CONTEXT.md` and task files own task-level routing and Load / Skip lists. Follow the selected workspace instead of reconstructing maintenance routes here.

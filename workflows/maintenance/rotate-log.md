@@ -47,8 +47,10 @@ surgery. Do not put rotation in a git hook, cron job, or autonomous commit path.
    git diff --check
    ```
 
-5. Commit the scoped files: `wiki/log.md` and the new `archive/wiki-log/*.md`.
-   A routine rotation touches nothing else.
+5. If the user explicitly asked for a commit, commit only the scoped files:
+   `wiki/log.md` and the new `archive/wiki-log/*.md`. Otherwise leave the
+   validated rotation uncommitted and report the changed files. A routine
+   rotation touches nothing else.
 
 ## Notes
 

@@ -15,14 +15,19 @@ sys.path[0], exactly as ledger_common is imported).
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 
 # A wikilink slug, ignoring an optional folder prefix and an optional alias:
 #   [[slug]], [[dir/slug]], [[dir/slug|alias]]  -> captures "slug".
 LINK_RE = re.compile(r"\[\[(?:[^/\]|]+/)?([^\]|]+?)(?:\|[^\]]+)?\]\]")
 
-# Code spans. Order of application matters: fenced blocks first, then inline.
-INLINE_CODE_RE = re.compile(r"`[^`]*`")
-FENCED_CODE_RE = re.compile(r"```.*?```", re.DOTALL)
+# Compatibility regexes remain importable for older callers/tests, but the
+# shared scanner below is authoritative because variable fence/span lengths
+# cannot be represented safely by the former pair of fixed regexes.
+INLINE_CODE_RE = re.compile(r"(?P<ticks>`+)(?!`).*?(?P=ticks)(?!`)", re.DOTALL)
+FENCED_CODE_RE = re.compile(
+    r"^[ \t]{0,3}(?:`{3,}|~{3,})[^\n]*(?:\n|\Z)", re.MULTILINE
+)
 
 # Root-level wiki pages that are catalogs/indexes, not entity pages: never link
 # targets and never counted as link sources. Shared so the dangling-link scan,
@@ -35,8 +40,26 @@ META_PAGES = {
 }
 META_DIRS = set()
 
-# A generated "## Referenced by" section runs to the next ## heading or EOF.
-REFERENCED_BY_SECTION_RE = re.compile(r"## Referenced by\n.*?(?=\n## |\Z)", re.DOTALL)
+# Kept as a public compatibility name. Section handling is implemented by the
+# heading-aware scanner below (case-insensitive, trailing hashes, and proper
+# same/higher-level termination), not by this regex.
+REFERENCED_BY_SECTION_RE = re.compile(
+    r"^##[ \t]+Referenced[ \t]+by(?:[ \t]+#+)?[ \t]*$", re.IGNORECASE | re.MULTILINE
+)
+
+HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+?)[ \t]*$")
+FENCE_OPEN_RE = re.compile(r"^[ \t]{0,3}(`{3,}|~{3,})([^\r\n]*)$")
+
+
+class FrontmatterError(ValueError):
+    """A leading frontmatter opener is malformed or has no exact close."""
+
+
+@dataclass(frozen=True)
+class _FrontmatterParts:
+    block: str
+    body: str
+    end: int
 
 # A wiki/log.md entry header: "## [YYYY-MM-DD] ..." or "## YYYY-MM-DD ...",
 # followed by end-of-line, " | description", or a word. Single source of truth
@@ -71,6 +94,39 @@ def parse_log_entry_type(line):
     return token.lower() if token else None
 
 
+def _line_value(line: str) -> str:
+    if line.endswith("\r\n"):
+        return line[:-2]
+    if line.endswith(("\n", "\r")):
+        return line[:-1]
+    return line
+
+
+def _leading_frontmatter(text: str) -> _FrontmatterParts | None:
+    """Return the one exact leading frontmatter region, if present."""
+    lines = text.splitlines(keepends=True)
+    if not lines:
+        return None
+    first = _line_value(lines[0])
+    if first != "---":
+        if first.startswith("---"):
+            raise FrontmatterError("leading frontmatter opener must be exactly '---'")
+        return None
+
+    offset = len(lines[0])
+    for line in lines[1:]:
+        if _line_value(line) == "---":
+            block = text[len(lines[0]):offset]
+            if block.endswith("\r\n"):
+                block = block[:-2]
+            elif block.endswith(("\n", "\r")):
+                block = block[:-1]
+            end = offset + len(line)
+            return _FrontmatterParts(block=block, body=text[end:], end=end)
+        offset += len(line)
+    raise FrontmatterError("leading frontmatter is missing an exact closing '---' line")
+
+
 def split_frontmatter(text):
     """Return (frontmatter_dict_of_toplevel_keys, body_text). Empty dict if none.
 
@@ -78,12 +134,10 @@ def split_frontmatter(text):
     Block-style list values are flattened to '' (the key is present with an
     empty scalar); use frontmatter_block() when you need the raw block text.
     """
-    if not text.startswith("---"):
+    parts = _leading_frontmatter(text)
+    if parts is None:
         return None, text
-    m = re.match(r"^---\n(.*?)\n---\n?(.*)$", text, re.DOTALL)
-    if not m:
-        return None, text
-    fm_block, body = m.group(1), m.group(2)
+    fm_block, body = parts.block, parts.body
     fm = {}
     for line in fm_block.splitlines():
         km = re.match(r"^([A-Za-z_][A-Za-z0-9_]*):(.*)$", line)
@@ -97,8 +151,102 @@ def frontmatter_block(text):
     or '' if there is none. Unlike split_frontmatter, this preserves block-style
     list values that the key parser flattens, so checks that scan raw lines
     (raw/ refs, source slugs, tags) see the real content."""
-    m = re.match(r"^---\n(.*?)\n---", text, re.DOTALL)
-    return m.group(1) if m else ""
+    parts = _leading_frontmatter(text)
+    return parts.block if parts is not None else ""
+
+
+def _mask_range(chars: list[str], start: int, end: int) -> None:
+    for index in range(start, end):
+        if chars[index] not in "\r\n":
+            chars[index] = "\x00"
+
+
+def _line_end(text: str, start: int) -> int:
+    newline = text.find("\n", start)
+    return len(text) if newline < 0 else newline + 1
+
+
+def _context_mask(
+    text: str, *, frontmatter: str = "preserve", mask_comments: bool
+) -> str:
+    """Mask code with one context-aware grammar.
+
+    ``frontmatter`` is ``preserve`` (skip it without interpreting literals),
+    ``mask`` (also blank it), or ``none`` (the caller already supplied a body).
+    Comments are always skipped as scanner context and may be preserved or
+    masked independently. This prevents fences/comments/frontmatter literals
+    from changing how later authored text is parsed.
+    """
+    if frontmatter not in {"preserve", "mask", "none"}:
+        raise ValueError(f"unsupported frontmatter mode: {frontmatter}")
+    chars = list(text)
+    start = 0
+    if frontmatter != "none":
+        parts = _leading_frontmatter(text)
+        if parts is not None:
+            if frontmatter == "mask":
+                _mask_range(chars, 0, parts.end)
+            start = parts.end
+
+    index = start
+    fence: tuple[str, int] | None = None
+    while index < len(text):
+        at_line_start = index == 0 or text[index - 1] == "\n"
+        if fence is not None:
+            end = _line_end(text, index)
+            value = _line_value(text[index:end])
+            char, length = fence
+            if re.fullmatch(rf"[ \t]{{0,3}}{re.escape(char)}{{{length},}}[ \t]*", value):
+                fence = None
+            _mask_range(chars, index, end)
+            index = end
+            continue
+
+        if at_line_start:
+            end = _line_end(text, index)
+            match = FENCE_OPEN_RE.match(_line_value(text[index:end]))
+            if match:
+                run = match.group(1)
+                fence = (run[0], len(run))
+                _mask_range(chars, index, end)
+                index = end
+                continue
+
+        if text.startswith("<!--", index):
+            close = text.find("-->", index + 4)
+            end = len(text) if close < 0 else close + 3
+            if mask_comments:
+                _mask_range(chars, index, end)
+            index = end
+            continue
+
+        if text[index] == "`":
+            run_end = index
+            while run_end < len(text) and text[run_end] == "`":
+                run_end += 1
+            run_length = run_end - index
+            search = run_end
+            close_end = -1
+            while search < len(text):
+                if text[search] != "`":
+                    search += 1
+                    continue
+                candidate_end = search
+                while candidate_end < len(text) and text[candidate_end] == "`":
+                    candidate_end += 1
+                if candidate_end - search == run_length:
+                    close_end = candidate_end
+                    break
+                search = candidate_end
+            if close_end >= 0:
+                _mask_range(chars, index, close_end)
+                index = close_end
+                continue
+            index = run_end
+            continue
+
+        index += 1
+    return "".join(chars)
 
 
 def strip_code_spans(text):
@@ -106,9 +254,7 @@ def strip_code_spans(text):
     example inside code is not mistaken for a real wikilink. Order matters:
     strip fenced blocks first, then inline spans, so the two dangling scans
     (entity pages and meta pages) stay in lockstep."""
-    text = FENCED_CODE_RE.sub(" ", text)
-    text = INLINE_CODE_RE.sub(" ", text)
-    return text
+    return mask_code_spans(text).replace("\x00", " ")
 
 
 def mask_code_spans(text):
@@ -117,11 +263,149 @@ def mask_code_spans(text):
     text. Use this when a regex must LOCATE something (a section span to
     rewrite) rather than merely count matches, so a fenced example can be
     skipped without shifting positions."""
-    def mask(m):
-        return "\x00" * len(m.group(0))
-    masked = FENCED_CODE_RE.sub(mask, text)
-    masked = INLINE_CODE_RE.sub(mask, masked)
-    return masked
+    return _context_mask(text, frontmatter="preserve", mask_comments=False)
+
+
+def _heading(line: str) -> tuple[int, str] | None:
+    match = HEADING_RE.match(line)
+    if not match:
+        return None
+    title = re.sub(r"[ \t]+#+[ \t]*$", "", match.group(2)).strip()
+    return len(match.group(1)), title.casefold()
+
+
+def _section_spans(
+    text: str, names: set[str], *, parse_frontmatter: bool = True
+) -> list[tuple[int, int]]:
+    """Locate named Markdown sections outside code, through same/higher heading."""
+    wanted = {name.casefold() for name in names}
+    masked = _context_mask(
+        text,
+        frontmatter="mask" if parse_frontmatter else "none",
+        mask_comments=True,
+    )
+    lines = masked.splitlines(keepends=True)
+    headings: list[tuple[int, int, str]] = []
+    offset = 0
+    for line in lines:
+        parsed = _heading(_line_value(line))
+        if parsed is not None:
+            headings.append((offset, parsed[0], parsed[1]))
+        offset += len(line)
+
+    spans: list[tuple[int, int]] = []
+    for index, (start, level, title) in enumerate(headings):
+        if level != 2 or title not in wanted:
+            continue
+        end = len(text)
+        for next_start, next_level, _ in headings[index + 1:]:
+            if next_level <= level:
+                end = next_start
+                break
+        spans.append((start, end))
+    return spans
+
+
+def section_spans(text: str, *names: str) -> list[tuple[int, int]]:
+    """Public, heading-aware spans for callers that must rewrite sections."""
+    return _section_spans(text, set(names))
+
+
+def section_body(text: str, name: str) -> str | None:
+    """Body of the first named section, or ``None`` when it is absent."""
+    spans = _section_spans(text, {name})
+    if not spans:
+        return None
+    start, end = spans[0]
+    line_end = text.find("\n", start, end)
+    if line_end < 0:
+        return ""
+    return text[line_end + 1:end]
+
+
+def strip_sections(text: str, *names: str) -> str:
+    """Remove named sections while preserving every byte outside their spans."""
+    spans = _section_spans(text, set(names))
+    if not spans:
+        return text
+    out: list[str] = []
+    cursor = 0
+    for start, end in spans:
+        if start < cursor:
+            continue
+        out.append(text[cursor:start])
+        cursor = end
+    out.append(text[cursor:])
+    return "".join(out)
+
+
+def strip_body_sections(text: str, *names: str) -> str:
+    """Remove sections from already-split body text (no frontmatter reparse)."""
+    spans = _section_spans(text, set(names), parse_frontmatter=False)
+    if not spans:
+        return text
+    out: list[str] = []
+    cursor = 0
+    for start, end in spans:
+        if start < cursor:
+            continue
+        out.append(text[cursor:start])
+        cursor = end
+    out.append(text[cursor:])
+    return "".join(out)
+
+
+def authored_link_view(text: str) -> str:
+    """Authored link graph: generated backlinks and all code are excluded."""
+    return _context_mask(
+        strip_sections(text, "Referenced by"),
+        frontmatter="preserve",
+        mask_comments=False,
+    ).replace("\x00", " ")
+
+
+def evidentiary_view(text: str) -> str:
+    """Authored evidence excluding metadata, link sections, code, and comments."""
+    _, body = split_frontmatter(text)
+    body = strip_body_sections(body, "Referenced by", "Related pages")
+    return authored_body_view(body)
+
+
+def authored_body_view(text: str) -> str:
+    """Authored body prose with code and HTML comments masked.
+
+    Unlike :func:`evidentiary_view`, this accepts an already-extracted body and
+    does not interpret a leading thematic break as frontmatter or remove named
+    sections. It is the shared view for already-extracted structured bodies.
+    """
+    return _context_mask(text, frontmatter="none", mask_comments=True).replace("\x00", " ")
+
+
+def status_review_view(text: str) -> str:
+    """Status-review text: authored prose and curated links, never generated/code."""
+    return _context_mask(
+        strip_sections(text, "Referenced by"),
+        frontmatter="preserve",
+        mask_comments=False,
+    ).replace("\x00", " ")
+
+
+def canonical_authored_text(text: str) -> str:
+    """Canonical authored content with generated backlink sections removed.
+
+    Only joins created by removing generated sections and the final newline are
+    canonicalized; every other authored character remains byte-for-byte.
+    """
+    canonical = text
+    for start, end in reversed(_section_spans(canonical, {"Referenced by"})):
+        before, after = canonical[:start], canonical[end:]
+        if before and after:
+            canonical = before.rstrip("\r\n") + "\n\n" + after.lstrip("\r\n")
+        elif before:
+            canonical = before.rstrip("\r\n")
+        else:
+            canonical = after.lstrip("\r\n")
+    return canonical.rstrip("\r\n") + "\n" if canonical else ""
 
 
 def dangling_slugs(text, valid_slugs):
@@ -130,7 +414,7 @@ def dangling_slugs(text, valid_slugs):
     for both the Tier-1 entity-page scan and the Tier-2 meta-page scan, so the
     two cannot drift on what counts as a dangling link."""
     out = []
-    for slug in LINK_RE.findall(strip_code_spans(text)):
+    for slug in LINK_RE.findall(authored_link_view(text)):
         if slug.endswith("/") or slug in valid_slugs:
             continue
         out.append(slug)
@@ -158,7 +442,7 @@ def strip_referenced_by(text):
     an authored link. Shared by lint.py (its outbound link-graph reads only
     authored links) and rebuild_referenced_by.py (it must not feed generated
     output back into the graph), so the two cannot drift on what is generated."""
-    return REFERENCED_BY_SECTION_RE.sub("", text)
+    return strip_sections(text, "Referenced by")
 
 
 def split_quoted_csv(value):

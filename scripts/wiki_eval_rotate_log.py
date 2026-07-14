@@ -219,52 +219,186 @@ def case_newest_entry_floor(root: Path) -> None:
 with_temp_root(case_newest_entry_floor)
 
 
-def case_archive_collision_refused(root: Path) -> None:
-    """The one potential data-loss path: a rerun on a LATER date produces the
-    same archive filename with different content (the rotation date is embedded
-    in the header). The script must refuse, leave both files untouched, and name
-    the recovery path; the same-date rerun completing an interrupted rotation is
-    covered by second-run-noop."""
-    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+def selected_path_is_embedded(root: Path, archive_path: Path) -> bool:
+    """Both planned live references must name the selected archive."""
+    relative = archive_path.relative_to(root).as_posix()
+    live = (root / "wiki" / "log.md").read_text(encoding="utf-8")
+    return f"-> {relative}." in live and f" to {relative}." in live
+
+
+def seed_base_archive(root: Path, entries: list[str]) -> tuple[Path, str]:
     write_log(root, entries)
     proc = run_rotate(root, "--target-lines", "30")
     archive_files = sorted((root / "archive" / "wiki-log").glob("*.md"))
     assert proc.returncode == 0 and len(archive_files) == 1, proc.stderr
-    archive_before = archive_files[0].read_text(encoding="utf-8")
+    base = archive_files[0]
+    return base, base.read_text(encoding="utf-8")
 
-    # Restore the pre-rotation log (simulating an interrupted rotation whose
-    # archive was written but whose log rewrite is being retried later), then
-    # re-run with a DIFFERENT date so the would-be archive content differs.
+
+def case_identical_base_reused(root: Path) -> None:
+    """An interrupted same-date run reuses the identical base archive."""
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    base, archive_before = seed_base_archive(root, entries)
     write_log(root, entries)
-    log_before = (root / "wiki" / "log.md").read_text(encoding="utf-8")
+    plan = rotate_log.build_plan(root, 30, ROTATION_DATE)
+    recover = run_rotate(root, "--target-lines", "30")
+    archive_files = sorted((root / "archive" / "wiki-log").glob("*.md"))
+    record(
+        "identical-base-selected-in-build-plan",
+        plan.archive_path == base,
+        f"planned={plan.archive_path} expected={base}",
+    )
+    record(
+        "identical-base-rerun-completes-idempotently",
+        recover.returncode == 0
+        and archive_files == [base]
+        and base.read_text(encoding="utf-8") == archive_before
+        and selected_path_is_embedded(root, base),
+        f"stdout={recover.stdout!r} stderr={recover.stderr!r} files={archive_files}",
+    )
+
+
+with_temp_root(case_identical_base_reused)
+
+
+def case_distinct_content_gets_suffix_and_reruns(root: Path) -> None:
+    """Distinct same-range content takes -2; an interrupted rerun reuses it."""
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    base, base_before = seed_base_archive(root, entries)
+    write_log(root, entries)
+    expected = base.with_name(f"{base.stem}-2.md")
+    plan = rotate_log.build_plan(root, 30, "2026-06-28")
     later = subprocess.run(
         [sys.executable, str(ROTATE), "--date", "2026-06-28", "--target-lines", "30"],
         cwd=root, text=True, capture_output=True,
     )
-    record("later-date-collision-refused",
-           later.returncode != 0
-           and "already exists with different content" in later.stderr,
-           f"stdout={later.stdout!r} stderr={later.stderr!r}")
-    record("collision-refusal-names-recovery",
-           "re-run with the original" in later.stderr and "--date" in later.stderr,
-           f"stderr={later.stderr!r}")
-    record("collision-leaves-both-files-untouched",
-           archive_files[0].read_text(encoding="utf-8") == archive_before
-           and (root / "wiki" / "log.md").read_text(encoding="utf-8") == log_before,
-           "archive or live log changed during a refused rotation")
+    record(
+        "distinct-content-selects-minus-2-in-build-plan",
+        plan.archive_path == expected,
+        f"planned={plan.archive_path} expected={expected}",
+    )
+    record(
+        "distinct-content-writes-suffix-with-selected-live-paths",
+        later.returncode == 0
+        and expected.is_file()
+        and base.read_text(encoding="utf-8") == base_before
+        and expected.read_text(encoding="utf-8") != base_before
+        and selected_path_is_embedded(root, expected),
+        f"stdout={later.stdout!r} stderr={later.stderr!r}",
+    )
 
-    # Same-date rerun after the interruption completes the log rewrite against
-    # the identical existing archive (the documented recovery path).
-    recover = run_rotate(root, "--target-lines", "30")
-    record("same-date-rerun-completes-recovery",
-           recover.returncode == 0
-           and archive_files[0].read_text(encoding="utf-8") == archive_before
-           and "maintenance | Log rotation"
-               in (root / "wiki" / "log.md").read_text(encoding="utf-8"),
-           f"stdout={recover.stdout!r} stderr={recover.stderr!r}")
+    suffix_before = expected.read_text(encoding="utf-8") if expected.exists() else ""
+    archive_before = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in sorted((root / "archive" / "wiki-log").glob("*.md"))
+    }
+    write_log(root, entries)
+    recovery_plan = rotate_log.build_plan(root, 30, "2026-06-28")
+    recovery = subprocess.run(
+        [sys.executable, str(ROTATE), "--date", "2026-06-28", "--target-lines", "30"],
+        cwd=root, text=True, capture_output=True,
+    )
+    archive_after = {
+        path.name: path.read_text(encoding="utf-8")
+        for path in sorted((root / "archive" / "wiki-log").glob("*.md"))
+    }
+    record(
+        "identical-suffixed-rerun-reuses-minus-2",
+        recovery_plan.archive_path == expected
+        and recovery.returncode == 0
+        and expected.read_text(encoding="utf-8") == suffix_before
+        and archive_after == archive_before
+        and selected_path_is_embedded(root, expected),
+        f"planned={recovery_plan.archive_path}; stdout={recovery.stdout!r}; "
+        f"stderr={recovery.stderr!r}; files={sorted(archive_after)}",
+    )
 
 
-with_temp_root(case_archive_collision_refused)
+with_temp_root(case_distinct_content_gets_suffix_and_reruns)
+
+
+def case_identical_later_suffix_beats_earlier_gap(root: Path) -> None:
+    """An identical -3 is reused even when the unused -2 name is available."""
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    base, _base_before = seed_base_archive(root, entries)
+    write_log(root, entries)
+    candidate_plan = rotate_log.build_plan(root, 30, "2026-06-28")
+    assert candidate_plan.archive_lines is not None
+    matching_suffix = base.with_name(f"{base.stem}-3.md")
+    matching_suffix.write_text("".join(candidate_plan.archive_lines), encoding="utf-8")
+
+    selected = rotate_log.build_plan(root, 30, "2026-06-28")
+    proc = subprocess.run(
+        [sys.executable, str(ROTATE), "--date", "2026-06-28", "--target-lines", "30"],
+        cwd=root, text=True, capture_output=True,
+    )
+    gap = base.with_name(f"{base.stem}-2.md")
+    record(
+        "identical-existing-suffix-wins-over-earlier-free-name",
+        selected.archive_path == matching_suffix
+        and proc.returncode == 0
+        and not gap.exists()
+        and selected_path_is_embedded(root, matching_suffix),
+        f"planned={selected.archive_path}; stdout={proc.stdout!r}; stderr={proc.stderr!r}",
+    )
+
+
+with_temp_root(case_identical_later_suffix_beats_earlier_gap)
+
+
+def case_first_unused_gap_selected(root: Path) -> None:
+    """With distinct base and -3 content, the first free suffix is -2."""
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    base, _base_before = seed_base_archive(root, entries)
+    occupied_later = base.with_name(f"{base.stem}-3.md")
+    occupied_later.write_text("different pre-existing archive\n", encoding="utf-8")
+    write_log(root, entries)
+    expected = base.with_name(f"{base.stem}-2.md")
+    plan = rotate_log.build_plan(root, 30, "2026-06-29")
+    proc = subprocess.run(
+        [sys.executable, str(ROTATE), "--date", "2026-06-29", "--target-lines", "30"],
+        cwd=root, text=True, capture_output=True,
+    )
+    record(
+        "first-unused-suffix-gap-is-selected",
+        plan.archive_path == expected
+        and proc.returncode == 0
+        and expected.is_file()
+        and occupied_later.read_text(encoding="utf-8") == "different pre-existing archive\n"
+        and selected_path_is_embedded(root, expected),
+        f"planned={plan.archive_path}; stdout={proc.stdout!r}; stderr={proc.stderr!r}",
+    )
+
+
+with_temp_root(case_first_unused_gap_selected)
+
+
+def case_minus_3_selected_after_occupied_minus_2(root: Path) -> None:
+    """When base and -2 are distinct, the next deterministic slot is -3."""
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    base, _base_before = seed_base_archive(root, entries)
+    occupied = base.with_name(f"{base.stem}-2.md")
+    occupied.write_text("different pre-existing minus-2 archive\n", encoding="utf-8")
+    write_log(root, entries)
+    expected = base.with_name(f"{base.stem}-3.md")
+    plan = rotate_log.build_plan(root, 30, "2026-06-29")
+    proc = subprocess.run(
+        [sys.executable, str(ROTATE), "--date", "2026-06-29", "--target-lines", "30"],
+        cwd=root, text=True, capture_output=True,
+    )
+    record(
+        "occupied-minus-2-selects-minus-3",
+        plan.archive_path == expected
+        and proc.returncode == 0
+        and expected.is_file()
+        and occupied.read_text(encoding="utf-8")
+            == "different pre-existing minus-2 archive\n"
+        and selected_path_is_embedded(root, expected),
+        f"planned={plan.archive_path}; stdout={proc.stdout!r}; stderr={proc.stderr!r}",
+    )
+
+
+with_temp_root(case_minus_3_selected_after_occupied_minus_2)
 
 
 def case_no_recognized_headers(root: Path) -> None:

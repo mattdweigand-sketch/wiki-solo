@@ -14,9 +14,9 @@ Promotion has two modes:
 - **Audit only** - evaluate the artifact and recommend one primary route. Do not edit files. Use when the user asks whether or how something should be promoted.
 - **Apply** - make the chosen wiki update, rebuild backlinks, run Tier-1 lint, and log the promotion. Use when the user explicitly asks to promote, apply, save, file, or update the wiki after the audit.
 
-The `/wiki-promote` shortcut is a route-first command. It does not mean "create a new promotion page." It means: evaluate the artifact, pick the right durable home, then either return an audit or apply the selected route if durable-write intent is already clear. Use `/wiki-capture` instead when the user is directly recording a decision or lived context, not promoting a separate artifact.
+Collaborative drafting is chat-only by default. Requests like "work with me," "let's discuss," "let's define," "refine this," "talk track," "make this sharper," or "help me think through" are not promotion intent, even when the topic already has a wiki page, the repo is the current working directory, or the result might be reusable. Continue the conversation in chat and do not edit files first.
 
-At the end of wiki-related work, if a useful reusable insight appears, run an audit automatically and show the recommended route. Apply the promotion only if the user has explicitly asked to promote, apply, save, file, or update the wiki with that promotion. A normal ingest request or commit request is not permission to apply extra promotion beyond the already-authorized work. Otherwise stop at the audit and ask for confirmation.
+Promotion is user-routed. Run an audit when the user asks whether, how, or where to preserve an artifact. Apply the promotion only when they explicitly ask to promote, apply, save, file, or update it. Ordinary ingest, question answering, and routine maintenance work do not end with an automatic promotion audit.
 
 Before applying any promotion or filing any analysis capture, run `python3 scripts/capture_gate.py` with the proposed artifact, phase, primary home, touched pages, and analysis criteria or promotion triggers. Ordinary ingest, decision capture, experience capture, workflow updates, setup updates, and routine page updates do not require this approval gate unless they are part of an artifact-promotion or analysis-capture route. If it prints `APPROVAL REQUIRED`, show the full block and do not edit files until the user approves the displayed durable action, primary destination, and allowed file scope. Re-run with `--approved` only after that approval, then run `python3 scripts/validate_capture_runs.py`.
 
@@ -92,23 +92,6 @@ Do not promote when all are true:
 - Create a new page for a useful phrase that fits cleanly inside an existing concept, initiative, decision, workflow, or analysis page.
 - Treat `/wiki-promote` as permission to save everything.
 - Add a new folder or entity type to hold one artifact.
-
-## Auto-Audit Triggers
-
-Promotion audit auto-triggers after wiki research, ingest, or maintenance work when the answer or work product does any of these:
-
-1. Creates a reusable distinction, label, or phrase future agents should apply.
-2. Changes a ranking, framework, comparison, or decision tree.
-3. Resolves or sharpens an open question.
-4. Identifies an existing page that should be updated.
-5. Says future agents should behave differently.
-6. Produces a reusable prompt, script idea, checklist, spec, or workflow step.
-
-Auto-audit means classify the artifact and recommend a route. It does not mean editing files. Apply mode still requires explicit durable-write intent.
-
-Do not auto-audit mid-collaboration. If the user is still shaping the artifact conversationally, finish the drafting work first. The audit belongs at a natural stopping point, and only as a recommendation unless the user has asked for a durable wiki change.
-
-Context alone is never a trigger. Do not infer promotion intent from being in the wiki repo, from prior similar artifacts having been saved, from the existence of a matching page, or from the artifact passing a promotion test.
 
 ## Routing Spec
 

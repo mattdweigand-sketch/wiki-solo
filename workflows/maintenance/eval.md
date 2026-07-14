@@ -1,22 +1,23 @@
 # Wiki Eval
 
-Run this workflow when the task is to verify the wiki system itself: scripts, gates, ledgers, backlink rebuilds, export behavior, stale-text sweep proof, wrapper parity, schema-doc parity, wiki-research runtime guardrails, and the deterministic Tier-1 gate. The `SUITES` registry in `scripts/wiki_eval.py` is the authoritative list of what runs.
+Run this workflow when the task is to verify the wiki system itself: scripts, gates, ledgers, backlink rebuilds, export behavior, stale-text sweep proof, wrapper parity, schema-doc parity, and the deterministic Tier-1 gate. The `SUITES` registry in `scripts/wiki_eval.py` is the authoritative list of what runs.
 
 This is different from `/wiki-lint`: lint checks wiki content; eval checks the tools that check and protect the wiki.
 
 ## Wrapper Surface Contract
 
-The live convenience surfaces are `.claude/commands/wiki-*.md` and `.codex/skills/wiki-*/SKILL.md`. They must cover the same eight shortcuts; `EXPECTED_SKILLS` in `scripts/check_wrapper_parity.py` is the authoritative name registry (the human-facing list lives in `AGENTS.md` and the README command table).
+The live convenience surfaces are `.claude/commands/wiki-*.md` and `.codex/skills/wiki-*/SKILL.md`. They must cover the same seven shortcuts; `EXPECTED_SKILLS` in `scripts/check_wrapper_parity.py` is the authoritative name registry (the human-facing list lives in `AGENTS.md` and the README command table).
 
 Canonical procedure belongs in `workflows/`. A wrapper is only a thin pointer: canonical routing paths plus at most one `scripts/*.py` command hint. It must not carry a numbered-step list or route-classification procedure. Deleting wrapper folders does not remove the underlying wiki workflow; it only removes that agent surface's shortcut.
 
 `python3 scripts/check_wrapper_parity.py` enforces the checkable part (the `wrapper-parity` suite runs it via `scripts/wiki_eval_wrappers.py`, which also seeds negative fixtures so the checker itself cannot go vacuous):
 
 - both wrapper surfaces cover exactly the expected `wiki-*` names
+- every Codex `SKILL.md` begins with strict frontmatter whose `name` matches its directory and whose `description` is nonempty
 - no wrapper carries more than one `scripts/*.py` reference
-- no wrapper carries a numbered-step list
+- no wrapper carries a numbered-step list in either `1.` or `1)` form
 - every `workflows/*.md` path a wrapper names exists in the tree
-- every shortcut with a single canonical task workflow names that route; `EXPECTED_WORKFLOW_REFS` in `scripts/check_wrapper_parity.py` is the authoritative route registry (`wiki-research` is deliberately absent because the research suite separately pins both research wrappers to route through the root)
+- every shortcut with a single canonical task workflow names that route; `EXPECTED_WORKFLOW_REFS` in `scripts/check_wrapper_parity.py` is the authoritative route registry
 
 It deliberately does not limit how many `workflows/` paths a wrapper names, because naming a workspace `CONTEXT.md` plus the routed task file is the legitimate thin-pointer pattern. It also cannot catch content drift between a wrapper and its twin (one surface carrying a guidance sentence the other lacks); keep wrapper bodies pointer-only so there is nothing to drift.
 
@@ -45,7 +46,7 @@ A new doc enumeration of a canonical vocabulary must either defer to the source 
 
 ## Load / Skip
 
-- **Load:** `scripts/wiki_eval.py`; `scripts/check_wrapper_parity.py` when the task concerns wrapper parity; `scripts/check_schema_doc_parity.py` when the task concerns schema docs; `scripts/wiki_research.py` when the task concerns wiki-research guardrails; any failing suite output if a run fails.
+- **Load:** `scripts/wiki_eval.py`; `scripts/check_wrapper_parity.py` when the task concerns wrapper parity; `scripts/check_schema_doc_parity.py` when the task concerns schema docs; any failing suite output if a run fails.
 - **Skip:** wiki entity pages, raw sources, unrelated workflow files, and Tier-2/Tier-3 content review.
 
 ## Steps

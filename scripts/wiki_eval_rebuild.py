@@ -36,6 +36,15 @@ def read_tree(root: Path) -> dict:
     }
 
 
+def read_tree_bytes(root: Path) -> dict[str, bytes]:
+    """Snapshot every file so a failed rebuild cannot hide partial writes."""
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
 def referenced_by_section(text: str) -> str:
     m = SECTION_RE.search(text)
     return m.group(0) if m else ""
@@ -47,6 +56,58 @@ def main() -> int:
 
     tmp = Path(tempfile.mkdtemp(prefix="wiki-rebuild-eval-"))
     try:
+        invalid_case = tmp / "invalid-utf8"
+        shutil.copytree(FIXTURE_WIKI, invalid_case / "wiki")
+        invalid_page = invalid_case / "wiki" / "sources" / "zz-invalid.md"
+        invalid_page.write_bytes(b"# Late invalid page\n\n\xff\n")
+        before_invalid = read_tree_bytes(invalid_case / "wiki")
+        invalid_run = subprocess.run(
+            [sys.executable, str(REBUILD_SCRIPT)],
+            cwd=invalid_case,
+            capture_output=True,
+            text=True,
+        )
+        after_invalid = read_tree_bytes(invalid_case / "wiki")
+        check(
+            "invalid-utf8-fails-cleanly",
+            invalid_run.returncode != 0
+            and "zz-invalid.md" in invalid_run.stderr
+            and "Traceback" not in invalid_run.stderr,
+            invalid_run.stderr.strip(),
+        )
+        all_invalid_paths = set(before_invalid) | set(after_invalid)
+        changed_invalid = sorted(
+            path
+            for path in all_invalid_paths
+            if before_invalid.get(path) != after_invalid.get(path)
+        )
+        check(
+            "invalid-utf8-preserves-entire-tree",
+            before_invalid == after_invalid,
+            f"files changed before the late read failure: {changed_invalid}",
+        )
+
+        write_failure_case = tmp / "write-failure"
+        shutil.copytree(FIXTURE_WIKI, write_failure_case / "wiki")
+        read_only_page = write_failure_case / "wiki" / "concepts" / "alpha.md"
+        read_only_page.chmod(0o444)
+        try:
+            write_failure_run = subprocess.run(
+                [sys.executable, str(REBUILD_SCRIPT)],
+                cwd=write_failure_case,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            read_only_page.chmod(0o644)
+        check(
+            "low-level-write-failure-is-nonzero",
+            write_failure_run.returncode != 0
+            and "cannot write wiki/concepts/alpha.md" in write_failure_run.stderr
+            and "Traceback" not in write_failure_run.stderr,
+            write_failure_run.stderr.strip(),
+        )
+
         shutil.copytree(FIXTURE_WIKI, tmp / "wiki")
         run = lambda: subprocess.run(
             [sys.executable, str(REBUILD_SCRIPT)],
@@ -97,6 +158,12 @@ def main() -> int:
             "delta (file starting with '## Related pages') was not prepended",
         )
 
+        # mtimes, not just bytes: byte comparison alone cannot distinguish the
+        # skip-unchanged write path from rewriting identical content, which
+        # churns every page's mtime on every rebuild.
+        mtimes_before = {
+            k: (tmp / "wiki" / k).stat().st_mtime_ns for k in after_first
+        }
         second = run()
         check("second-rebuild-exits-zero", second.returncode == 0, second.stderr.strip())
         after_second = read_tree(tmp / "wiki")
@@ -107,6 +174,16 @@ def main() -> int:
             "idempotent-second-pass",
             after_first == after_second,
             f"files changed on second rebuild: {changed}",
+        )
+        mtimes_after = {
+            k: (tmp / "wiki" / k).stat().st_mtime_ns for k in after_first
+        }
+        check(
+            "second-pass-rewrites-nothing",
+            mtimes_before == mtimes_after,
+            "already-correct pages were rewritten byte-identically (mtime churn): "
+            + ", ".join(sorted(k for k in mtimes_before
+                               if mtimes_before[k] != mtimes_after.get(k))),
         )
 
         # A [[link]] inside a code fence is a syntax example, not an authored

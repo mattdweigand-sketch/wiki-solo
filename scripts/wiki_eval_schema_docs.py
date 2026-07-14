@@ -231,6 +231,42 @@ def reword_confidence_block(root: Path) -> None:
     )
 
 
+def break_inline_list(root: Path) -> None:
+    path = root / "AGENTS.md"
+    folders = sorted(CONSTANTS["FOLDER_TYPE_KEYS"])
+    replace_once(
+        path,
+        f"**Entity types:** {', '.join(folders)}",
+        "Entity types are prose now",
+    )
+
+
+def break_table_location(root: Path) -> None:
+    replace_once(
+        root / "wiki" / "SCHEMA.md",
+        "| Type | Location | Purpose |",
+        "| Type | Path | Purpose |",
+    )
+
+
+def break_table_first_column(root: Path) -> None:
+    first = ordered(CONSTANTS, "VALID_AUTHORITY_FRESHNESS")[0]
+    replace_once(
+        root / "wiki" / "SCHEMA.md",
+        f"| `{first}` | Fixture default |",
+        "freshness rows are prose now",
+    )
+
+
+def break_bullet_enum(root: Path) -> None:
+    first = ordered(CONSTANTS, "VALID_CONFIDENCE")[0]
+    replace_once(
+        root / "wiki" / "SCHEMA.md",
+        f"- `{first}` - Fixture meaning",
+        f"`{first}` is prose now",
+    )
+
+
 def case(name, mutate, expect_fragment):
     """Build the clean tree, apply `mutate(root)`, and assert on the problems:
     expect_fragment=None asserts a clean run; otherwise some problem line must
@@ -290,6 +326,26 @@ case(
     "reworded-block-fires",
     reword_confidence_block,
     "wiki/SCHEMA.md: confidence: extraction failure for pipe-enum",
+)
+case(
+    "inline-list-extraction-failure-fires",
+    break_inline_list,
+    "AGENTS.md: entity-folders: extraction failure for inline-list",
+)
+case(
+    "table-location-extraction-failure-fires",
+    break_table_location,
+    "wiki/SCHEMA.md: entity-table-folders: extraction failure for table-location",
+)
+case(
+    "table-first-column-extraction-failure-fires",
+    break_table_first_column,
+    "wiki/SCHEMA.md: freshness-defaults: extraction failure for table-first-column",
+)
+case(
+    "bullet-enum-extraction-failure-fires",
+    break_bullet_enum,
+    "wiki/SCHEMA.md: confidence-values: extraction failure for bullet-enum",
 )
 
 live_problems = schema_doc_parity_problems()

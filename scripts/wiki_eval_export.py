@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
 import tempfile
@@ -30,12 +31,14 @@ def fake_rclone(
     target: str = "gdrive:wiki-exports/wiki-export.zip",
     size_delta: int = 0,
     configured: bool = False,
+    corrupt: bool = False,
 ) -> Path:
     path = root / "rclone"
     state = root / "configured-remotes.txt"
     if configured:
         state.write_text("gdrive\n", encoding="utf-8")
     path.write_text(f"""#!{sys.executable}
+import hashlib
 import pathlib
 import shutil
 import sys
@@ -69,7 +72,10 @@ elif command == "copyto":
     if len(sys.argv) != 4 or sys.argv[3] != target:
         print("unexpected copyto args", file=sys.stderr)
         sys.exit(2)
-    shutil.copyfile(sys.argv[2], remote_zip)
+    data = pathlib.Path(sys.argv[2]).read_bytes()
+    if {corrupt!r}:
+        data = data[::-1]
+    remote_zip.write_bytes(data)
 elif command == "lsl":
     if len(sys.argv) != 3 or sys.argv[2] != target:
         print("unexpected lsl args", file=sys.stderr)
@@ -78,6 +84,14 @@ elif command == "lsl":
         print("remote missing", file=sys.stderr)
         sys.exit(3)
     print(f"{{remote_zip.stat().st_size + size_delta}} 2026-07-08 00:00:00.000000000 wiki-export.zip")
+elif command == "md5sum":
+    if len(sys.argv) != 3 or sys.argv[2] != target:
+        print("unexpected md5sum args", file=sys.stderr)
+        sys.exit(2)
+    if not remote_zip.exists():
+        print("remote missing", file=sys.stderr)
+        sys.exit(3)
+    print(f"{{hashlib.md5(remote_zip.read_bytes()).hexdigest()}}  wiki-export.zip")
 else:
     print("unexpected command", file=sys.stderr)
     sys.exit(2)
@@ -197,6 +211,24 @@ with tempfile.TemporaryDirectory(prefix="wiki-export-eval-") as td:
         results.record("verify-rejects-count-mismatch", False, "export zip was not created")
         results.record("verify-rejects-nested-export-path", False, "export zip was not created")
 
+with tempfile.TemporaryDirectory(prefix="wiki-export-symlink-eval-") as td:
+    root = Path(td)
+    outside = root.parent / f"{root.name}-outside.txt"
+    outside.write_text("outside", encoding="utf-8")
+    (root / "escape-link").symlink_to(outside)
+    proc = subprocess.run(
+        [sys.executable, str(EXPORT), "--repo-root", str(root), "--dry-run"],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    results.record(
+        "export-rejects-symlink-tree",
+        proc.returncode == 1 and "contains symlink" in proc.stderr,
+        f"exit={proc.returncode}; stderr={proc.stderr!r}",
+    )
+    outside.unlink()
+
 with tempfile.TemporaryDirectory(prefix="wiki-export-upload-eval-") as td:
     root = Path(td)
     out = root / "wiki-export.zip"
@@ -259,6 +291,20 @@ with tempfile.TemporaryDirectory(prefix="wiki-export-upload-missing-eval-") as t
         "upload-rclone-requires-rclone",
         not ok and any("not found" in e for e in errors),
         f"missing rclone must fail loudly; ok={ok} errors={errors}",
+    )
+
+with tempfile.TemporaryDirectory(prefix="wiki-export-upload-corrupt-eval-") as td:
+    root = Path(td)
+    out = root / "wiki-export.zip"
+    out.write_bytes(b"backup")
+    rclone = fake_rclone(root, configured=True, corrupt=True)
+    ok, errors = export_wiki.upload_rclone(
+        out, "gdrive:wiki-exports/wiki-export.zip", str(rclone)
+    )
+    results.record(
+        "upload-rclone-rejects-same-size-content-mismatch",
+        not ok and any("did not match local md5" in error for error in errors),
+        f"same-size wrong content must fail checksum verification; ok={ok} errors={errors}",
     )
 
 with tempfile.TemporaryDirectory(prefix="wiki-export-upload-invalid-eval-") as td:

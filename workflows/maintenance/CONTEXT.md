@@ -19,6 +19,7 @@ Synthesis promotion uses `python3 scripts/capture_gate.py --kind=synthesis` befo
 
 | Task | Open | Also load | Skip |
 |---|---|---|---|
+| Audit root documents or workflow routing for drift | [`audit-docs.md`](audit-docs.md) | named documents and only the live paths needed to verify them | wiki entity pages, raw sources, unrelated workflows |
 | Lint the wiki | [`lint.md`](lint.md) | all wiki pages, `wiki/contradictions.md`, `wiki/sourcing-queue.md` | `raw/`, the other task files |
 | Rotate `wiki/log.md` when `log_rotation_due` fires | [`rotate-log.md`](rotate-log.md) | `wiki/log.md`, `scripts/rotate_log.py`, `log_rotation_due` lint output | wiki entity pages, raw sources, backlink rebuilds |
 | Run the wiki tooling evals | [`eval.md`](eval.md) | `scripts/wiki_eval.py`; failing suite output only if a run fails | wiki entity pages, raw sources, Tier-2/Tier-3 content review |

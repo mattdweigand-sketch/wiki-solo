@@ -59,8 +59,23 @@ with tempfile.TemporaryDirectory() as td:
     for name, ok in checks:
         results.record(name, ok, "stdout: " + out.replace("\n", " | "))
 
+    malformed_today = subprocess.run(
+        [sys.executable, str(SCRIPT), "--root", str(root), "--today", "not-a-date"],
+        text=True,
+        capture_output=True,
+    )
+    results.record(
+        "malformed-today-is-clean-argparse-error",
+        malformed_today.returncode == 2
+        and "usage:" in malformed_today.stderr.lower()
+        and "Traceback" not in malformed_today.stderr,
+        f"exit {malformed_today.returncode}; stderr: {malformed_today.stderr.strip()}",
+    )
+
 print()
 print("-- live review-due --")
-subprocess.run([sys.executable, str(SCRIPT)], check=False)
+live = subprocess.run([sys.executable, str(SCRIPT)], check=False)
+results.record("review-live-exit-clean", live.returncode == 0,
+               f"live child exit {live.returncode}")
 
 sys.exit(results.finish())
