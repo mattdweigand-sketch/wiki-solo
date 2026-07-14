@@ -21,7 +21,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from _wiki_parse import frontmatter_block, get_entity_pages
+from _wiki_parse import FrontmatterError, frontmatter_block, get_entity_pages
 
 
 # Capture the whole rest of the line: a value with trailing tokens (e.g.
@@ -31,12 +31,22 @@ REVIEW_BY_RE = re.compile(r"^review_by:(.*)$", re.M)
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
+def iso_date_arg(value: str) -> date:
+    """Argparse converter for clean usage errors on malformed --today."""
+    try:
+        return date.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(
+            f"{value!r} is not a valid YYYY-MM-DD date"
+        ) from exc
+
+
 def collect(root: Path, today: date):
     due, bad = [], []
     for p in get_entity_pages(root):
         try:
             fm = frontmatter_block(p.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError):
+        except (OSError, UnicodeDecodeError, FrontmatterError):
             continue
         m = REVIEW_BY_RE.search(fm)
         if not m:
@@ -62,9 +72,10 @@ def collect(root: Path, today: date):
 def main() -> int:
     ap = argparse.ArgumentParser(description="List pages due for outcome review.")
     ap.add_argument("--root", default="wiki", help="Wiki root to scan.")
-    ap.add_argument("--today", default=None, help="Override today (YYYY-MM-DD), for tests.")
+    ap.add_argument("--today", type=iso_date_arg, default=None,
+                    help="Override today (YYYY-MM-DD), for tests.")
     args = ap.parse_args()
-    today = date.fromisoformat(args.today) if args.today else date.today()
+    today = args.today or date.today()
 
     due, bad = collect(Path(args.root), today)
     print(f"Outcome review due as of {today.isoformat()}: {len(due)} page(s)")

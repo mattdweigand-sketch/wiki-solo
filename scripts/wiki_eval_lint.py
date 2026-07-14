@@ -14,13 +14,14 @@ a system temp directory per case. Writes nothing inside the repo.
 """
 
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-from _wiki_parse import get_entity_pages
+from _wiki_parse import META_PAGES, get_entity_pages
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LINT = REPO_ROOT / "scripts" / "lint.py"
@@ -46,20 +47,21 @@ def run_case(name, mutate, args=("--tier1",), expect_code=0, expect=(), absent=(
             [sys.executable, str(LINT), *args],
             cwd=root, text=True, capture_output=True,
         )
+        output = proc.stdout + proc.stderr
         ok = proc.returncode == expect_code
         for marker in expect:
-            ok = ok and marker in proc.stdout
+            ok = ok and marker in output
         for marker in absent:
-            ok = ok and marker not in proc.stdout
+            ok = ok and marker not in output
         results.append((name, ok))
         if not ok:
             print(f"FAIL {name}")
             print(f"  exit {proc.returncode} (expected {expect_code})")
             for marker in expect:
-                if marker not in proc.stdout:
+                if marker not in output:
                     print(f"  missing: {marker!r}")
             for marker in absent:
-                if marker in proc.stdout:
+                if marker in output:
                     print(f"  unexpected: {marker!r}")
         else:
             print(f"PASS {name}")
@@ -91,6 +93,27 @@ def write_adjudications(root, **kwargs):
     (root / "scripts" / "lint-adjudications.json").write_text(json.dumps(base))
 
 
+def write_raw_buckets(root, value):
+    (root / "scripts" / "raw-buckets.json").write_text(json.dumps(value))
+
+
+def add_source_profile(root, name):
+    """Add an indexed source with alpha/beta's three-link co-citation profile."""
+    path = root / "wiki" / "sources" / f"{name}.md"
+    path.write_text(
+        f'---\ntitle: "{name.replace("-", " ").title()}"\ntype: source\n'
+        'created: 2026-06-01\nupdated: 2026-06-01\n'
+        'sources: ["experience: lint eval fixture"]\ntags: [fixture]\n'
+        'confidence: medium\nsource_type: other\nagent_use_cases:\n'
+        '  - lint eval fixture\n---\n\n'
+        'Source profile fixture for cross-reference detector precision.\n\n'
+        '## Related pages\n\n'
+        '- [[delta-one]]\n- [[delta-two]]\n- [[delta-three]]\n'
+    )
+    append(root, "wiki/index.md",
+           f"| [{name}.md](sources/{name}.md) | Source profile fixture |\n")
+
+
 def add_authority(root, rel, *lines):
     p = root / rel
     t = p.read_text()
@@ -112,6 +135,14 @@ def write_peer_source(root, source_name="gamma"):
     add_index_row(root, "sources/peer-source.md", "fixture peer source")
     append(root, "wiki/concepts/alpha.md", "\n- Related: [[peer-source]]\n")
 
+
+
+def fail_prerequisite(name, detail, *, sink=None, emit=True):
+    """Record an unavailable eval prerequisite as a real failed case."""
+    target = results if sink is None else sink
+    target.append((name, False))
+    if emit:
+        print(f"FAIL {name} ({detail})")
 
 
 # ---- Tier 1: clean fixture is the control ----
@@ -206,6 +237,38 @@ run_case(
     expect_code=1, expect=("dangling-link",),
 )
 run_case(
+    "synthesis-as-source-frontmatter-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   'sources: ["experience: lint eval fixture"]',
+                   'sources: ["experience: lint eval fixture", "[[synthesis]]"]'),
+    expect_code=1, expect=("synthesis-as-source", "sources: cites the synthesis ledger"),
+)
+run_case(
+    "synthesis-as-source-bare-slug-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   'sources: ["experience: lint eval fixture"]',
+                   'sources: ["experience: lint eval fixture", "synthesis"]'),
+    expect_code=1, expect=("synthesis-as-source", "source-ref"),
+)
+run_case(
+    "synthesis-as-source-body-fires",
+    lambda r: edit(r, "wiki/concepts/alpha.md",
+                   "Alpha body text for the lint eval fixture.",
+                   "Alpha body text for the lint eval fixture (source: [[synthesis]])."),
+    expect_code=1, expect=("synthesis-as-source", "body cites [[synthesis]] as a source"),
+)
+run_case(
+    "synthesis-link-not-as-source-allowed",
+    lambda r: (
+        edit(r, "wiki/concepts/alpha.md",
+             "Alpha body text for the lint eval fixture.",
+             "Alpha body text for the lint eval fixture near [[synthesis]], "
+             "with a syntax example `(source: [[synthesis]])` in code."),
+        append(r, "wiki/concepts/alpha.md", "- Related: [[synthesis]]\n"),
+    ),
+    expect_code=0, absent=("synthesis-as-source",),
+)
+run_case(
     # content:links#2 + #3: a [[link]] written as a syntax example inside an
     # inline code span on an ENTITY page must not be reported dangling, matching
     # the meta-page behavior. Reverting the code-span strip in the Tier-1
@@ -216,6 +279,28 @@ run_case(
     expect_code=0, absent=("some-undefined-demo-page",),
 )
 run_case(
+    "rich-code-links-not-dangling",
+    lambda r: append(
+        r,
+        "wiki/concepts/alpha.md",
+        "\nDouble ``[[double-code-decoy]]``.\n"
+        "~~~\n[[tilde-code-decoy]]\n~~~\n"
+        "````python\n``` inner literal\n[[four-code-decoy]]\n````\n",
+    ),
+    expect_code=0,
+    absent=("double-code-decoy", "tilde-code-decoy", "four-code-decoy"),
+)
+run_case(
+    "uppercase-generated-backlinks-not-dangling",
+    lambda r: append(
+        r,
+        "wiki/concepts/alpha.md",
+        "\n## REFERENCED BY ###\n\n[[generated-dangling-decoy]]\n",
+    ),
+    expect_code=0,
+    absent=("generated-dangling-decoy",),
+)
+run_case(
     # code:lint#4: a raw/ token inside a non-sources frontmatter field (here a
     # title) must NOT be existence-checked as a provenance ref. Reverting the
     # sources-scoped scan reintroduces a spurious (source-ref) failure.
@@ -224,6 +309,103 @@ run_case(
                    'title: "Alpha"',
                    'title: "How to use raw/data pipelines"'),
     expect_code=0, absent=("source-ref",),
+)
+run_case(
+    "source-url-containing-raw-segment-is-not-repo-path",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [https://example.test/raw/records/remote.pdf]",
+    ),
+    expect_code=0,
+    absent=("source-ref",),
+)
+run_case(
+    "prefixed-absolute-raw-path-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [/raw/notes/real.md]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "unsafe raw repository path expression"),
+)
+run_case(
+    "uri-raw-path-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [file:raw/notes/real.md]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "unsafe raw repository path expression"),
+)
+run_case(
+    "windows-raw-path-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        r"sources: [C:\raw\notes\real.md]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "unsafe raw repository path expression"),
+)
+run_case(
+    "nul-prefixed-raw-path-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [\x00raw/notes/real.md]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "unsafe raw repository path expression"),
+)
+run_case(
+    "explicit-wiki-source-ref-passes",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [wiki/sources/gamma.md]",
+    ),
+)
+run_case(
+    "traversing-wiki-source-ref-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [wiki/sources/../../outside.md]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "wiki/sources/../../outside.md", "unsafe"),
+)
+run_case(
+    "uri-wiki-source-ref-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [file:wiki/sources/gamma.md]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "unsafe wiki repository path expression"),
+)
+run_case(
+    "generic-traversing-source-ref-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [../outside]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "unsafe provenance path expression"),
 )
 run_case(
     # code:lint#3: a prose bullet of the form "- Word: ..." with NO wikilink in
@@ -321,6 +503,67 @@ run_case(
                             "authority_ref: raw/notes/missing-authority.md"),
     expect_code=1, expect=("authority-ref-shape",
                            "raw/notes/missing-authority.md"),
+)
+run_case(
+    "authority-source-page-traversal-fires",
+    lambda r: (
+        (r / "outside.md").write_text("outside fixture"),
+        add_authority(
+            r,
+            "wiki/concepts/alpha.md",
+            "authority_kind: source-page",
+            "authority_ref: wiki/sources/../../outside.md",
+        ),
+    ),
+    expect_code=1,
+    expect=("authority-ref-shape", "contained existing wiki/sources"),
+)
+run_case(
+    "external-url-authority-must-be-one-url",
+    lambda r: add_authority(
+        r,
+        "wiki/concepts/alpha.md",
+        "authority_kind: external-url",
+        "authority_ref: https://example.test raw/../outside.md",
+    ),
+    expect_code=1,
+    expect=("authority-ref-shape", "exactly one http:// or https:// URL"),
+)
+run_case(
+    "mixed-authority-traversal-fires",
+    lambda r: add_authority(
+        r,
+        "wiki/concepts/alpha.md",
+        "authority_kind: mixed",
+        "authority_ref: raw/../outside.md",
+    ),
+    expect_code=1,
+    expect=("authority-ref-shape", "mixed authority_ref", "unsafe repository path"),
+)
+run_case(
+    "source-url-plus-unsafe-path-fires",
+    lambda r: edit(
+        r,
+        "wiki/concepts/alpha.md",
+        'sources: ["experience: lint eval fixture"]',
+        "sources: [https://example.test raw/../outside.md]",
+    ),
+    expect_code=1,
+    expect=("source-ref", "raw/../outside.md"),
+)
+run_case(
+    "source-ref-traversal-fires",
+    lambda r: (
+        (r / "outside.md").write_text("outside fixture"),
+        edit(
+            r,
+            "wiki/concepts/alpha.md",
+            'sources: ["experience: lint eval fixture"]',
+            "sources: [raw/../outside.md]",
+        ),
+    ),
+    expect_code=1,
+    expect=("source-ref", "raw/../outside.md"),
 )
 run_case(
     "source-page-current-state-authority-fires",
@@ -484,6 +727,18 @@ run_case(
     ),
 )
 run_case(
+    "resolving-raw-directory-marker-passes",
+    lambda r: (
+        (r / "raw" / "notes" / "record-folder").mkdir(parents=True),
+        edit(
+            r,
+            "wiki/concepts/alpha.md",
+            'sources: ["experience: lint eval fixture"]',
+            "sources: [raw/notes/record-folder/]",
+        ),
+    ),
+)
+run_case(
     # Block-style sources: lists get the same provenance checks as inline
     # lists: a missing raw/ ref on an indented '- item' line must fire.
     "block-style-missing-raw-source-ref-fires",
@@ -536,7 +791,8 @@ run_case(
         (r / "wiki/concepts/nested").mkdir(),
         (r / "wiki/concepts/nested/deep.md").write_text("# hidden\n"),
     ),
-    expect_code=1, expect=("wiki-structure", "wiki/concepts/nested/deep.md"),
+    expect_code=1, expect=("wiki-structure", "wiki/concepts/nested", "direct directory"),
+    absent=("nested/deep.md",),
 )
 run_case(
     # code:eval-lint#2: the file branch of the wiki-structure check was never
@@ -563,6 +819,20 @@ run_case(
     expect_code=1, expect=("frontmatter", "missing or malformed"),
 )
 run_case(
+    "junk-frontmatter-close-fails-cleanly",
+    lambda r: edit(r, "wiki/concepts/alpha.md", "---\n\nAlpha body", "---junk\n\nAlpha body"),
+    expect_code=1,
+    expect=("frontmatter", "missing an exact closing"),
+)
+run_case(
+    "junk-frontmatter-full-lint-fails-cleanly",
+    lambda r: edit(r, "wiki/concepts/alpha.md", "---\n\nAlpha body", "---junk\n\nAlpha body"),
+    args=(),
+    expect_code=1,
+    expect=("frontmatter", "missing an exact closing"),
+    absent=("Traceback",),
+)
+run_case(
     # code:eval-lint#1: corrupt raw-buckets.json (the integrity branch) had no
     # firing case. A raw/ tree plus unparseable taxonomy is a Tier-1 failure.
     "corrupt-raw-buckets-fires",
@@ -579,7 +849,9 @@ run_case(
     lambda r: (
         (r / "raw" / "notes").mkdir(parents=True),
         (r / "raw" / "notes" / ".gitkeep").write_text(""),
-        (r / "scripts" / "raw-buckets.json").write_text('{"buckets": ["notes"]}'),
+        (r / "scripts" / "raw-buckets.json").write_text(
+            '{"description": "fixture", "buckets": ["notes"]}'
+        ),
     ),
     expect_code=1, expect=("raw-buckets", "must contain a 'buckets' object"),
 )
@@ -680,6 +952,26 @@ run_case(
     args=(), absent=("not found in cited source",),
 )
 run_case(
+    "unsafe-raw-symlink-cannot-satisfy-quote",
+    lambda r: (
+        (r / "raw" / "notes").mkdir(parents=True),
+        append(r, "wiki/index.md", "\n" + FIXTURE_QUOTE + "\n"),
+        (r / "raw" / "notes" / "escape.txt").symlink_to(
+            r / "wiki" / "index.md"
+        ),
+        edit(
+            r,
+            "wiki/sources/gamma.md",
+            'sources: ["experience: lint eval fixture"]',
+            "sources: [raw/notes/escape.txt]",
+        ),
+        seed_quote(r),
+    ),
+    args=(),
+    expect_code=1,
+    expect=("source-ref", "quote mismatch", "not found in cited source"),
+)
+run_case(
     "quote-mismatch-suppressed",
     lambda r: (
         seed_quote(r),
@@ -688,6 +980,46 @@ run_case(
              "reason": "fixture", "date": "2026-06-11"}]),
     ),
     args=(), expect=("suppressed",), absent=("not found in cited source",),
+)
+
+SPLIT_QUOTE_FRAGMENT_A = "Gamma source carries the first coherent quote fragment"
+SPLIT_QUOTE_FRAGMENT_B = "Delta source carries the second coherent quote fragment"
+SPLIT_QUOTE = f"{SPLIT_QUOTE_FRAGMENT_A} ... {SPLIT_QUOTE_FRAGMENT_B}"
+
+
+def seed_split_quote(root, *, coherent=False):
+    edit(
+        root,
+        "wiki/concepts/beta.md",
+        "Beta body text for the lint eval fixture.",
+        f'Beta body text for the lint eval fixture. "{SPLIT_QUOTE}" '
+        "(sources: [[gamma]], [[delta-one]])",
+    )
+    edit(
+        root,
+        "wiki/sources/gamma.md",
+        "Gamma is an orphan source page.",
+        "Gamma is an orphan source page. "
+        + SPLIT_QUOTE_FRAGMENT_A
+        + (" " + SPLIT_QUOTE_FRAGMENT_B if coherent else ""),
+    )
+    edit(
+        root,
+        "wiki/concepts/delta-one.md",
+        "Delta one body.",
+        "Delta one body. " + SPLIT_QUOTE_FRAGMENT_B,
+    )
+
+
+run_case(
+    "quote-fragments-split-across-sources-fires",
+    lambda r: seed_split_quote(r),
+    args=(), expect=("not found in cited source",),
+)
+run_case(
+    "quote-fragments-one-source-passes",
+    lambda r: seed_split_quote(r, coherent=True),
+    args=(), absent=("not found in cited source",),
 )
 
 # ---- Tier 2: compiled-page recompile candidates ----
@@ -999,6 +1331,22 @@ run_case(
     None, args=(),
     expect=("sources/gamma.md",
             "concepts/alpha.md  +  concepts/beta.md"),
+)
+run_case(
+    "crossref-both-source-pages-skipped",
+    lambda r: (add_source_profile(r, "source-one"),
+               add_source_profile(r, "source-two")),
+    args=(), absent=("sources/source-one.md  +  sources/source-two.md",),
+)
+run_case(
+    "crossref-mixed-source-nonsource-still-fires",
+    lambda r: add_source_profile(r, "source-profile"),
+    args=(), expect=("concepts/alpha.md  +  sources/source-profile.md",),
+)
+run_case(
+    "crossref-nonsource-control-still-fires",
+    None,
+    args=(), expect=("concepts/alpha.md  +  concepts/beta.md",),
 )
 run_case(
     "orphan-suppressed-by-adjudication",
@@ -1557,6 +1905,18 @@ run_case(
                      "\nSyntax example: `[[some-undefined-meta-demo]]`.\n"),
     expect_code=0, absent=("some-undefined-meta-demo",),
 )
+run_case(
+    "meta-dangling-rich-code-ignored",
+    lambda r: append(
+        r,
+        "wiki/index.md",
+        "\nDouble ``[[double-meta-decoy]]``.\n"
+        "~~~\n[[tilde-meta-decoy]]\n~~~\n"
+        "````python\n``` inner literal\n[[four-meta-decoy]]\n````\n",
+    ),
+    expect_code=0,
+    absent=("double-meta-decoy", "tilde-meta-decoy", "four-meta-decoy"),
+)
 
 def check_raw_tracked_fires():
     """The raw-tracked Tier-1 guard needs a git work tree, which the copy-to-temp
@@ -1574,9 +1934,9 @@ def check_raw_tracked_fires():
             subprocess.run(["git", "add", "-f", "raw/leak.pdf"], cwd=root,
                            check=True, capture_output=True)
         except (OSError, subprocess.SubprocessError) as e:
-            results.append(("raw-tracked-fires", True))
-            print("SKIP raw-tracked-fires (git unavailable: "
-                  f"{type(e).__name__})")
+            fail_prerequisite(
+                "raw-tracked-fires", f"git prerequisite unavailable: {type(e).__name__}"
+            )
             return
         proc = subprocess.run([sys.executable, str(LINT), "--tier1"],
                               cwd=root, text=True, capture_output=True)
@@ -1604,9 +1964,10 @@ def check_raw_tracked_case_variant_fires():
             subprocess.run(["git", "add", "-f", "Raw/leak.pdf"], cwd=root,
                            check=True, capture_output=True)
         except (OSError, subprocess.SubprocessError) as e:
-            results.append(("raw-tracked-case-variant-fires", True))
-            print("SKIP raw-tracked-case-variant-fires (git unavailable: "
-                  f"{type(e).__name__})")
+            fail_prerequisite(
+                "raw-tracked-case-variant-fires",
+                f"git prerequisite unavailable: {type(e).__name__}",
+            )
             return
         proc = subprocess.run([sys.executable, str(LINT), "--tier1"],
                               cwd=root, text=True, capture_output=True)
@@ -1618,8 +1979,222 @@ def check_raw_tracked_case_variant_fires():
             print(f"  exit {proc.returncode}; stdout: {proc.stdout[:300]}")
 
 
+# ---- Phase 5: fail-closed structure and governed Tier-1 data ----
+run_case(
+    "direct-entity-junk-file-fails",
+    lambda r: (r / "wiki/concepts/illegal.bin").write_bytes(b"junk"),
+    expect_code=1,
+    expect=("wiki-structure", "wiki/concepts/illegal.bin", "non-.md"),
+    absent=("Traceback",),
+)
+run_case(
+    "empty-direct-entity-directory-fails",
+    lambda r: (r / "wiki/concepts/nested").mkdir(),
+    expect_code=1,
+    expect=("wiki-structure", "wiki/concepts/nested", "directory"),
+    absent=("Traceback",),
+)
+run_case(
+    "direct-entity-broken-symlink-fails",
+    lambda r: (r / "wiki/concepts/escape.md").symlink_to(r / "missing-target.md"),
+    args=(),
+    expect_code=1,
+    expect=("wiki-structure", "wiki/concepts/escape.md", "special entry"),
+    absent=("Traceback",),
+)
+run_case(
+    "direct-entity-directory-symlink-fails",
+    lambda r: (r / "wiki/concepts/directory-link.md").symlink_to(
+        r / "wiki/concepts", target_is_directory=True
+    ),
+    args=(),
+    expect_code=1,
+    expect=("wiki-structure", "wiki/concepts/directory-link.md", "special entry"),
+    absent=("Traceback",),
+)
+
+for case_name, registry, marker in (
+    ("raw-buckets-list-top-level-fails", [], "top level must be a JSON object"),
+    ("raw-buckets-empty-object-fails", {}, "nonempty string 'description'"),
+    (
+        "raw-buckets-empty-buckets-fails",
+        {"description": "fixture", "buckets": {}},
+        "'buckets' must be a nonempty object",
+    ),
+    (
+        "raw-buckets-bad-key-fails",
+        {"description": "fixture", "buckets": {"Bad Bucket": "fixture"}},
+        "bucket key 'Bad Bucket' is not kebab-case",
+    ),
+    (
+        "raw-buckets-blank-description-fails",
+        {"description": "  ", "buckets": {"notes": "fixture"}},
+        "nonempty string 'description'",
+    ),
+    (
+        "raw-buckets-blank-bucket-description-fails",
+        {"description": "fixture", "buckets": {"notes": "  "}},
+        "bucket 'notes' needs a nonempty string description",
+    ),
+):
+    run_case(
+        case_name,
+        lambda r, value=registry: write_raw_buckets(r, value),
+        expect_code=1,
+        expect=("raw-buckets", marker),
+        absent=("Traceback",),
+    )
+
+for page, field in (
+    ("wiki/concepts/alpha.md", "title"),
+    ("wiki/concepts/alpha.md", "type"),
+    ("wiki/concepts/alpha.md", "created"),
+    ("wiki/concepts/alpha.md", "updated"),
+    ("wiki/concepts/alpha.md", "confidence"),
+    ("wiki/sources/gamma.md", "source_type"),
+):
+    for suffix, replacement in (("blank", ""), ("quote-only", "''")):
+        run_case(
+            f"required-{field}-{suffix}-fails",
+            lambda r, rel=page, key=field, value=replacement: edit(
+                r, rel, next(
+                    line for line in (r / rel).read_text().splitlines()
+                    if line.startswith(f"{key}:")
+                ), f"{key}: {value}"
+            ),
+            expect_code=1,
+            expect=("frontmatter", f"{field} must be a nonempty scalar"),
+            absent=("Traceback",),
+        )
+
+for meta_name in sorted(META_PAGES):
+    run_case(
+        f"non-utf8-meta-{meta_name.lower()}-fails-cleanly",
+        lambda r, name=meta_name: (r / "wiki" / f"{name}.md").write_bytes(b"\xff"),
+        expect_code=1,
+        expect=("meta-encoding", f"wiki/{meta_name}.md", "not valid UTF-8"),
+        absent=("Traceback",),
+    )
+
+run_case(
+    "sourcing-marker-duplicate-attribute-fails",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=concepts folder=sources count=5 -->"
+    ),
+    expect_code=1,
+    expect=("sourcing-queue-count-marker", "duplicate attribute 'folder'"),
+    absent=("Traceback",),
+)
+run_case(
+    "sourcing-marker-unknown-attribute-fails",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=concepts count=5 extra=yes -->"
+    ),
+    expect_code=1,
+    expect=("sourcing-queue-count-marker", "unknown attribute 'extra'"),
+    absent=("Traceback",),
+)
+run_case(
+    "sourcing-marker-unparsed-attribute-text-fails",
+    lambda r: write_sourcing_queue(
+        r, "<!-- lint:entity-count folder=concepts stray count=5 -->"
+    ),
+    expect_code=1,
+    expect=("sourcing-queue-count-marker", "malformed attribute text"),
+    absent=("Traceback",),
+)
+
+LONG_QUOTE_PREFIX = (
+    "This deliberately long shared quote prefix contains enough normalized words "
+    "and characters to extend well beyond the former eighty character identity boundary"
+)
+LONG_QUOTE_ONE = LONG_QUOTE_PREFIX + " before ending with the first distinct conclusion."
+LONG_QUOTE_TWO = LONG_QUOTE_PREFIX + " before ending with the second distinct conclusion."
+
+
+def seed_long_quote_identity(root):
+    edit(
+        root,
+        "wiki/concepts/beta.md",
+        "Beta body text for the lint eval fixture.",
+        f'Beta body text for the lint eval fixture. "{LONG_QUOTE_ONE}" '
+        f'(source: [[gamma]])\n\n"{LONG_QUOTE_TWO}" (source: [[gamma]])',
+    )
+    write_adjudications(root, reviewed_quotes=[{
+        "page": "concepts/beta.md",
+        "quote": LONG_QUOTE_ONE,
+        "reason": "fixture full-identity suppression",
+        "date": "2026-07-11",
+    }])
+
+
+run_case(
+    "long-quotes-sharing-eighty-character-prefix-stay-distinct",
+    seed_long_quote_identity,
+    args=(),
+    expect_code=0,
+    expect=(
+        "quote mismatches (quoted text not verbatim in cited source): 1",
+        "adjudicated, suppressed via scripts/lint-adjudications.json: 1",
+    ),
+    absent=("adjudication_dead", "Traceback"),
+)
+
+
+def check_git_failure_inside_worktree_fails():
+    """A failed Git invariant query cannot look clean once worktree status is known."""
+    real_git = shutil.which("git")
+    if real_git is None:
+        fail_prerequisite(
+            "git-failure-inside-worktree-fails", "git prerequisite unavailable"
+        )
+        return
+    with tempfile.TemporaryDirectory(prefix="wiki-git-failure-") as td:
+        root = Path(td)
+        copy_fixture(root)
+        subprocess.run([real_git, "init", "-q"], cwd=root, check=True, capture_output=True)
+        fake_bin = root / "tmp" / "fake-bin"
+        fake_bin.mkdir(parents=True)
+        fake_git = fake_bin / "git"
+        fake_git.write_text(
+            "#!/bin/sh\n"
+            "if [ \"$1\" = \"rev-parse\" ]; then echo true; exit 0; fi\n"
+            "if [ \"$1\" = \"ls-files\" ]; then echo forced failure >&2; exit 73; fi\n"
+            f'exec "{real_git}" "$@"\n'
+        )
+        fake_git.chmod(0o755)
+        env = os.environ.copy()
+        env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
+        proc = subprocess.run(
+            [sys.executable, str(LINT), "--tier1"],
+            cwd=root,
+            text=True,
+            capture_output=True,
+            env=env,
+        )
+        output = proc.stdout + proc.stderr
+        ok = (
+            proc.returncode == 1
+            and "raw-tracked" in output
+            and "git ls-files failed inside worktree" in output
+            and "Traceback" not in output
+        )
+        results.append(("git-failure-inside-worktree-fails", ok))
+        print(("PASS " if ok else "FAIL ") + "git-failure-inside-worktree-fails")
+        if not ok:
+            print(f"  exit {proc.returncode}; output: {output[:500]}")
+
+
 check_raw_tracked_fires()
 check_raw_tracked_case_variant_fires()
+check_git_failure_inside_worktree_fails()
+
+prerequisite_probe = []
+fail_prerequisite("probe", "unavailable", sink=prerequisite_probe, emit=False)
+results.append(("git-unavailable-never-counts-as-pass",
+                prerequisite_probe == [("probe", False)]))
+print(("PASS " if results[-1][1] else "FAIL ")
+      + "git-unavailable-never-counts-as-pass")
 
 print()
 failed = [n for n, ok in results if not ok]

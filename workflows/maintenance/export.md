@@ -22,7 +22,7 @@ description: Use this workflow when the user says "export the wiki" or wants a l
    python3 scripts/export_wiki.py --date YYYY-MM-DD
    ```
 
-   This includes `wiki/`, `raw/`, `workflows/`, `scripts/` with fixtures and ledgers, `.claude/commands/`, `.codex/skills/`, `.github/workflows/`, and the top-level docs. It excludes `.git/`, `tmp/`, `deliverables/`, Claude worktrees, local Claude settings, Finder metadata, `.env`, and generated zip files.
+   This includes `wiki/`, `raw/`, `workflows/`, `scripts/` with fixtures and ledgers, `.claude/commands/`, `.codex/skills/`, `.github/workflows/`, and the top-level docs. It excludes `.git/`, `tmp/`, `deliverables/`, Claude worktrees, local Claude settings, Finder metadata, `.env`, and generated zip files. The export refuses any symlink in the tree so it cannot silently archive content from outside the repository or omit a broken link.
 
 2. If you need to inspect before building, run:
 
@@ -47,7 +47,7 @@ description: Use this workflow when the user says "export the wiki" or wants a l
      --upload-target gdrive:wiki-exports/wiki-export-YYYY-MM-DD.zip
    ```
 
-   The script runs `rclone copyto`, verifies the remote byte size with `rclone lsl`, and leaves credentials in the user's local `rclone` config. Do not commit credentials, tokens, or user-specific Drive targets.
+   The script runs `rclone copyto`, verifies the remote byte size with `rclone lsl`, verifies content identity with `rclone md5sum`, and leaves credentials in the user's local `rclone` config. Do not commit credentials, tokens, or user-specific Drive targets.
 
 5. No `wiki/log.md` entry. The export changes no wiki content; the zip in `tmp/` is a disposable artifact until the user moves it.
 

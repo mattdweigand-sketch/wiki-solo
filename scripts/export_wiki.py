@@ -9,6 +9,7 @@ only runs when an explicit rclone destination is provided.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import subprocess
 import sys
 import zipfile
@@ -95,6 +96,11 @@ def export_files(repo_root: Path) -> list[Path]:
             continue
         files.append(path)
     return files
+
+
+def find_symlinks(repo_root: Path) -> list[Path]:
+    """Return every symlink, including broken links, under the export root."""
+    return sorted(path for path in repo_root.rglob("*") if path.is_symlink())
 
 
 def zip_path(repo_root: Path, output_dir: str, stamp: str) -> Path:
@@ -222,6 +228,16 @@ def parse_rclone_lsl_size(stdout: str) -> tuple[int | None, list[str]]:
         return None, [f"remote listing did not start with a byte count: {lines[0]}"]
 
 
+def parse_rclone_md5(stdout: str) -> tuple[str | None, list[str]]:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    if len(lines) != 1:
+        return None, [f"expected one remote md5sum line, got {len(lines)}"]
+    value = lines[0].split(maxsplit=1)[0].lower()
+    if len(value) != 32 or any(char not in "0123456789abcdef" for char in value):
+        return None, [f"remote md5sum did not start with an MD5 hash: {lines[0]}"]
+    return value, []
+
+
 def upload_rclone(
     output: Path,
     target: str,
@@ -244,6 +260,7 @@ def upload_rclone(
             return False, errors
 
     expected_size = output.stat().st_size
+    expected_md5 = hashlib.md5(output.read_bytes()).hexdigest()
     ok, _, errors = run_rclone(rclone_bin, ["copyto", str(output), target])
     if not ok:
         return False, errors
@@ -257,6 +274,14 @@ def upload_rclone(
         return False, [
             f"remote size {remote_size} did not match local size {expected_size}"
         ]
+    ok, stdout, errors = run_rclone(rclone_bin, ["md5sum", target])
+    if not ok:
+        return False, errors
+    remote_md5, parse_errors = parse_rclone_md5(stdout)
+    if parse_errors:
+        return False, parse_errors
+    if remote_md5 != expected_md5:
+        return False, [f"remote md5 {remote_md5} did not match local md5 {expected_md5}"]
     return True, []
 
 
@@ -282,6 +307,12 @@ def main() -> int:
             )
             return 1
     repo_root = Path(args.repo_root).resolve()
+    symlinks = find_symlinks(repo_root)
+    if symlinks:
+        print("Wiki export refused: the tree contains symlink(s):", file=sys.stderr)
+        for link in symlinks:
+            print(f"- {link.relative_to(repo_root)}", file=sys.stderr)
+        return 1
     files = export_files(repo_root)
     output = zip_path(repo_root, args.output_dir, args.date)
 

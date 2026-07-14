@@ -2,12 +2,22 @@
 title: Activity Log
 type: log
 created: 2026-05-17
-updated: 2026-07-09
+updated: 2026-07-14
 ---
 
 # Activity Log
 
 Append-only history of ingest, lint, query, and decision-capture sessions. Newest entries on top.
+
+---
+
+## [2026-07-14] maintenance | template parity refresh and research-overlay removal
+
+Change: Ported the reusable mechanics committed in the maintained personal wiki after the prior template checkpoint, including shared repository-path containment, Markdown parser hardening, fail-closed approval-ledger writes, stronger lint and eval coverage, governance-document audit routing, workflow simplification, and export symlink/checksum verification. Removed the entire optional wiki-research overlay from the active template surface: wrappers, workflow, runtime, eval suite, owner registry, routes, and documentation references.
+Reason: Keep `wiki-solo` current as a safe unconfigured template while intentionally offering only the ordinary wiki question-answering workflow.
+Rejected alternative: Mirror the personal wiki tree literally, which would import private corpus content, configured-domain assumptions, and the research overlay this template no longer supports.
+Accepted tradeoff: Historical log entries remain append-only and still describe when the removed overlay was previously added; every active surface is free of it.
+Validation: PASS - full `python3 scripts/wiki_eval.py`; full `python3 scripts/lint.py`; `python3 scripts/check_wrapper_parity.py`; `python3 scripts/check_schema_doc_parity.py`; `python3 scripts/export_wiki.py --dry-run --date 2026-07-14`; `python3 -m py_compile scripts/*.py`; active-surface research-reference scan; private-marker scan; `git diff --check`.
 
 ---
 

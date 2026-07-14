@@ -3,9 +3,7 @@
 
 Entrypoint for the deterministic checks that guard live tooling. The SUITES
 registry below is the single enumeration of what runs; each suite's own
-docstring describes what it guards. The autonomy harness suites are archived
-under archive/wiki-harness/ per decisions/archive-wiki-autonomy-harness;
-restore them from there if the harness is reopened.
+docstring describes what it guards.
 """
 
 from __future__ import annotations
@@ -17,6 +15,7 @@ from pathlib import Path
 
 
 SUITES = {
+    "eval-runner": [sys.executable, "scripts/wiki_eval_runner.py"],
     "parse": [sys.executable, "scripts/wiki_eval_parse.py"],
     "rebuild": [sys.executable, "scripts/wiki_eval_rebuild.py"],
     "lint": [sys.executable, "scripts/wiki_eval_lint.py"],
@@ -29,20 +28,39 @@ SUITES = {
     "ledger-validators": [sys.executable, "scripts/wiki_eval_ledgers.py"],
     "wrapper-parity": [sys.executable, "scripts/wiki_eval_wrappers.py"],
     "schema-docs": [sys.executable, "scripts/wiki_eval_schema_docs.py"],
-    "research": [sys.executable, "scripts/wiki_eval_research.py"],
     "tier1": [sys.executable, "scripts/lint.py", "--tier1"],
 }
 
 
-def unregistered_suites() -> list[str]:
-    """wiki_eval_*.py files that appear in no registered suite command. A new
-    suite file that is never added to SUITES would otherwise silently never
-    run; this makes the default run fail loudly instead."""
-    registered = {part for command in SUITES.values() for part in command}
-    scripts_dir = Path(__file__).resolve().parent
+def registered_eval_scripts(suites: dict[str, list[str]]) -> set[str]:
+    """Eval script basenames registered as the executable's script argument.
+
+    Python suite commands have the form ``[python, script, *args]``. Only the
+    script at position 1 establishes registration; an eval-looking decoy in a
+    later argument must not hide an orphaned suite file.
+    """
+    registered: set[str] = set()
+    for command in suites.values():
+        if len(command) < 2:
+            continue
+        candidate = Path(command[1]).name
+        if candidate.startswith("wiki_eval_") and candidate.endswith(".py"):
+            registered.add(candidate)
+    return registered
+
+
+def unregistered_suites(
+    *,
+    scripts_dir: Path | None = None,
+    suites: dict[str, list[str]] | None = None,
+) -> list[str]:
+    """Return ``wiki_eval_*.py`` files absent from command position 1."""
+    directory = scripts_dir or Path(__file__).resolve().parent
+    registered = registered_eval_scripts(SUITES if suites is None else suites)
     return sorted(
-        p.name for p in scripts_dir.glob("wiki_eval_*.py")
-        if f"scripts/{p.name}" not in registered
+        path.name
+        for path in directory.glob("wiki_eval_*.py")
+        if path.name not in registered
     )
 
 

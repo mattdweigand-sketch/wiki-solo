@@ -153,6 +153,57 @@ def assert_payload_conserved(original: list[Entry], moved: list[Entry], kept: li
         raise RotationError("payload conservation failed: original log entries changed")
 
 
+def _archive_candidate_index(path: Path, base_rel: Path) -> int | None:
+    """Return deterministic slot 1/base, 2/-2, 3/-3, etc. for a path."""
+    if path.name == base_rel.name:
+        return 1
+    prefix = f"{base_rel.stem}-"
+    if not path.name.startswith(prefix) or path.suffix != ".md":
+        return None
+    raw_index = path.stem[len(prefix):]
+    if not raw_index.isdigit():
+        return None
+    index = int(raw_index)
+    return index if index >= 2 and raw_index == str(index) else None
+
+
+def select_archive_path(root: Path, base_rel: Path, candidate_text: str) -> Path:
+    """Choose a non-overwriting archive path for already-rendered content.
+
+    Interrupted runs recover by reusing the lowest-numbered base/suffixed file
+    whose bytes already equal the candidate. If none match, choose the first
+    unused deterministic slot (base, then -2, -3, ...). Selection happens in
+    build_plan so the live pointer and maintenance entry render the real path.
+    """
+    archive_dir = root / base_rel.parent
+    existing: dict[int, Path] = {}
+    if archive_dir.exists():
+        if not archive_dir.is_dir():
+            raise RotationError(f"{base_rel.parent} exists but is not a directory")
+        for path in archive_dir.iterdir():
+            index = _archive_candidate_index(path, base_rel)
+            if index is not None:
+                existing[index] = path
+
+    for index in sorted(existing):
+        path = existing[index]
+        try:
+            text = path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise RotationError(
+                f"cannot compare existing archive {path.relative_to(root)}: {exc}"
+            ) from exc
+        if text == candidate_text:
+            return path.relative_to(root)
+
+    index = 1
+    while index in existing:
+        index += 1
+    if index == 1:
+        return base_rel
+    return base_rel.with_name(f"{base_rel.stem}-{index}.md")
+
+
 def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPlan:
     validate_target(target_lines)
 
@@ -177,7 +228,7 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
             "wiki/log.md has fewer than two entries"
         )
 
-    chosen: tuple[list[Entry], list[Entry], Path, list[str], int] | None = None
+    chosen: tuple[list[Entry], list[Entry]] | None = None
     for cut in range(1, len(entries)):
         moved = entries[:cut]
         kept = entries[cut:]
@@ -202,7 +253,7 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
         )
         after_count = line_count(after_without_rotation) + rotation_line_count
         if after_count <= target_lines:
-            chosen = (moved, kept, archive_rel, new_header, after_count)
+            chosen = (moved, kept)
             break
 
     if chosen is None:
@@ -211,7 +262,7 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
             "choose a larger --target-lines value"
         )
 
-    moved, kept, archive_rel, new_header, after_count = chosen
+    moved, kept = chosen
     assert_payload_conserved(entries, moved, kept)
 
     oldest = moved[0].date
@@ -220,6 +271,27 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
         archive_header(oldest, newest, rotation_date, len(moved))
         + flatten(moved)
     )
+    base_archive_rel = ARCHIVE_DIR / f"{oldest}-to-{newest}.md"
+    archive_rel = select_archive_path(
+        root,
+        base_archive_rel,
+        "".join(archive_lines),
+    )
+    new_header = add_archive_pointer(header, archive_rel, oldest, newest)
+    after_without_rotation = new_header + flatten(kept)
+    rotation_line_count = len(
+        rotation_entry(
+            rotation_date=rotation_date,
+            archive_rel=archive_rel,
+            oldest=oldest,
+            newest=newest,
+            moved_entries=len(moved),
+            kept_entries=len(kept),
+            before_lines=before_count,
+            after_lines=0,
+        )
+    )
+    after_count = line_count(after_without_rotation) + rotation_line_count
     live_lines = (
         new_header
         + flatten(kept)
@@ -264,10 +336,8 @@ def write_plan(root: Path, plan: RotationPlan) -> None:
         existing = plan.archive_path.read_text(encoding="utf-8")
         if existing != archive_text:
             raise RotationError(
-                f"{plan.archive_path.relative_to(root)} already exists with different content. "
-                "If this is a rerun of an interrupted rotation, re-run with the original "
-                "--date shown in that archive's 'Rotated:' line to complete the log rewrite; "
-                "this run will not overwrite an existing archive."
+                f"selected archive {plan.archive_path.relative_to(root)} changed after planning; "
+                "re-run to select against current archive contents. This run will not overwrite it."
             )
     else:
         plan.archive_path.parent.mkdir(parents=True, exist_ok=True)

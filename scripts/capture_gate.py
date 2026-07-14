@@ -44,18 +44,21 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import posixpath
 import re
 import sys
 from pathlib import Path
 
+from _repo_paths import MAY_CREATE_FILE, RepoPathError, resolve_repo_path
+
 from ledger_common import (
+    ALLOWED_ROOT_FILES,
     ALLOWED_ROOTS,
+    LedgerIntegrityError,
     approved_at_now,
     split_scope,
-    under_allowed_root,
     write_approval_record as _write_approval_record,
 )
+from _wiki_parse import FrontmatterError, canonical_authored_text
 from validate_capture_runs import validate_approval
 
 
@@ -146,12 +149,6 @@ def parser() -> argparse.ArgumentParser:
         help="Whether the answer is about this wiki's configured domain.",
     )
     p.add_argument(
-        "--life-context",
-        dest="domain_context",
-        type=yn,
-        help=argparse.SUPPRESS,
-    )
-    p.add_argument(
         "--trigger",
         action="append",
         choices=PROMOTION_TRIGGERS,
@@ -185,8 +182,15 @@ def is_analyses_path(path: str) -> bool:
 
 
 def normalize_path(path: str) -> str:
-    """Resolve ./, //, and .. so destinations cannot be spelled around guards."""
-    return posixpath.normpath(path.strip())
+    """Validate without normalizing unsafe spellings into safe-looking paths."""
+    value = path.strip()
+    return resolve_repo_path(
+        value,
+        repo_root=Path.cwd(),
+        allowed_prefixes=(prefix.rstrip("/") for prefix in ALLOWED_ROOTS),
+        allowed_root_files=ALLOWED_ROOT_FILES,
+        mode=MAY_CREATE_FILE,
+    )
 
 
 def real_destinations(home: str, pages_touched: str) -> list[str]:
@@ -200,8 +204,8 @@ def real_destinations(home: str, pages_touched: str) -> list[str]:
     return out
 
 
-def measure_draft(path: str) -> tuple[int, str] | None:
-    """Measure word count and bytes hash, or None if the draft can't be read."""
+def measure_draft(path: str) -> tuple[int, str, str] | None:
+    """Measure count and exact hash, retaining decoded text from one read."""
     p = Path(path)
     if not p.is_file():
         return None
@@ -210,15 +214,11 @@ def measure_draft(path: str) -> tuple[int, str] | None:
         text = data.decode("utf-8")
     except (OSError, UnicodeDecodeError):
         return None
-    return len(re.findall(r"\w+", text)), hashlib.sha256(data).hexdigest()
-
-
-def measure_word_count(path: str) -> int | None:
-    """Count word tokens in the drafted artifact, or None if it can't be read."""
-    measured = measure_draft(path)
-    if measured is None:
-        return None
-    return measured[0]
+    return (
+        len(re.findall(r"\w+", text)),
+        hashlib.sha256(data).hexdigest(),
+        text,
+    )
 
 
 def classify_accepted(args: argparse.Namespace, word_count: int) -> tuple[str, str, str]:
@@ -282,19 +282,13 @@ def approval_guard(args: argparse.Namespace, route: str, home: str) -> str | Non
             return (f"{route} targeting {target} requires --path to the drafted "
                     "artifact so its word count is measured, not declared; any "
                     f"{ANALYSES_PREFIX} destination in the scope triggers this.")
-        if measure_word_count(args.path) is None:
-            return f"--path {args.path!r} is not a readable file."
     return None
-
-
-def out_of_root_destinations(args: argparse.Namespace, home: str) -> list[str]:
-    """Concrete declared destinations outside allowed durable roots or under raw/."""
-    return [d for d in real_destinations(home, args.pages_touched) if not under_allowed_root(d)]
 
 
 def capture_approval_record(args: argparse.Namespace, route: str, home: str, scope: list[str],
                             word_count: int, word_count_source: str,
-                            draft_sha256: str = "") -> dict[str, object]:
+                            draft_sha256: str = "",
+                            authored_sha256: str = "") -> dict[str, object]:
     record: dict[str, object] = {
         "record_type": "capture_approval",
         "schema_version": 1,
@@ -311,10 +305,15 @@ def capture_approval_record(args: argparse.Namespace, route: str, home: str, sco
         "word_count_source": word_count_source,
         "word_count_path": args.path.strip(),
         "domain_context": args.domain_context,
-        "triggers": sorted(args.trigger),
+        "triggers": sorted(set(args.trigger)),
     }
     if draft_sha256:
         record["draft_sha256"] = draft_sha256
+    if authored_sha256 and (
+        route == "analysis-capture" or any(is_analyses_path(path) for path in scope)
+    ):
+        record["authored_sha256"] = authored_sha256
+        record["authored_hash_policy"] = "strip_referenced_by_v1"
     return record
 
 
@@ -334,12 +333,13 @@ def synthesis_approval_record(args: argparse.Namespace, home: str, scope: list[s
 
 
 def write_approval_record(record: dict[str, object], ledger: str,
-                          record_type: str) -> tuple[bool, Path, str]:
+                          record_type: str) -> tuple[bool, Path, str, str]:
     return _write_approval_record(
         Path(ledger),
         record,
         record_type=record_type,
         schema_description=LEDGER_SCHEMA_DESCRIPTION,
+        validate_approval=validate_approval,
     )
 
 
@@ -449,9 +449,6 @@ def synthesis_guard(args: argparse.Namespace, home: str, scope: list[str]) -> st
         return f"approval scope must name concrete paths, not placeholders: {placeholders}"
     if home not in scope:
         return f"primary home {home} must be included in --pages-touched."
-    outside = [p for p in checked_scope if p and not under_allowed_root(posixpath.normpath(p))]
-    if outside:
-        return f"approval scope paths must be under an allowed root: {outside}"
     # Synthesis flips status on existing, already-reviewed analyses pages. A
     # NEW analysis has a draft to measure, so it must go through the measured
     # analysis-capture route instead of this unmeasured branch.
@@ -481,14 +478,15 @@ def run_synthesis(args: argparse.Namespace) -> int:
         if problems:
             return blocked("refusing to write an approval record its own validator "
                            "rejects: " + "; ".join(problems), args)
-        print("Approval: confirmed for this exact synthesis content and file scope.")
-        wrote, ledger_path, label = write_approval_record(
+        wrote, ledger_path, label, record_hash = write_approval_record(
             record, args.approval_ledger, "synthesis_approval"
         )
+        print("Approval: confirmed for this exact synthesis content and file scope.")
         if wrote:
             print(f"Structured approval record: appended approval for {label} to {ledger_path}")
         else:
             print(f"Structured approval record: already present for {label} in {ledger_path}")
+        print(f"Approval record SHA-256: {record_hash}")
         print_synthesis_approval_confirmed(args, home, scope)
         return 0
 
@@ -507,12 +505,6 @@ def run_free_phase(args: argparse.Namespace) -> int:
     if any(is_analyses_path(d) for d in real_destinations(home, args.pages_touched)):
         return blocked(f"phase '{args.phase}' may not write to {ANALYSES_PREFIX}; "
                        "an analysis must go through analysis-capture or promotion-audit.",
-                       args)
-
-    outside = out_of_root_destinations(args, home)
-    if outside:
-        return blocked("destinations must be under an allowed root "
-                       f"({', '.join(ALLOWED_ROOTS)}) and never raw/: offending {outside}",
                        args)
 
     print("CAPTURE GATE")
@@ -538,11 +530,12 @@ def run_capture(args: argparse.Namespace) -> int:
     word_count = 0
     word_count_source = "unmeasured"
     draft_sha256 = ""
+    draft_text = ""
     if args.path:
         measured = measure_draft(args.path)
         if measured is None:
             return blocked(f"--path {args.path!r} is not a readable file.", args)
-        word_count, draft_sha256 = measured
+        word_count, draft_sha256, draft_text = measured
         word_count_source = "measured"
 
     if args.synthesized_pages < 0:
@@ -571,12 +564,6 @@ def run_capture(args: argparse.Namespace) -> int:
                            "an analysis must go through analysis-capture or "
                            f"promotion-audit.{hint}", args)
 
-    outside = out_of_root_destinations(args, declared_home)
-    if outside:
-        return blocked("destinations must be under an allowed root "
-                       f"({', '.join(ALLOWED_ROOTS)}) and never raw/: offending {outside}",
-                       args)
-
     approval_required = route in APPROVAL_ROUTES
 
     if approval_required:
@@ -585,6 +572,17 @@ def run_capture(args: argparse.Namespace) -> int:
             return blocked(block, args)
 
     scope = scope_with_home(home, args.pages_touched)
+    authored_sha256 = ""
+    if args.path and (
+        route == "analysis-capture" or any(is_analyses_path(path) for path in scope)
+    ):
+        try:
+            authored = canonical_authored_text(draft_text).encode("utf-8")
+        except FrontmatterError as exc:
+            return blocked(
+                f"--path {args.path!r} has malformed frontmatter: {exc}", args
+            )
+        authored_sha256 = hashlib.sha256(authored).hexdigest()
     print_capture_summary(args, route, home, reason, scope)
 
     if route == "chat-only":
@@ -594,19 +592,20 @@ def run_capture(args: argparse.Namespace) -> int:
     if args.approved:
         record = capture_approval_record(args, route, home, scope,
                                          word_count, word_count_source,
-                                         draft_sha256)
+                                         draft_sha256, authored_sha256)
         problems = validate_approval(record)
         if problems:
             return blocked("refusing to write an approval record its own validator "
                            "rejects: " + "; ".join(problems), args)
-        print("Approval: confirmed for this exact route.")
-        wrote, ledger_path, label = write_approval_record(
+        wrote, ledger_path, label, record_hash = write_approval_record(
             record, args.approval_ledger, "capture_approval"
         )
+        print("Approval: confirmed for this exact route.")
         if wrote:
             print(f"Structured approval record: appended approval for {label} to {ledger_path}")
         else:
             print(f"Structured approval record: already present for {label} in {ledger_path}")
+        print(f"Approval record SHA-256: {record_hash}")
         print_capture_approval_confirmed(args, route, home, scope)
         return 0
 
@@ -623,9 +622,13 @@ def main() -> int:
         if exc.code == 2:
             return 3
         return exc.code if isinstance(exc.code, int) else 3
-    if args.kind == "synthesis":
-        return run_synthesis(args)
-    return run_capture(args)
+    args.trigger = sorted(set(args.trigger))
+    try:
+        if args.kind == "synthesis":
+            return run_synthesis(args)
+        return run_capture(args)
+    except (RepoPathError, LedgerIntegrityError) as exc:
+        return blocked(str(exc), args)
 
 
 if __name__ == "__main__":

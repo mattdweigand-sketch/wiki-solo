@@ -26,6 +26,13 @@ from eval_lib import Results
 results = Results()
 
 
+def replace_once(path: Path, old: str, new: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    if old not in text:
+        raise AssertionError(f"fixture text not found in {path}: {old!r}")
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
 def build_clean_tree(root: Path) -> None:
     """A minimal parity-clean wrapper tree: every EXPECTED_SKILLS name on both
     surfaces, one script hint at most, no numbered steps, one real workflow ref."""
@@ -42,7 +49,14 @@ def build_clean_tree(root: Path) -> None:
         (commands / f"{name}.md").write_text(body, encoding="utf-8")
         skill = root / ".codex" / "skills" / name
         skill.mkdir(parents=True)
-        (skill / "SKILL.md").write_text(body, encoding="utf-8")
+        (skill / "SKILL.md").write_text(
+            "---\n"
+            f"name: {name}\n"
+            f"description: Fixture wrapper for {name}.\n"
+            "---\n\n"
+            + body,
+            encoding="utf-8",
+        )
 
 
 def case(name, mutate, expect_fragment):
@@ -85,6 +99,31 @@ case("numbered-steps-fire",
          "# wiki-eval\n\n1. do the first thing\n2. do the second thing\n",
          encoding="utf-8"),
      "numbered-step list")
+case("parenthesized-numbered-steps-fire",
+     lambda r: (r / ".codex" / "skills" / "wiki-eval" / "SKILL.md").write_text(
+         "---\nname: wiki-eval\ndescription: fixture\n---\n\n"
+         "1) do the first thing\n2) do the second thing\n",
+         encoding="utf-8"),
+     "numbered-step list")
+case("codex-frontmatter-required",
+     lambda r: (r / ".codex" / "skills" / "wiki-lint" / "SKILL.md").write_text(
+         "# wiki-lint\n\nFollow workflows/maintenance/lint.md.\n",
+         encoding="utf-8"),
+     "must begin with strict frontmatter")
+case("codex-frontmatter-name-must-match-directory",
+     lambda r: replace_once(
+         r / ".codex" / "skills" / "wiki-lint" / "SKILL.md",
+         "name: wiki-lint",
+         "name: wiki-export",
+     ),
+     "frontmatter name 'wiki-export' must equal directory 'wiki-lint'")
+case("codex-frontmatter-description-required",
+     lambda r: replace_once(
+         r / ".codex" / "skills" / "wiki-lint" / "SKILL.md",
+         "description: Fixture wrapper for wiki-lint.",
+         "description:   ",
+     ),
+     "frontmatter description must be nonempty")
 case("dangling-workflow-ref-fires",
      lambda r: (r / ".claude" / "commands" / "wiki-export.md").write_text(
          "# wiki-export\n\nFollow workflows/maintenance/does-not-exist.md.\n",

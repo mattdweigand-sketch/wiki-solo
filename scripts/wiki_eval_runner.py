@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Hermetic self-tests for the live eval registry and result accounting."""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import wiki_eval
+from eval_lib import Results
+
+
+def main() -> int:
+    results = Results()
+    check = results.record
+
+    registered_helper = getattr(wiki_eval, "registered_eval_scripts", None)
+    check(
+        "registered-eval-scripts-helper-exists",
+        callable(registered_helper),
+        "wiki_eval.registered_eval_scripts is missing",
+    )
+
+    with tempfile.TemporaryDirectory(prefix="wiki-eval-runner-") as td:
+        scripts_dir = Path(td)
+        real = scripts_dir / "wiki_eval_real.py"
+        decoy = scripts_dir / "wiki_eval_decoy.py"
+        real.write_text("raise SystemExit(0)\n", encoding="utf-8")
+        decoy.write_text("raise SystemExit(0)\n", encoding="utf-8")
+        suites = {
+            "real": [sys.executable, str(real)],
+            "decoy-argument": [sys.executable, "runner.py", str(decoy)],
+        }
+        if callable(registered_helper):
+            registered = registered_helper(suites)
+            check(
+                "only-command-position-one-registers",
+                registered == {real.name},
+                f"registered={sorted(registered)}",
+            )
+        else:
+            check(
+                "only-command-position-one-registers",
+                False,
+                "registration helper unavailable",
+            )
+        try:
+            orphans = wiki_eval.unregistered_suites(
+                scripts_dir=scripts_dir,
+                suites=suites,
+            )
+        except TypeError as exc:
+            check("orphan-check-is-injectable", False, str(exc))
+        else:
+            check(
+                "orphan-check-is-injectable",
+                orphans == [decoy.name],
+                f"orphans={orphans}",
+            )
+
+    result_failure = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from eval_lib import Results; "
+                "r = Results(); r.record('forced-failure', False); "
+                "raise SystemExit(r.finish())"
+            ),
+        ],
+        cwd=Path(__file__).resolve().parent,
+        capture_output=True,
+        text=True,
+    )
+    check(
+        "results-false-record-exits-one",
+        result_failure.returncode == 1,
+        f"exit={result_failure.returncode}; stderr={result_failure.stderr!r}",
+    )
+    check(
+        "results-false-record-reports-exact-summary",
+        "Summary: 0 passed, 1 failed" in result_failure.stdout,
+        result_failure.stdout.strip(),
+    )
+    return results.finish()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

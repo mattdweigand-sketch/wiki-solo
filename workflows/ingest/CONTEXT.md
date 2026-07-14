@@ -59,7 +59,7 @@ Create new entity pages as warranted by the active entity types in `wiki/domain.
 ## Step 5 - Update wiki-wide files
 
 1. Update `wiki/glossary.md` with any new or refined terms.
-2. Update `wiki/index.md`: add new pages and refresh summaries of changed pages. Index rows must use Markdown links to folder-qualified page paths, such as `[page-slug](concepts/page-slug.md)`, because Tier-1 lint uses those links to verify coverage. Use `[[wikilinks]]` inside authored page bodies and `## Related pages`, not as the index coverage link.
+2. Update `wiki/index.md`: add new pages and refresh summaries of changed pages. Index rows must use Markdown links to folder-qualified page paths—for example, a `page-slug` label targeting `concepts/page-slug.md`—because Tier-1 lint uses those links to verify coverage. Use `[[wikilinks]]` inside authored page bodies and `## Related pages`, not as the index coverage link.
 3. Update `wiki/overview.md` if the source shifts the big picture.
 
 ## Step 6 - Stale-text sweep, rebuild, and lint
@@ -117,19 +117,7 @@ python3 scripts/lint.py
 
 Tier-2 is a review queue, not a failure gate. For newly created or changed pages, check whether the ingest left an orphan source page, missing cross-reference, uncited/thin page, quote mismatch, confidence-upgrade candidate, missing `Open questions / gaps`, or missing `review_by` checkpoint. Fix clear ingest misses before logging; leave unrelated existing candidates for the lint workflow.
 
-## Step 7 - Promotion audit
-
-Before logging, check whether the ingest produced a reusable artifact that belongs outside normal source/concept/analysis updates. Auto-audit if the ingest created or refined:
-
-- A reusable operating rule for future agents.
-- A naming, style, or schema convention.
-- A repeated workflow step that belongs in `workflows/`.
-- A deterministic check that belongs in `scripts/`.
-- A durable decision that should live in `wiki/decisions/`.
-
-Do not apply extra promotion automatically unless the user asked to promote, apply, save, file, or update the wiki beyond the ingest. If applying a promotion, run `python3 scripts/capture_gate.py` for that promotion route and stop if it requires approval. Include the recommended route in the log as `Promotion audit: none | <recommended route>`.
-
-## Step 8 - Log
+## Step 7 — Log
 
 Append to `wiki/log.md`:
 
@@ -140,7 +128,6 @@ Pages updated: ...
 Key additions: ...
 Stale-text sweep: status=completed; commands=["rg -n -i -- '<phrase>' wiki/"]; hit_count=0; pages_fixed=[]; historical_no_change_hits=[]
 Contradictions flagged: ...
-Promotion audit: none | <recommended route>
 ```
 
 If the source did not resolve an open/current-state claim, use this line instead:

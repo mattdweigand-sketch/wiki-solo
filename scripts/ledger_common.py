@@ -14,33 +14,79 @@ main approved destination is always part of the explicit editable scope.
 
 from __future__ import annotations
 
+import fcntl
+import hashlib
 import json
-import posixpath
+import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
+from _repo_paths import MAY_CREATE_FILE, RepoPathError, resolve_repo_path
+
 
 # Durable roots an approved capture/promotion/synthesis may edit. raw/ is
 # excluded on purpose: source artifacts are never edited or committed.
-ALLOWED_ROOTS = ("wiki/", "scripts/", "workflows/", ".claude/", ".codex/", "archive/")
+ALLOWED_ROOTS = ("wiki/", "scripts/", "workflows/", ".claude/", ".codex/")
 ALLOWED_ROOT_FILES = {"AGENTS.md", "CLAUDE.md", "CONTEXT.md", "README.md", "REFERENCES.md"}
+APPROVAL_RECORD_TYPES = frozenset({"capture_approval", "synthesis_approval"})
 # Inert identifier field on historical records; new records never generate it.
 LEGACY_ID_FIELD = "run_id"
 IDENTITY_EXCLUDE_FIELDS = {"approved_at", LEGACY_ID_FIELD, "word_count_source", "word_count_path"}
 
 
-def under_allowed_root(path: str) -> bool:
+class LedgerIntegrityError(ValueError):
+    """A candidate or complete ledger failed deterministic validation."""
+
+    def __init__(self, failures: str | list[str] | tuple[str, ...]):
+        if isinstance(failures, str):
+            failures = (failures,)
+        self.failures = tuple(failures)
+        super().__init__("approval ledger integrity check failed: " + "; ".join(self.failures))
+
+
+@dataclass(frozen=True)
+class ValidatedApprovalLine:
+    record: dict[str, Any]
+    line_no: int
+    line_text: str
+    sha256: str
+
+
+@dataclass(frozen=True)
+class LedgerValidation:
+    errors: tuple[str, ...]
+    approval_count: int
+    approvals: tuple[ValidatedApprovalLine, ...]
+
+
+def under_allowed_root(path: str, *, repo_root: Path) -> bool:
     """True when a destination path is under an allowed durable root and not
     under raw/. The explicit raw/ exclusion is redundant defense (raw/ is not an
     allowed root) but makes the no-raw rule legible at the one place it matters."""
-    if path.startswith("raw/") or path == "raw":
+    try:
+        resolve_repo_path(
+            path,
+            repo_root=repo_root,
+            allowed_prefixes=(prefix.rstrip("/") for prefix in ALLOWED_ROOTS),
+            allowed_root_files=ALLOWED_ROOT_FILES,
+            mode=MAY_CREATE_FILE,
+        )
+    except RepoPathError:
         return False
-    return path in ALLOWED_ROOT_FILES or any(path.startswith(prefix) for prefix in ALLOWED_ROOTS)
+    return True
 
 
 def is_nonempty_string(value: Any) -> bool:
     return isinstance(value, str) and bool(value.strip())
+
+
+def is_strict_int(value: Any) -> bool:
+    """True for real integers only. bool subclasses int in Python (True == 1),
+    so a bare isinstance/equality check would accept `"schema_version": true`;
+    every integer-shaped ledger field must reject booleans explicitly."""
+    return isinstance(value, int) and not isinstance(value, bool)
 
 
 def split_scope(value: str) -> list[str]:
@@ -70,14 +116,14 @@ def validate_schema(record: dict[str, Any], line_no: int) -> list[str]:
     errors: list[str] = []
     if line_no != 1:
         errors.append("schema record must be the first line")
-    if record.get("schema_version") != 1:
+    if not is_strict_int(record.get("schema_version")) or record["schema_version"] != 1:
         errors.append("schema record must have schema_version 1")
     if not is_nonempty_string(record.get("description")):
         errors.append("schema record must have a description")
     return errors
 
 
-def validate_pages(record: dict[str, Any]) -> list[str]:
+def validate_pages(record: dict[str, Any], *, repo_root: Path) -> list[str]:
     """Validate pages_touched shape, allowed-root scope, and primary_home membership."""
     pages_touched = record.get("pages_touched")
     if not isinstance(pages_touched, list) or not pages_touched:
@@ -99,7 +145,7 @@ def validate_pages(record: dict[str, Any]) -> list[str]:
     if record.get("backfilled") is not True:
         outside = [
             path for path in pages_touched
-            if not under_allowed_root(posixpath.normpath(path))
+            if not under_allowed_root(path, repo_root=repo_root)
         ]
         if outside:
             errors.append(f"pages_touched paths must be under an allowed root: {outside}")
@@ -141,22 +187,123 @@ def approval_label(record: dict[str, Any]) -> str:
     return artifact if len(artifact) <= 80 else artifact[:77] + "..."
 
 
-def existing_approval_identities(path: Path, record_type: str) -> set[str]:
-    """Approved content identities already present for the given record_type."""
-    if not path.exists():
-        return set()
+def approval_record_sha256(line: str | bytes) -> str:
+    """SHA-256 of one exact UTF-8 JSONL line, excluding only its LF."""
+    encoded = line.encode("utf-8") if isinstance(line, str) else line
+    if encoded.endswith(b"\n"):
+        encoded = encoded[:-1]
+    return hashlib.sha256(encoded).hexdigest()
 
-    identities: set[str] = set()
-    for line in path.read_text(encoding="utf-8").splitlines():
+
+def validate_ledger_text(
+    text: str,
+    record_types: set[str] | frozenset[str],
+    validate_approval: Callable[[dict[str, Any]], list[str]],
+    *,
+    allow_empty: bool = False,
+) -> LedgerValidation:
+    """Pure structural and semantic validation over exact JSONL text."""
+    if text == "":
+        errors = () if allow_empty else ("expected exactly one schema record, found 0",)
+        return LedgerValidation(errors, 0, ())
+    if not text.strip():
+        return LedgerValidation(
+            ("ledger is nonempty but contains only whitespace",), 0, ()
+        )
+
+    lines = text.split("\n")
+    if lines[-1] == "":
+        lines.pop()
+
+    errors: list[str] = []
+    approvals: list[ValidatedApprovalLine] = []
+    seen_identities: set[str] = set()
+    schema_count = 0
+    approval_count = 0
+    for line_no, line in enumerate(lines, start=1):
         if not line.strip():
+            errors.append(f"line {line_no}: blank lines are not allowed")
             continue
         try:
             record = json.loads(line)
-        except json.JSONDecodeError:
+        except (ValueError, RecursionError) as exc:
+            detail = getattr(exc, "msg", str(exc))
+            errors.append(f"line {line_no}: invalid JSON: {detail}")
             continue
-        if record.get("record_type") == record_type and record.get("approval_status") == "approved":
-            identities.add(approval_identity(record))
-    return identities
+        if not isinstance(record, dict):
+            errors.append(f"line {line_no}: record must be a JSON object")
+            continue
+
+        record_type = record.get("record_type")
+        if record_type == "schema":
+            schema_count += 1
+            errors.extend(
+                f"line {line_no}: {error}"
+                for error in validate_schema(record, line_no)
+            )
+            continue
+        if not isinstance(record_type, str) or record_type not in record_types:
+            errors.append(f"line {line_no}: unsupported record_type {record_type!r}")
+            continue
+
+        approval_count += 1
+        errors.extend(
+            f"line {line_no}: {error}" for error in validate_approval(record)
+        )
+        try:
+            identity = approval_identity(record)
+        except (TypeError, ValueError, RecursionError) as exc:
+            errors.append(f"line {line_no}: approval identity is not canonicalizable: {exc}")
+        else:
+            if identity in seen_identities:
+                errors.append(f"line {line_no}: duplicate approval record")
+            seen_identities.add(identity)
+        approvals.append(
+            ValidatedApprovalLine(
+                record=record,
+                line_no=line_no,
+                line_text=line,
+                sha256=approval_record_sha256(line),
+            )
+        )
+
+    if schema_count != 1:
+        errors.append(f"expected exactly one schema record, found {schema_count}")
+    return LedgerValidation(tuple(errors), approval_count, tuple(approvals))
+
+
+def _decode_ledger(content: bytes, label: str) -> str:
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise LedgerIntegrityError(f"{label} is not valid UTF-8: {exc}") from exc
+
+
+def _require_valid(result: LedgerValidation) -> None:
+    if result.errors:
+        raise LedgerIntegrityError(result.errors)
+
+
+def _validate_candidate(
+    record: dict[str, Any],
+    record_type: str,
+    validate_approval: Callable[[dict[str, Any]], list[str]],
+) -> None:
+    errors: list[str] = []
+    if not isinstance(record_type, str) or record_type not in APPROVAL_RECORD_TYPES:
+        errors.append(f"unsupported candidate record_type {record_type!r}")
+    if not isinstance(record, dict):
+        errors.append("candidate record must be a JSON object")
+    elif record.get("record_type") != record_type:
+        errors.append(
+            f"candidate record_type {record.get('record_type')!r} does not match {record_type!r}"
+        )
+    elif record.get("backfilled") is True:
+        errors.append("the live writer may not create backfilled approval records")
+    else:
+        errors.extend(validate_approval(record))
+    if errors:
+        raise LedgerIntegrityError([f"candidate: {error}" for error in errors])
 
 
 def write_approval_record(
@@ -164,84 +311,113 @@ def write_approval_record(
     record: dict[str, Any],
     record_type: str,
     schema_description: str,
-) -> tuple[bool, Path, str]:
-    """Idempotently append an approval record, seeding the schema line on first write.
+    validate_approval: Callable[[dict[str, Any]], list[str]],
+) -> tuple[bool, Path, str, str]:
+    """Validate then idempotently append one exact approval JSONL line."""
+    _validate_candidate(record, record_type, validate_approval)
+    if not is_nonempty_string(schema_description):
+        raise LedgerIntegrityError("candidate schema description must be nonempty")
+    try:
+        record_line = json.dumps(
+            record, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")
+    except (TypeError, ValueError, RecursionError) as exc:
+        raise LedgerIntegrityError(f"candidate is not JSON serializable: {exc}") from exc
 
-    Returns (wrote, ledger_path, label); wrote is False when an approved record
-    with the same content identity is already present.
-    """
-    identity = approval_identity(record)
     label = approval_label(record)
-    approved_identities = existing_approval_identities(ledger_path, record_type)
-    if identity in approved_identities:
-        return False, ledger_path, label
+    try:
+        ledger_path.parent.mkdir(parents=True, exist_ok=True)
+        with ledger_path.open("a+b") as ledger:
+            fcntl.flock(ledger.fileno(), fcntl.LOCK_EX)
+            try:
+                ledger.seek(0)
+                content = ledger.read()
+                if content:
+                    existing = validate_ledger_text(
+                        _decode_ledger(content, str(ledger_path)),
+                        APPROVAL_RECORD_TYPES,
+                        validate_approval,
+                    )
+                    _require_valid(existing)
+                    identity = approval_identity(record)
+                    for approval in existing.approvals:
+                        if approval_identity(approval.record) == identity:
+                            return False, ledger_path, label, approval.sha256
+                else:
+                    existing = validate_ledger_text(
+                        "", APPROVAL_RECORD_TYPES, validate_approval, allow_empty=True
+                    )
+                    _require_valid(existing)
 
-    ledger_path.parent.mkdir(parents=True, exist_ok=True)
-    seed_schema = not has_schema_record(ledger_path)
-    # A truncated final line (no trailing newline) must not have the next
-    # record appended onto it, which would corrupt both records.
-    needs_newline = (
-        ledger_path.exists()
-        and ledger_path.stat().st_size > 0
-        and not ledger_path.read_bytes().endswith(b"\n")
+                if content:
+                    separator = b"" if content.endswith(b"\n") else b"\n"
+                    payload = separator + record_line + b"\n"
+                else:
+                    schema = {
+                        "record_type": "schema",
+                        "schema_version": 1,
+                        "description": schema_description,
+                    }
+                    schema_line = json.dumps(
+                        schema, sort_keys=True, separators=(",", ":")
+                    ).encode("utf-8")
+                    payload = schema_line + b"\n" + record_line + b"\n"
+
+                projected = content + payload
+                projected_result = validate_ledger_text(
+                    _decode_ledger(projected, "projected ledger"),
+                    APPROVAL_RECORD_TYPES,
+                    validate_approval,
+                )
+                _require_valid(projected_result)
+
+                ledger.seek(0, 2)
+                ledger.write(payload)
+                ledger.flush()
+                os.fsync(ledger.fileno())
+            finally:
+                fcntl.flock(ledger.fileno(), fcntl.LOCK_UN)
+    except LedgerIntegrityError:
+        raise
+    except OSError as exc:
+        raise LedgerIntegrityError(f"ledger I/O failed for {ledger_path}: {exc}") from exc
+    return True, ledger_path, label, approval_record_sha256(record_line)
+
+
+def lookup_approval_record_by_sha256(
+    path: Path,
+    record_sha256: str,
+    record_types: set[str] | frozenset[str],
+    validate_approval: Callable[[dict[str, Any]], list[str]],
+) -> dict[str, Any] | None:
+    """Return a record by exact line hash, only after full-ledger validation."""
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise LedgerIntegrityError(f"cannot read approval ledger {path}: {exc}") from exc
+    result = validate_ledger_text(
+        _decode_ledger(content, str(path)), record_types, validate_approval
     )
-    with ledger_path.open("a", encoding="utf-8") as f:
-        if needs_newline:
-            f.write("\n")
-        if seed_schema:
-            schema = {"record_type": "schema", "schema_version": 1,
-                      "description": schema_description}
-            f.write(json.dumps(schema, sort_keys=True, separators=(",", ":")) + "\n")
-        f.write(json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n")
-    return True, ledger_path, label
+    _require_valid(result)
+    for approval in result.approvals:
+        if approval.sha256 == record_sha256:
+            return approval.record
+    return None
 
 
 def validate_ledger(
     path: Path,
-    record_types: set[str],
+    record_types: set[str] | frozenset[str],
     validate_approval: Callable[[dict[str, Any]], list[str]],
 ) -> tuple[list[str], int]:
-    """Iterate a JSONL approval ledger and apply shared structural checks."""
-    errors: list[str] = []
-    approval_count = 0
-    seen_identities: set[str] = set()
-    schema_count = 0
-
-    if not path.exists():
-        return [f"{path} does not exist"], 0
-
-    for line_no, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        if not line.strip():
-            errors.append(f"line {line_no}: blank lines are not allowed")
-            continue
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError as exc:
-            errors.append(f"line {line_no}: invalid JSON: {exc.msg}")
-            continue
-        if not isinstance(record, dict):
-            errors.append(f"line {line_no}: record must be a JSON object")
-            continue
-
-        rtype = record.get("record_type")
-        if rtype == "schema":
-            schema_count += 1
-            for error in validate_schema(record, line_no):
-                errors.append(f"line {line_no}: {error}")
-            continue
-        if rtype not in record_types:
-            errors.append(f"line {line_no}: unsupported record_type {rtype!r}")
-            continue
-
-        approval_count += 1
-        for error in validate_approval(record):
-            errors.append(f"line {line_no}: {error}")
-        identity = approval_identity(record)
-        if identity in seen_identities:
-            errors.append(f"line {line_no}: duplicate approval record")
-        seen_identities.add(identity)
-
-    if schema_count != 1:
-        errors.append(f"expected exactly one schema record, found {schema_count}")
-
-    return errors, approval_count
+    """Read a JSONL approval ledger and apply the shared pure validator."""
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        return [f"cannot read {path}: {exc}"], 0
+    try:
+        text = content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        return [f"{path} is not valid UTF-8: {exc}"], 0
+    result = validate_ledger_text(text, record_types, validate_approval)
+    return list(result.errors), result.approval_count
