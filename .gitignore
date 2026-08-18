@@ -18,3 +18,9 @@ raw/*
 # Local Claude Code settings
 .claude/settings.local.json
 .claude/worktrees/
+
+# Stable approval-ledger lock. The inode persists while the ledger is replaced.
+scripts/.capture-runs.lock
+
+# Recoverable multi-file transaction authority. Never delete it to clear a gate.
+/.wiki-transactions/

@@ -16,6 +16,8 @@ import zipfile
 from datetime import date
 from pathlib import Path
 
+from _file_transactions import transaction_status
+
 
 DEFAULT_EXCLUDES = (
     ".git/",
@@ -307,6 +309,13 @@ def main() -> int:
             )
             return 1
     repo_root = Path(args.repo_root).resolve()
+    transactions_clean, transaction_reports = transaction_status(repo_root)
+    if not transactions_clean:
+        print("Wiki export refused: .wiki-transactions/ is nonclean:", file=sys.stderr)
+        for report in transaction_reports:
+            print(f"- {report}", file=sys.stderr)
+        return 1
+
     symlinks = find_symlinks(repo_root)
     if symlinks:
         print("Wiki export refused: the tree contains symlink(s):", file=sys.stderr)

@@ -19,6 +19,7 @@ import tempfile
 from pathlib import Path
 
 import ledger_common
+from _durable_files import stable_lock
 from _wiki_parse import canonical_authored_text
 from capture_gate import DEFAULT_APPROVAL_LEDGER, LEDGER_SCHEMA_DESCRIPTION
 from eval_lib import Results
@@ -106,20 +107,7 @@ SYNTHESIS = [
 ]
 
 
-def approval_records(record_type):
-    if not APPROVAL_LEDGER.exists():
-        return []
-    out = []
-    for line in APPROVAL_LEDGER.read_text().splitlines():
-        if not line.strip():
-            continue
-        record = json.loads(line)
-        if record.get("record_type") == record_type:
-            out.append(record)
-    return out
-
-
-def approval_records_from(path: Path, record_type: str):
+def approval_records_from(path: Path, record_type: str) -> list[dict[str, object]]:
     if not path.exists():
         return []
     out = []
@@ -130,6 +118,10 @@ def approval_records_from(path: Path, record_type: str):
         if record.get("record_type") == record_type:
             out.append(record)
     return out
+
+
+def approval_records(record_type):
+    return approval_records_from(APPROVAL_LEDGER, record_type)
 
 
 def check_no_ledger(name):
@@ -153,60 +145,8 @@ def check_gate_created_ledger_validates(name):
     results.record(name, ok, "validator: " + proc.stdout.replace("\n", " | "))
 
 
-def check_synthesis_record() -> None:
-    records = approval_records("synthesis_approval")
-    ok = (
-        len(records) == 1
-        and records[0].get("record_type") == "synthesis_approval"
-        and records[0].get("approval_status") == "approved"
-        and records[0].get("primary_home") == "wiki/synthesis.md"
-        and records[0].get("ledger_update_required") is True
-        and records[0].get("pages_touched") == ["wiki/primer.md", "wiki/synthesis.md", "wiki/log.md"]
-        and "run_id" not in records[0]
-    )
-    results.record("synthesis-approved-writes-structured-record", ok, "records: " + repr(records))
-
-
-def check_synthesis_idempotent() -> None:
-    before = approval_records("synthesis_approval")
-    proc = subprocess.run(
-        [sys.executable, str(GATE), "--artifact", "eval fixture",
-         "--approval-ledger", str(APPROVAL_LEDGER), *SYNTHESIS, "--approved"],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    after = approval_records("synthesis_approval")
-    ok = (
-        proc.returncode == 0
-        and len(before) == 1
-        and before == after
-        and "already present" in proc.stdout
-    )
-    results.record("synthesis-approved-structured-record-idempotent", ok,
-                   f"exit {proc.returncode}; stdout: " + proc.stdout.replace("\n", " | ")
-                   + f"; before: {before!r}; after: {after!r}")
-
-
-def check_workflow_contract() -> None:
-    text = SYNTHESIZE_WORKFLOW.read_text()
-    # Structural markers only: script paths, banner, and flag. Full-sentence
-    # markers would couple this eval to prose wording that legitimately evolves.
-    required = (
-        "scripts/capture_gate.py",
-        "scripts/capture-runs.jsonl",
-        "scripts/validate_capture_runs.py",
-        "APPROVAL REQUIRED",
-        "wiki/synthesis.md",
-        "--approved",
-    )
-    missing = [marker for marker in required if marker not in text]
-    ok = not missing
-    results.record("synthesize-workflow-requires-gate", ok, "missing: " + ", ".join(missing))
-
-
-def capture_record_fixture(**updates):
-    record = {
+def capture_record_fixture(**updates: object) -> dict[str, object]:
+    record: dict[str, object] = {
         "record_type": "capture_approval",
         "schema_version": 1,
         "approval_status": "approved",
@@ -721,9 +661,8 @@ print(json.dumps({"wrote": wrote, "path": str(path), "label": label,
     completed_while_locked = False
     child_stdout = ""
     child_stderr = ""
-    with ledger.open("a+", encoding="utf-8") as locked:
-        fcntl.flock(locked.fileno(), fcntl.LOCK_EX)
-        try:
+    with stable_lock(ledger_common.approval_lock_path(ledger)):
+        with ledger.open("a+", encoding="utf-8") as locked:
             child = subprocess.Popen(
                 [
                     sys.executable,
@@ -748,8 +687,6 @@ print(json.dumps({"wrote": wrote, "path": str(path), "label": label,
                 completed_while_locked = True
             locked.write(payload)
             locked.flush()
-        finally:
-            fcntl.flock(locked.fileno(), fcntl.LOCK_UN)
 
     if child is not None:
         try:
@@ -791,6 +728,252 @@ print(json.dumps({"wrote": wrote, "path": str(path), "label": label,
         f"ledger={ledger.read_text(encoding='utf-8').replace(chr(10), ' | ')}"
     )
     results.record("approval-ledger-contention-is-idempotent", ok, detail)
+
+
+def check_parallel_approval_writers() -> None:
+    child_code = """
+import json
+import sys
+from pathlib import Path
+from ledger_common import write_approval_record
+from validate_capture_runs import validate_approval
+print('READY', flush=True)
+sys.stdin.readline()
+result = write_approval_record(
+    Path(sys.argv[1]), json.loads(sys.argv[2]), sys.argv[3], sys.argv[4], validate_approval
+)
+print(json.dumps({'wrote': result[0], 'hash': result[3]}), flush=True)
+"""
+
+    def run_group(ledger: Path, records: list[dict]) -> tuple[list[dict], str]:
+        children = []
+        ready = []
+        for record in records:
+            proc = subprocess.Popen(
+                [
+                    sys.executable,
+                    "-c",
+                    child_code,
+                    str(ledger),
+                    json.dumps(record),
+                    record["record_type"],
+                    LEDGER_SCHEMA_DESCRIPTION,
+                ],
+                cwd=REPO_ROOT / "scripts",
+                text=True,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+            )
+            assert proc.stdout is not None
+            ready.append(proc.stdout.readline().strip())
+            children.append(proc)
+        for proc in children:
+            assert proc.stdin is not None
+            proc.stdin.write("go\n")
+            proc.stdin.flush()
+            proc.stdin.close()
+        parsed: list[dict] = []
+        details: list[str] = []
+        for proc in children:
+            assert proc.stdout is not None and proc.stderr is not None
+            stdout = proc.stdout.read()
+            stderr = proc.stderr.read()
+            proc.wait(timeout=10)
+            details.append(f"exit={proc.returncode} stdout={stdout!r} stderr={stderr!r}")
+            if proc.returncode == 0 and stdout.strip():
+                parsed.append(json.loads(stdout.splitlines()[-1]))
+        return parsed, f"ready={ready}; " + "; ".join(details)
+
+    same_ledger = Path(TMP.name) / "parallel-same.jsonl"
+    same_record = capture_record_fixture(artifact="parallel same", draft_sha256="c" * 64)
+    same_results, same_detail = run_group(same_ledger, [same_record] * 8)
+    same_validation = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(same_ledger)], capture_output=True, text=True
+    )
+    results.record(
+        "parallel-same-event-writers-are-exactly-idempotent",
+        len(same_results) == 8
+        and sum(bool(item["wrote"]) for item in same_results) == 1
+        and len({item["hash"] for item in same_results}) == 1
+        and len(approval_records_from(same_ledger, "capture_approval")) == 1
+        and same_validation.returncode == 0,
+        same_detail,
+    )
+
+    distinct_ledger = Path(TMP.name) / "parallel-distinct.jsonl"
+    distinct_records = [
+        capture_record_fixture(artifact=f"parallel distinct {index}", draft_sha256=f"{index:x}" * 64)
+        for index in range(1, 9)
+    ]
+    distinct_results, distinct_detail = run_group(distinct_ledger, distinct_records)
+    distinct_validation = subprocess.run(
+        [sys.executable, str(VALIDATOR), str(distinct_ledger)], capture_output=True, text=True
+    )
+    results.record(
+        "parallel-distinct-event-writers-have-no-lost-records",
+        len(distinct_results) == 8
+        and all(item["wrote"] for item in distinct_results)
+        and len(approval_records_from(distinct_ledger, "capture_approval")) == 8
+        and distinct_validation.returncode == 0,
+        distinct_detail,
+    )
+
+
+def check_atomic_ledger_faults_and_entry_types() -> None:
+    import os
+
+    base = capture_record_fixture(artifact="fault base", draft_sha256="d" * 64)
+    candidate = capture_record_fixture(artifact="fault candidate", draft_sha256="e" * 64)
+    stages = (
+        "before_write", "after_write", "after_file_fsync", "before_replace",
+        "after_replace", "after_dir_fsync", "before_reopen", "after_reopen", "after_verify",
+    )
+    all_ok = True
+    details: list[str] = []
+    for stage in stages:
+        ledger = Path(TMP.name) / f"ledger-fault-{stage}.jsonl"
+        ledger_common.write_approval_record(
+            ledger, base, "capture_approval", LEDGER_SCHEMA_DESCRIPTION, validate_approval
+        )
+        try:
+            ledger_common.write_approval_record(
+                ledger,
+                candidate,
+                "capture_approval",
+                LEDGER_SCHEMA_DESCRIPTION,
+                validate_approval,
+                fault=lambda current, wanted=stage: (_ for _ in ()).throw(RuntimeError(wanted)) if current == wanted else None,
+            )
+        except RuntimeError:
+            pass
+        except Exception as exc:
+            # DurableFileError is wrapped as LedgerIntegrityError before replace.
+            if stage not in {"before_write", "after_write", "after_file_fsync", "before_replace"}:
+                details.append(f"{stage}: unexpected {type(exc).__name__}: {exc}")
+        errors, count = ledger_common.validate_ledger(
+            ledger, ledger_common.APPROVAL_RECORD_TYPES, validate_approval
+        )
+        if errors or count not in {1, 2}:
+            all_ok = False
+            details.append(f"{stage}: errors={errors} count={count}")
+        rerun = ledger_common.write_approval_record(
+            ledger, candidate, "capture_approval", LEDGER_SCHEMA_DESCRIPTION, validate_approval
+        )
+        errors, count = ledger_common.validate_ledger(
+            ledger, ledger_common.APPROVAL_RECORD_TYPES, validate_approval
+        )
+        if errors or count != 2:
+            all_ok = False
+            details.append(f"{stage}: rerun={rerun} errors={errors} count={count}")
+    results.record("ledger-fault-matrix-leaves-validator-clean-old-or-new", all_ok, "; ".join(details))
+
+    killed_ledger = Path(TMP.name) / "ledger-process-kill-after-replace.jsonl"
+    ledger_common.write_approval_record(
+        killed_ledger, base, "capture_approval", LEDGER_SCHEMA_DESCRIPTION, validate_approval
+    )
+    kill_code = """
+import json
+import os
+import sys
+from pathlib import Path
+from ledger_common import write_approval_record
+from validate_capture_runs import validate_approval
+write_approval_record(
+    Path(sys.argv[1]), json.loads(sys.argv[2]), 'capture_approval', sys.argv[3],
+    validate_approval,
+    fault=lambda stage: os._exit(88) if stage == 'after_replace' else None,
+)
+"""
+    killed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            kill_code,
+            str(killed_ledger),
+            json.dumps(candidate),
+            LEDGER_SCHEMA_DESCRIPTION,
+        ],
+        cwd=REPO_ROOT / "scripts",
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    killed_errors, killed_count = ledger_common.validate_ledger(
+        killed_ledger, ledger_common.APPROVAL_RECORD_TYPES, validate_approval
+    )
+    killed_retry = ledger_common.write_approval_record(
+        killed_ledger,
+        candidate,
+        "capture_approval",
+        LEDGER_SCHEMA_DESCRIPTION,
+        validate_approval,
+    )
+    results.record(
+        "ledger-process-kill-after-replace-is-valid-and-idempotent",
+        killed.returncode == 88
+        and not killed_errors
+        and killed_count == 2
+        and killed_retry[0] is False,
+        f"exit={killed.returncode} errors={killed_errors} count={killed_count} retry={killed_retry}",
+    )
+
+    unsafe_ok = True
+    unsafe_details: list[str] = []
+    for kind in ("symlink", "hardlink", "directory", "fifo"):
+        ledger = Path(TMP.name) / f"unsafe-ledger-{kind}.jsonl"
+        anchor = Path(TMP.name) / f"unsafe-anchor-{kind}.jsonl"
+        anchor.write_text("anchor\n", encoding="utf-8")
+        if kind == "symlink":
+            ledger.symlink_to(anchor)
+        elif kind == "hardlink":
+            os.link(anchor, ledger)
+        elif kind == "directory":
+            ledger.mkdir()
+        else:
+            os.mkfifo(ledger)
+        try:
+            ledger_common.write_approval_record(
+                ledger, base, "capture_approval", LEDGER_SCHEMA_DESCRIPTION, validate_approval
+            )
+        except ledger_common.LedgerIntegrityError:
+            pass
+        else:
+            unsafe_ok = False
+            unsafe_details.append(f"accepted {kind}")
+    results.record("ledger-unsafe-entry-types-fail-closed", unsafe_ok, "; ".join(unsafe_details))
+
+    live_bytes = (REPO_ROOT / "scripts/capture-runs.jsonl").read_bytes()
+    live_validation = ledger_common.validate_ledger_text(
+        live_bytes.decode("utf-8"), ledger_common.APPROVAL_RECORD_TYPES, validate_approval
+    )
+    copy_path = Path(TMP.name) / "production-ledger-copy.jsonl"
+    copy_path.write_bytes(live_bytes)
+    if live_validation.approvals:
+        existing_record = live_validation.approvals[-1].record
+        expected_bytes = live_bytes
+    else:
+        ledger_common.write_approval_record(
+            copy_path,
+            base,
+            "capture_approval",
+            LEDGER_SCHEMA_DESCRIPTION,
+            validate_approval,
+        )
+        existing_record = base
+        expected_bytes = copy_path.read_bytes()
+    no_op = ledger_common.write_approval_record(
+        copy_path,
+        existing_record,
+        existing_record["record_type"],
+        LEDGER_SCHEMA_DESCRIPTION,
+        validate_approval,
+    )
+    results.record(
+        "production-ledger-copy-is-byte-identical-after-idempotent-write",
+        not live_validation.errors and no_op[0] is False and copy_path.read_bytes() == expected_bytes,
+        f"errors={live_validation.errors} no_op={no_op}",
+    )
 
 
 def check_validator_draft_hash_rules() -> None:
@@ -1516,6 +1699,9 @@ run_case(
 )
 check_approved_synthesis_existing_analysis()
 check_workflow_contract()
+check_approval_ledger_contention()
+check_parallel_approval_writers()
+check_atomic_ledger_faults_and_entry_types()
 
 # Appending after a truncated trailing newline must not merge two records into
 # one corrupt line.

@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "description": "Generated wiki shortcut wrappers; canonical behavior lives in workflows/.",
+  "shortcuts": {
+    "wiki-capture": {
+      "name": "wiki-capture",
+      "workflow_refs": [
+        "workflows/maintenance/CONTEXT.md",
+        "workflows/maintenance/capture.md"
+      ],
+      "script_hint": null,
+      "claude_description": "Capture a decision or lived experience into the wiki",
+      "codex_description": "Run the wiki first-person capture workflow. Use when the user says /wiki-capture, wiki-capture, capture this decision, remember this experience, or wants a decision or lived experience saved into the wiki.",
+      "authorization": "none",
+      "claude_arguments": true
+    },
+    "wiki-eval": {
+      "name": "wiki-eval",
+      "workflow_refs": [
+        "workflows/maintenance/CONTEXT.md",
+        "workflows/maintenance/eval.md"
+      ],
+      "script_hint": null,
+      "claude_description": "Run the wiki tooling eval workflow",
+      "codex_description": "Run the wiki tooling eval workflow. Use when the user says /wiki-eval, wiki-eval, run wiki evals, run the live evals, verify wiki guardrails, or wants to check that the wiki tools still work.",
+      "authorization": "none",
+      "claude_arguments": true
+    },
+    "wiki-export": {
+      "name": "wiki-export",
+      "workflow_refs": [
+        "workflows/maintenance/CONTEXT.md",
+        "workflows/maintenance/export.md"
+      ],
+      "script_hint": "python3 scripts/export_wiki.py --date YYYY-MM-DD",
+      "claude_description": "Export a zip backup of the entire wiki corpus, including raw sources",
+      "codex_description": "Run the wiki export workflow. Use when the user says /wiki-export, wiki-export, export the wiki, back up the wiki, or wants a zip backup of the corpus.",
+      "authorization": "none",
+      "claude_arguments": true
+    },
+    "wiki-ingest": {
+      "name": "wiki-ingest",
+      "workflow_refs": [
+        "workflows/ingest/CONTEXT.md"
+      ],
+      "script_hint": null,
+      "claude_description": "Ingest a new source from raw/ into the wiki",
+      "codex_description": "Run the wiki ingest workflow. Use when the user says /wiki-ingest, wiki-ingest, ingest a source, drop into raw and ingest, or wants a raw artifact turned into wiki pages.",
+      "authorization": "none",
+      "claude_arguments": true
+    },
+    "wiki-lint": {
+      "name": "wiki-lint",
+      "workflow_refs": [
+        "workflows/maintenance/CONTEXT.md",
+        "workflows/maintenance/lint.md"
+      ],
+      "script_hint": null,
+      "claude_description": "Lint the wiki, including deterministic checks, judgment candidates, and the verifier evidence check",
+      "codex_description": "Run the wiki lint workflow, including its verifier-agent evidence check. Use when the user says /wiki-lint, wiki-lint, lint the wiki, run lint, or wants deterministic and judgment-oriented wiki checks.",
+      "authorization": "lint-evidence-check",
+      "claude_arguments": true
+    },
+    "wiki-promote": {
+      "name": "wiki-promote",
+      "workflow_refs": [
+        "workflows/maintenance/CONTEXT.md",
+        "workflows/maintenance/artifact-promotion.md"
+      ],
+      "script_hint": null,
+      "claude_description": "Route a useful artifact to the right durable wiki home",
+      "codex_description": "Run the wiki artifact-promotion router. Use when the user says /wiki-promote, wiki-promote, promote, save this artifact, file this, or asks where a useful output belongs in the wiki.",
+      "authorization": "none",
+      "claude_arguments": true
+    },
+    "wiki-synthesize": {
+      "name": "wiki-synthesize",
+      "workflow_refs": [
+        "workflows/maintenance/CONTEXT.md",
+        "workflows/maintenance/synthesize.md"
+      ],
+      "script_hint": null,
+      "claude_description": "Run a memo-first synthesis pass that surfaces corpus distillation candidates for review",
+      "codex_description": "Run the wiki synthesis workflow. Use when the user says /wiki-synthesize, wiki-synthesize, synthesize the wiki, run synthesis, or wants a corpus distillation pass.",
+      "authorization": "none",
+      "claude_arguments": true
+    }
+  }
+}

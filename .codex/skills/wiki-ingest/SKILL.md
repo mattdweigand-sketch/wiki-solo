@@ -5,4 +5,5 @@ description: Run the wiki ingest workflow. Use when the user says /wiki-ingest, 
 
 # Wiki Ingest
 
-Run the ingest workflow for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/ingest/CONTEXT.md`, and follow that workflow's Load / Skip list exactly.
+Run `wiki-ingest` through the canonical wiki workflow for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/ingest/CONTEXT.md`, and follow the routed Load / Skip list exactly.
+This wrapper is generated from `scripts/wiki-wrapper-contract.json`; canonical behavior lives in `workflows/`.

@@ -28,6 +28,8 @@ SUITES = {
     "ledger-validators": [sys.executable, "scripts/wiki_eval_ledgers.py"],
     "wrapper-parity": [sys.executable, "scripts/wiki_eval_wrappers.py"],
     "schema-docs": [sys.executable, "scripts/wiki_eval_schema_docs.py"],
+    "durable-files": [sys.executable, "scripts/wiki_eval_durable_files.py"],
+    "transactions": [sys.executable, "scripts/wiki_eval_transactions.py"],
     "tier1": [sys.executable, "scripts/lint.py", "--tier1"],
 }
 

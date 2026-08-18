@@ -33,6 +33,7 @@ from datetime import date
 from itertools import combinations
 from pathlib import Path
 
+from _file_transactions import transaction_status
 from _repo_paths import HTTP_URL_RE, EXISTING_FILE, RepoPathError, is_http_url, resolve_repo_path
 from _wiki_parse import (
     FrontmatterError,
@@ -85,7 +86,7 @@ ROOT_ALLOWED_FILES = {
     "README.md", "REFERENCES.md", "SETUP.md",
 }
 ROOT_ALLOWED_DIRS = {
-    ".claude", ".codex", ".github", ".git", "archive", "deliverables", "raw",
+    ".claude", ".codex", ".github", ".git", ".wiki-transactions", "archive", "deliverables", "raw",
     "scripts", "tmp", "wiki", "workflows",
 }
 WIKI_ALLOWED_FILES = {f"{name}.md" for name in META_PAGES}
@@ -488,6 +489,10 @@ def check_folder_structure():
 
     # tmp/ is intentionally disposable scratch space. Lint does not govern
     # its contents; the maintenance workflow may empty it at the end of a run.
+    transactions_clean, transaction_reports = transaction_status(Path.cwd().resolve())
+    if not transactions_clean:
+        for detail in transaction_reports:
+            fails.append(("transaction-state", ".wiki-transactions/", detail))
     return fails
 
 def check_no_tracked_raw():

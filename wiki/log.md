@@ -2,12 +2,22 @@
 title: Activity Log
 type: log
 created: 2026-05-17
-updated: 2026-07-14
+updated: 2026-08-17
 ---
 
 # Activity Log
 
 Append-only history of ingest, lint, query, and decision-capture sessions. Newest entries on top.
+
+---
+
+## [2026-08-17] maintenance | recoverable writes and generated wrapper contract
+
+Change: Ported the template-safe durability and wrapper architecture from the maintained personal wiki: stable-lock atomic approval-ledger replacement, recoverable multi-file transactions for backlink rebuilds and log rotation, fail-closed transaction guards in Tier 1, pre-commit, and export, an operator status/recover/diagnose CLI, adversarial durability evals, and a manifest that deterministically renders both wrapper surfaces.
+Reason: Bring `wiki-solo` up to date on the two approved architectural improvements without importing personal corpus content or configured-domain behavior.
+Rejected alternative: Cherry-pick or mirror the source repository broadly, which would also import evidence-fidelity, transcript-specific, personal backup, and corpus policies outside this port's scope.
+Accepted tradeoff: The template gains recovery-state and eval code weight, and wrapper edits must now go through the manifest or renderer instead of being made directly.
+Validation: PASS - `python3 -m py_compile scripts/*.py`; `python3 scripts/wiki_transactions.py status`; targeted durable-files, transactions, gate, rebuild, rotate-log, export, lint, and wrapper-parity suites; wrapper render check; schema-doc parity; full `python3 scripts/wiki_eval.py`; Tier-1 and full lint; discoverable-code check; private-marker scan; `git diff --check`.
 
 ---
 

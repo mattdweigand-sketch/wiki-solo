@@ -11,6 +11,7 @@ import zipfile
 from pathlib import Path
 
 import export_wiki
+from _file_transactions import run_transaction
 from eval_lib import Results
 
 
@@ -341,5 +342,44 @@ results.record(
     proc.returncode == 1 and "--init-rclone-drive requires --upload-target" in proc.stderr,
     f"exit {proc.returncode}; stdout: {proc.stdout!r}; stderr: {proc.stderr!r}",
 )
+
+with tempfile.TemporaryDirectory(prefix="wiki-export-transaction-eval-") as td:
+    root = Path(td)
+    for rel in export_wiki.REQUIRED_FILES:
+        write(root / rel)
+    for prefix in export_wiki.REQUIRED_PREFIXES:
+        write(root / f"{prefix}fixture.txt")
+    target = root / "wiki/fixture.txt"
+    preimage = target.read_bytes()
+    try:
+        run_transaction(
+            root,
+            consumer="rebuild-referenced-by",
+            outputs={"wiki/fixture.txt": b"new"},
+            expected_preimages={"wiki/fixture.txt": preimage},
+            allowed_prefixes=("wiki",),
+            fault=lambda event: (_ for _ in ()).throw(RuntimeError("stop"))
+            if event == "after_journal:PREPARED" else None,
+        )
+    except RuntimeError:
+        pass
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(EXPORT),
+            "--repo-root",
+            str(root),
+            "--dry-run",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    results.record(
+        "export-blocks-nonclean-transaction-before-archive-creation",
+        proc.returncode == 1
+        and ".wiki-transactions/ is nonclean" in proc.stderr
+        and not list(root.rglob("*.zip")),
+        f"stdout={proc.stdout!r}; stderr={proc.stderr!r}",
+    )
 
 sys.exit(results.finish())

@@ -5,4 +5,6 @@ description: Run the wiki lint workflow, including its verifier-agent evidence c
 
 # Wiki Lint
 
-Run the lint workflow for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md` and `workflows/maintenance/lint.md`, and follow that workflow's Load / Skip list exactly. Invoking this skill authorizes the workflow's Step-3 verifier-agent evidence check.
+Run `wiki-lint` through the canonical wiki workflow for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/lint.md`, and follow the routed Load / Skip list exactly.
+Invoking this wrapper authorizes only the lint workflow's verifier-agent evidence check.
+This wrapper is generated from `scripts/wiki-wrapper-contract.json`; canonical behavior lives in `workflows/`.

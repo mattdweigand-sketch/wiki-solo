@@ -152,7 +152,7 @@ When creating a wiki page:
 4. Cite source pages with `(source: [[page]])` when stating specific facts.
 5. Use `## Related pages` with typed relationship labels when clear.
 6. Update `wiki/index.md`.
-7. Run `python3 scripts/rebuild_referenced_by.py`.
+7. Run `python3 scripts/rebuild_referenced_by.py`. The rebuild applies one recoverable generation; preserve and diagnose any reported transaction conflict instead of deleting `.wiki-transactions/`.
 
 When updating operating docs:
 
@@ -180,6 +180,8 @@ When updating operating docs:
    python3 scripts/rebuild_referenced_by.py
    python3 scripts/lint.py --tier1
    ```
+
+   The rebuild plans from one authored-page snapshot and applies one recoverable generation. If it reports a conflict or corrupt transaction, preserve the recovery authority and diagnose the named transaction before continuing.
 
 10. Append to `wiki/log.md`:
 

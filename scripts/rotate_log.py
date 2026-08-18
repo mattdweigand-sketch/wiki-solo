@@ -4,12 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
+import stat
 import sys
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 
 from _wiki_parse import parse_log_entry_date
+from _file_transactions import (
+    TransactionError,
+    recover_all,
+    run_transaction,
+    transaction_status,
+)
 from lint import LOG_ROTATION_WARN_LINES
 
 
@@ -42,6 +50,10 @@ class RotationPlan:
     kept_entries: int = 0
     archive_lines: list[str] | None = None
     live_lines: list[str] | None = None
+    log_preimage: bytes | None = None
+    log_preimage_sha256: str = ""
+    archive_preimage: bytes | None = None
+    archive_preimage_sha256: str | None = None
 
 
 def line_count(lines: list[str]) -> int:
@@ -167,7 +179,7 @@ def _archive_candidate_index(path: Path, base_rel: Path) -> int | None:
     return index if index >= 2 and raw_index == str(index) else None
 
 
-def select_archive_path(root: Path, base_rel: Path, candidate_text: str) -> Path:
+def select_archive_path(root: Path, base_rel: Path, candidate_text: str) -> tuple[Path, bytes | None]:
     """Choose a non-overwriting archive path for already-rendered content.
 
     Interrupted runs recover by reusing the lowest-numbered base/suffixed file
@@ -178,7 +190,8 @@ def select_archive_path(root: Path, base_rel: Path, candidate_text: str) -> Path
     archive_dir = root / base_rel.parent
     existing: dict[int, Path] = {}
     if archive_dir.exists():
-        if not archive_dir.is_dir():
+        directory_info = archive_dir.lstat()
+        if stat.S_ISLNK(directory_info.st_mode) or not stat.S_ISDIR(directory_info.st_mode):
             raise RotationError(f"{base_rel.parent} exists but is not a directory")
         for path in archive_dir.iterdir():
             index = _archive_candidate_index(path, base_rel)
@@ -188,20 +201,24 @@ def select_archive_path(root: Path, base_rel: Path, candidate_text: str) -> Path
     for index in sorted(existing):
         path = existing[index]
         try:
-            text = path.read_text(encoding="utf-8")
+            info = path.lstat()
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise RotationError(f"existing archive is not a single-link regular file: {path.relative_to(root)}")
+            content = path.read_bytes()
+            text = content.decode("utf-8")
         except (OSError, UnicodeDecodeError) as exc:
             raise RotationError(
                 f"cannot compare existing archive {path.relative_to(root)}: {exc}"
             ) from exc
         if text == candidate_text:
-            return path.relative_to(root)
+            return path.relative_to(root), content
 
     index = 1
     while index in existing:
         index += 1
     if index == 1:
-        return base_rel
-    return base_rel.with_name(f"{base_rel.stem}-{index}.md")
+        return base_rel, None
+    return base_rel.with_name(f"{base_rel.stem}-{index}.md"), None
 
 
 def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPlan:
@@ -211,7 +228,11 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
     if not log_path.exists():
         raise RotationError(f"{LOG_PATH} does not exist")
 
-    original_lines = log_path.read_text(encoding="utf-8").splitlines(keepends=True)
+    try:
+        log_preimage = log_path.read_bytes()
+        original_lines = log_preimage.decode("utf-8").splitlines(keepends=True)
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RotationError(f"cannot read {LOG_PATH} once as UTF-8: {exc}") from exc
     before_count = line_count(original_lines)
     if before_count <= target_lines:
         return RotationPlan(
@@ -219,6 +240,8 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
             before_lines=before_count,
             after_lines=before_count,
             target_lines=target_lines,
+            log_preimage=log_preimage,
+            log_preimage_sha256=hashlib.sha256(log_preimage).hexdigest(),
         )
 
     header, entries = parse_log(original_lines)
@@ -272,7 +295,7 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
         + flatten(moved)
     )
     base_archive_rel = ARCHIVE_DIR / f"{oldest}-to-{newest}.md"
-    archive_rel = select_archive_path(
+    archive_rel, archive_preimage = select_archive_path(
         root,
         base_archive_rel,
         "".join(archive_lines),
@@ -322,28 +345,58 @@ def build_plan(root: Path, target_lines: int, rotation_date: str) -> RotationPla
         kept_entries=len(kept),
         archive_lines=archive_lines,
         live_lines=live_lines,
+        log_preimage=log_preimage,
+        log_preimage_sha256=hashlib.sha256(log_preimage).hexdigest(),
+        archive_preimage=archive_preimage,
+        archive_preimage_sha256=(
+            hashlib.sha256(archive_preimage).hexdigest()
+            if archive_preimage is not None else None
+        ),
     )
 
 
-def write_plan(root: Path, plan: RotationPlan) -> None:
+def write_plan(root: Path, plan: RotationPlan, *, fault=None) -> list[str]:
     if plan.no_op:
-        return
-    if plan.archive_path is None or plan.archive_lines is None or plan.live_lines is None:
+        return []
+    if (
+        plan.archive_path is None
+        or plan.archive_lines is None
+        or plan.live_lines is None
+        or plan.log_preimage is None
+    ):
         raise RotationError("internal error: write requested for incomplete plan")
 
-    archive_text = "".join(plan.archive_lines)
-    if plan.archive_path.exists():
-        existing = plan.archive_path.read_text(encoding="utf-8")
-        if existing != archive_text:
-            raise RotationError(
-                f"selected archive {plan.archive_path.relative_to(root)} changed after planning; "
-                "re-run to select against current archive contents. This run will not overwrite it."
-            )
+    archive_bytes = "".join(plan.archive_lines).encode("utf-8")
+    live_bytes = "".join(plan.live_lines).encode("utf-8")
+    plan.archive_path.parent.mkdir(parents=True, exist_ok=True)
+    outputs = {LOG_PATH.as_posix(): live_bytes}
+    preimages: dict[str, bytes | None] = {LOG_PATH.as_posix(): plan.log_preimage}
+    guards: dict[str, bytes] = {}
+    archive_rel = plan.archive_path.relative_to(root).as_posix()
+    if plan.archive_preimage is None:
+        outputs[archive_rel] = archive_bytes
+        preimages[archive_rel] = None
+    elif plan.archive_preimage != archive_bytes:
+        raise RotationError(f"selected archive preimage is not byte-identical: {archive_rel}")
     else:
-        plan.archive_path.parent.mkdir(parents=True, exist_ok=True)
-        plan.archive_path.write_text(archive_text, encoding="utf-8")
-
-    (root / LOG_PATH).write_text("".join(plan.live_lines), encoding="utf-8")
+        guards[archive_rel] = plan.archive_preimage
+    try:
+        recovery = run_transaction(
+            root,
+            consumer="rotate-log",
+            outputs=outputs,
+            expected_preimages=preimages,
+            guard_preimages=guards,
+            allowed_prefixes=(LOG_PATH.as_posix(), ARCHIVE_DIR.as_posix()),
+            fault=fault,
+        )
+    except TransactionError as exc:
+        raise RotationError(str(exc)) from exc
+    if (root / LOG_PATH).read_bytes() != live_bytes:
+        raise RotationError("installed live log failed byte verification")
+    if plan.archive_path.read_bytes() != archive_bytes:
+        raise RotationError("installed archive failed byte verification")
+    return recovery
 
 
 def print_plan(plan: RotationPlan, *, dry_run: bool) -> None:
@@ -384,9 +437,28 @@ def main() -> int:
     args = parser().parse_args()
     try:
         date.fromisoformat(args.date)
-        plan = build_plan(Path.cwd(), args.target_lines, args.date)
+        root = Path.cwd().resolve()
+        if args.dry_run:
+            clean, reports = transaction_status(root)
+            if not clean:
+                raise RotationError("transaction recovery required before dry-run: " + "; ".join(reports))
+            recovery: list[str] = []
+        else:
+            try:
+                recovery = recover_all(root)
+            except TransactionError as exc:
+                raise RotationError(str(exc)) from exc
+            if recovery:
+                print("Recovered interrupted transaction before planning:")
+                for message in recovery:
+                    print(f"- {message}")
+        plan = build_plan(root, args.target_lines, args.date)
         if not args.dry_run:
-            write_plan(Path.cwd(), plan)
+            write_recovery = write_plan(root, plan)
+            if write_recovery:
+                print("Recovered interrupted transaction before commit:")
+                for message in write_recovery:
+                    print(f"- {message}")
         print_plan(plan, dry_run=args.dry_run)
         return 0
     except ValueError:

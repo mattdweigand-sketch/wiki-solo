@@ -47,7 +47,7 @@ python3 scripts/capture_gate.py --artifact "<answer summary>" --phase accepted \
   --path "tmp/<draft>.md"
 ```
 
-On `APPROVAL REQUIRED`, follow `AGENTS.md`: ask first, re-run with `--approved` after the user approves, then run `python3 scripts/validate_capture_runs.py`. Save to `wiki/analyses/<slug>.md`, add or update the `wiki/index.md` row, run `python3 scripts/rebuild_referenced_by.py`, and run `python3 scripts/lint.py --tier1`. Notify in one line: `Filed as analyses/<slug>.md.` If any criterion fails, answer in chat only and do not write `wiki/log.md`.
+On `APPROVAL REQUIRED`, follow `AGENTS.md`: ask first, re-run with `--approved` after the user approves, then run `python3 scripts/validate_capture_runs.py`. Save to `wiki/analyses/<slug>.md`, add or update the `wiki/index.md` row, run `python3 scripts/rebuild_referenced_by.py`, and run `python3 scripts/lint.py --tier1`. The rebuild applies one recoverable generation; preserve `.wiki-transactions/` and diagnose any named conflict or corruption instead of deleting recovery state. Notify in one line: `Filed as analyses/<slug>.md.` If any criterion fails, answer in chat only and do not write `wiki/log.md`.
 
 ```text
 ## [YYYY-MM-DD] query | <question summary>

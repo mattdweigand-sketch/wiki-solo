@@ -2,6 +2,7 @@
 description: Capture a decision or lived experience into the wiki
 ---
 
-Run the first-person capture workflow. Read `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/capture.md`, and follow its Load / Skip list exactly. This command is just a Claude Code shortcut; the workflow file is canonical and agent-neutral.
+Run `wiki-capture` through the canonical wiki workflow. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/capture.md`, and follow the routed Load / Skip list exactly.
+This wrapper is generated from `scripts/wiki-wrapper-contract.json`; canonical behavior lives in `workflows/`.
 
 $ARGUMENTS

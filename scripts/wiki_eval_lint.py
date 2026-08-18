@@ -21,6 +21,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+from _file_transactions import run_transaction
 from _wiki_parse import META_PAGES, get_entity_pages
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -779,6 +780,44 @@ run_case(
     "unexpected-root-dir-fires",
     lambda r: (r / "notabucket").mkdir(),
     expect_code=1, expect=("repo-structure", "unexpected top-level directory"),
+)
+
+
+def seed_nonclean_transaction(root):
+    page = root / "wiki/concepts/alpha.md"
+    content = page.read_bytes()
+    try:
+        run_transaction(
+            root,
+            consumer="rebuild-referenced-by",
+            outputs={"wiki/concepts/alpha.md": content + b"\nchanged\n"},
+            expected_preimages={"wiki/concepts/alpha.md": content},
+            allowed_prefixes=("wiki",),
+            fault=lambda event: (_ for _ in ()).throw(RuntimeError("stop"))
+            if event == "after_prepared_publish" else None,
+        )
+    except RuntimeError:
+        pass
+
+
+run_case(
+    "nonclean-transaction-state-fails-tier1",
+    seed_nonclean_transaction,
+    expect_code=1,
+    expect=("transaction-state", "PREPARED"),
+)
+run_case(
+    "empty-transaction-authority-passes-tier1",
+    lambda root: (root / ".wiki-transactions").mkdir(mode=0o700),
+)
+run_case(
+    "unknown-transaction-authority-entry-fails-tier1",
+    lambda root: (
+        (root / ".wiki-transactions").mkdir(mode=0o700),
+        (root / ".wiki-transactions/unknown").write_text("x", encoding="utf-8"),
+    ),
+    expect_code=1,
+    expect=("transaction-state", "unknown authority entry"),
 )
 run_case(
     "unexpected-wiki-folder-fires",

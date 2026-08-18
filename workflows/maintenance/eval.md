@@ -1,25 +1,37 @@
 # Wiki Eval
 
-Run this workflow when the task is to verify the wiki system itself: scripts, gates, ledgers, backlink rebuilds, export behavior, stale-text sweep proof, wrapper parity, schema-doc parity, and the deterministic Tier-1 gate. The `SUITES` registry in `scripts/wiki_eval.py` is the authoritative list of what runs.
+Run this workflow when the task is to verify the wiki system itself: scripts, durable file updates, recoverable transactions, gates, ledgers, backlink rebuilds, export behavior, stale-text sweep proof, wrapper parity, schema-doc parity, and the deterministic Tier-1 gate. The `SUITES` registry in `scripts/wiki_eval.py` is the authoritative list of what runs.
 
 This is different from `/wiki-lint`: lint checks wiki content; eval checks the tools that check and protect the wiki.
 
 ## Wrapper Surface Contract
 
-The live convenience surfaces are `.claude/commands/wiki-*.md` and `.codex/skills/wiki-*/SKILL.md`. They must cover the same seven shortcuts; `EXPECTED_SKILLS` in `scripts/check_wrapper_parity.py` is the authoritative name registry (the human-facing list lives in `AGENTS.md` and the README command table).
+The live convenience surfaces are `.claude/commands/wiki-*.md` and `.codex/skills/wiki-*/SKILL.md`. `scripts/wiki-wrapper-contract.json` is the sole wrapper-name, description, route, and command-hint authority. The human-facing name lists in `AGENTS.md` and the README command table must match it.
 
-Canonical procedure belongs in `workflows/`. A wrapper is only a thin pointer: canonical routing paths plus at most one `scripts/*.py` command hint. It must not carry a numbered-step list or route-classification procedure. Deleting wrapper folders does not remove the underlying wiki workflow; it only removes that agent surface's shortcut.
+Canonical procedure belongs in `workflows/`. A wrapper is a deterministic render: canonical routing paths plus at most one `scripts/*.py` command hint. Deleting wrapper folders does not remove the underlying wiki workflow; it only removes that agent surface's shortcut.
 
-`python3 scripts/check_wrapper_parity.py` enforces the checkable part (the `wrapper-parity` suite runs it via `scripts/wiki_eval_wrappers.py`, which also seeds negative fixtures so the checker itself cannot go vacuous):
+Use `python3 scripts/render_wiki_wrappers.py --render` after changing the manifest or renderer. `python3 scripts/render_wiki_wrappers.py --check` and `python3 scripts/check_wrapper_parity.py` enforce the contract; the `wrapper-parity` suite runs adversarial fixtures so the checks cannot go vacuous:
 
-- both wrapper surfaces cover exactly the expected `wiki-*` names
-- every Codex `SKILL.md` begins with strict frontmatter whose `name` matches its directory and whose `description` is nonempty
-- no wrapper carries more than one `scripts/*.py` reference
-- no wrapper carries a numbered-step list in either `1.` or `1)` form
-- every `workflows/*.md` path a wrapper names exists in the tree
-- every shortcut with a single canonical task workflow names that route; `EXPECTED_WORKFLOW_REFS` in `scripts/check_wrapper_parity.py` is the authoritative route registry
+- both wrapper surfaces cover exactly the manifest names
+- every tracked wrapper is byte-for-byte equal to the current manifest render
+- every manifest workflow path exists and every optional command hint names a real `scripts/*.py` file
+- `AGENTS.md` and the README command table expose exactly the same shortcut set
 
-It deliberately does not limit how many `workflows/` paths a wrapper names, because naming a workspace `CONTEXT.md` plus the routed task file is the legitimate thin-pointer pattern. It also cannot catch content drift between a wrapper and its twin (one surface carrying a guidance sentence the other lacks); keep wrapper bodies pointer-only so there is nothing to drift.
+Do not hand-edit generated wrappers. Change canonical procedure in `workflows/`; change wrapper metadata or routing in the manifest; change output structure in the renderer.
+
+## Durable Update Contract
+
+Approved ledger writes use a stable sidecar lock and atomic full-file replacement. Backlink rebuilds and log rotations use the shared recoverable transaction authority under `.wiki-transactions/`. The transaction CLI is the operator surface:
+
+```bash
+python3 scripts/wiki_transactions.py status
+python3 scripts/wiki_transactions.py recover
+python3 scripts/wiki_transactions.py diagnose <transaction-id>
+```
+
+`status` is read-only and does not create the authority. `recover` applies only the deterministic recorded policy. `diagnose` reports paths, states, and hashes without dumping file contents. Never delete or empty `.wiki-transactions/` to make a guard pass. A clean interrupted transaction can be recovered; a conflict or corrupt record is preserved for diagnosis. Tier 1, pre-commit, and export fail closed while the authority is nonclean.
+
+The `durable-files` and `transactions` suites exercise atomic replacement, locking, crashes, conflicts, corruption, CLI behavior, and each fail-closed guard. The gate, rebuild, and rotate-log suites add operation-specific concurrency, fault-injection, and recovery coverage.
 
 Historical note: identical global installs under `~/.codex/skills/wiki-*` once created duplicate repo-local and global slash-command entries. That one-time cleanup is complete and its removal machinery was retired 2026-07-01; if duplicate slash entries ever reappear, delete the global copies by hand.
 
@@ -46,7 +58,7 @@ A new doc enumeration of a canonical vocabulary must either defer to the source 
 
 ## Load / Skip
 
-- **Load:** `scripts/wiki_eval.py`; `scripts/check_wrapper_parity.py` when the task concerns wrapper parity; `scripts/check_schema_doc_parity.py` when the task concerns schema docs; any failing suite output if a run fails.
+- **Load:** `scripts/wiki_eval.py`; `scripts/wiki-wrapper-contract.json`, `scripts/render_wiki_wrappers.py`, and `scripts/check_wrapper_parity.py` when the task concerns wrappers; `scripts/wiki_transactions.py` when the task concerns recovery state; `scripts/check_schema_doc_parity.py` when the task concerns schema docs; any failing suite output if a run fails.
 - **Skip:** wiki entity pages, raw sources, unrelated workflow files, and Tier-2/Tier-3 content review.
 
 ## Steps

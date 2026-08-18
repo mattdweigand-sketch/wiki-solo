@@ -2,18 +2,28 @@
 """Rebuild generated ``## Referenced by`` sections for wiki entity pages.
 
 The rebuild is deliberately planned from one immutable UTF-8 snapshot. Every
-page is read and transformed before the first write, so unreadable input or a
-failed transformation cannot leave a predictable partial rebuild. Generated
-sections and code spans never feed the reverse link graph back into itself.
+page is read and transformed before the first write, and every changed output
+is applied through one recoverable file transaction. Generated sections and
+code spans never feed the reverse link graph back into itself.
 """
 
 from __future__ import annotations
 
 import sys
 from collections import defaultdict
+from dataclasses import dataclass
+import hashlib
+import stat
 from pathlib import Path
 
-from _wiki_parse import LINK_RE, authored_link_view, get_entity_pages, section_spans
+from _file_transactions import TransactionError, recover_all, run_transaction
+from _wiki_parse import (
+    LINK_RE,
+    authored_link_view,
+    canonical_authored_text,
+    get_entity_pages,
+    section_spans,
+)
 
 
 WIKI_ROOT = Path("wiki")
@@ -23,20 +33,38 @@ class RebuildError(RuntimeError):
     """A controlled read, transform, or write failure."""
 
 
-def load_page_texts(all_pages: list[Path]) -> dict[Path, str]:
+@dataclass(frozen=True)
+class PageSnapshot:
+    text: str
+    content: bytes
+    sha256: str
+    mode: int
+
+
+def load_page_texts(all_pages: list[Path]) -> dict[Path, PageSnapshot]:
     """Read every target exactly once as UTF-8, before any page is written."""
-    snapshot: dict[Path, str] = {}
+    snapshot: dict[Path, PageSnapshot] = {}
     for page in all_pages:
         try:
-            snapshot[page] = page.read_text(encoding="utf-8")
+            info = page.lstat()
+            if stat.S_ISLNK(info.st_mode) or not stat.S_ISREG(info.st_mode) or info.st_nlink != 1:
+                raise RebuildError(f"cannot snapshot unsafe page entry {page}")
+            content = page.read_bytes()
+            text = content.decode("utf-8")
+            snapshot[page] = PageSnapshot(
+                text=text,
+                content=content,
+                sha256=hashlib.sha256(content).hexdigest(),
+                mode=stat.S_IMODE(info.st_mode),
+            )
         except (OSError, UnicodeError) as exc:
             raise RebuildError(f"cannot read {page} as UTF-8: {exc}") from exc
     return snapshot
 
 
-def authored_texts(snapshot: dict[Path, str]) -> dict[Path, str]:
+def authored_texts(snapshot: dict[Path, PageSnapshot]) -> dict[Path, str]:
     """Return pure link-scan views with code and generated regions masked."""
-    return {page: authored_link_view(text) for page, text in snapshot.items()}
+    return {page: authored_link_view(item.text) for page, item in snapshot.items()}
 
 
 def build_reverse_index(
@@ -111,28 +139,64 @@ def render_page(authored_page: str, new_block: str) -> str:
 
 
 def build_plan(
-    snapshot: dict[Path, str], wiki_root: Path = WIKI_ROOT
+    snapshot: dict[Path, PageSnapshot], wiki_root: Path = WIKI_ROOT
 ) -> tuple[dict[Path, str], dict[Path, int]]:
     """Compute changed outputs and inbound counts from the original snapshot."""
     reverse_index = build_reverse_index(authored_texts(snapshot), wiki_root)
     changed: dict[Path, str] = {}
     inbound_counts: dict[Path, int] = {}
-    for page, original in snapshot.items():
+    for page, item in snapshot.items():
+        original = item.text
         refs = find_references(page.stem, reverse_index, page)
         inbound_counts[page] = sum(len(links) for links in refs.values())
         rendered = render_page(original, build_referenced_by_block(refs))
+        try:
+            rendered.encode("utf-8")
+        except UnicodeEncodeError as exc:
+            raise RebuildError(f"rendered output is not UTF-8 encodable for {page}: {exc}") from exc
+        if len(section_spans(rendered, "Referenced by")) != 1:
+            raise RebuildError(f"generated-section invariant failed for {page}")
+        if canonical_authored_text(rendered) != canonical_authored_text(original):
+            raise RebuildError(f"authored text changed while rendering {page}")
         if rendered != original:
             changed[page] = rendered
     return changed, inbound_counts
 
 
-def apply_plan(changed_only: dict[Path, str]) -> None:
-    """Write only changed outputs after the complete plan has succeeded."""
+def apply_plan(
+    changed_only: dict[Path, str],
+    snapshot: dict[Path, PageSnapshot],
+    *,
+    repo_root: Path,
+    fault=None,
+) -> list[str]:
+    """Apply only changed pages as one recoverable generated generation."""
+    if not changed_only:
+        return []
+    outputs: dict[str, bytes] = {}
+    preimages: dict[str, bytes | None] = {}
     for page, text in changed_only.items():
-        try:
-            page.write_text(text, encoding="utf-8")
-        except (OSError, UnicodeError) as exc:
-            raise RebuildError(f"cannot write {page}: {exc}") from exc
+        item = snapshot[page]
+        if not (item.mode & stat.S_IWUSR):
+            raise RebuildError(f"cannot write {page}: owner write permission is not set")
+        relative = page.relative_to(repo_root).as_posix() if page.is_absolute() else page.as_posix()
+        outputs[relative] = text.encode("utf-8")
+        preimages[relative] = item.content
+    try:
+        recovery = run_transaction(
+            repo_root,
+            consumer="rebuild-referenced-by",
+            outputs=outputs,
+            expected_preimages=preimages,
+            allowed_prefixes=("wiki",),
+            fault=fault,
+        )
+    except TransactionError as exc:
+        raise RebuildError(str(exc)) from exc
+    for page, text in changed_only.items():
+        if page.read_bytes() != text.encode("utf-8"):
+            raise RebuildError(f"installed backlink output failed verification: {page}")
+    return recovery
 
 
 def main() -> int:
@@ -147,9 +211,25 @@ def main() -> int:
     all_pages = get_entity_pages(WIKI_ROOT)
     print(f"Found {len(all_pages)} entity pages.")
     try:
+        try:
+            recovery = recover_all(Path.cwd().resolve())
+        except TransactionError as exc:
+            raise RebuildError(str(exc)) from exc
+        if recovery:
+            print("Recovered interrupted transaction before snapshot:")
+            for message in recovery:
+                print(f"- {message}")
         snapshot = load_page_texts(all_pages)
         changed, inbound_counts = build_plan(snapshot)
-        apply_plan(changed)
+        apply_recovery = apply_plan(
+            changed,
+            snapshot,
+            repo_root=Path.cwd().resolve(),
+        )
+        if apply_recovery:
+            print("Recovered interrupted transaction before commit:")
+            for message in apply_recovery:
+                print(f"- {message}")
     except (RebuildError, ValueError) as exc:
         print(f"Error: backlink rebuild failed: {exc}", file=sys.stderr)
         return 1

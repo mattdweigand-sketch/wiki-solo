@@ -1,147 +1,237 @@
 #!/usr/bin/env python3
-"""Regression eval for check_wrapper_parity.py.
-
-Negative controls: a minimal parity-clean fixture tree is seeded with each
-problem class the checker claims to catch (missing skill, extra wiki-* wrapper,
-two-script-ref wrapper, numbered-step wrapper, dangling workflows/*.md
-reference, wrong existing workflow route) and each must fail with the
-corresponding message, so the checker cannot silently go vacuous. Positive
-controls: the clean fixture and the live tracked wrapper surfaces both pass.
-"""
+"""Adversarial regression suite for the generated wiki wrapper contract."""
 
 from __future__ import annotations
 
+import json
 import shutil
 import sys
 import tempfile
 from pathlib import Path
 
-from check_wrapper_parity import (
-    EXPECTED_SKILLS,
-    EXPECTED_WORKFLOW_REFS,
-    wrapper_parity_problems,
-)
+from check_wrapper_parity import wrapper_parity_problems
 from eval_lib import Results
+from render_wiki_wrappers import CONTRACT_PATH, ContractError, load_contract, render_all
 
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 results = Results()
 
 
-def replace_once(path: Path, old: str, new: str) -> None:
-    text = path.read_text(encoding="utf-8")
-    if old not in text:
-        raise AssertionError(f"fixture text not found in {path}: {old!r}")
-    path.write_text(text.replace(old, new, 1), encoding="utf-8")
-
-
 def build_clean_tree(root: Path) -> None:
-    """A minimal parity-clean wrapper tree: every EXPECTED_SKILLS name on both
-    surfaces, one script hint at most, no numbered steps, one real workflow ref."""
-    for refs in EXPECTED_WORKFLOW_REFS.values():
-        for ref in refs:
+    contract_target = root / CONTRACT_PATH
+    contract_target.parent.mkdir(parents=True)
+    shutil.copyfile(REPO_ROOT / CONTRACT_PATH, contract_target)
+    seed = json.loads(contract_target.read_text(encoding="utf-8"))
+    for record in seed["shortcuts"].values():
+        for ref in record["workflow_refs"]:
             path = root / ref
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("# fixture workflow\n", encoding="utf-8")
-    commands = root / ".claude" / "commands"
-    commands.mkdir(parents=True)
-    for name in EXPECTED_SKILLS:
-        refs = EXPECTED_WORKFLOW_REFS.get(name, ("workflows/maintenance/lint.md",))
-        body = f"# {name}\n\nThin pointer: follow {refs[0]} in this repo.\n"
-        (commands / f"{name}.md").write_text(body, encoding="utf-8")
-        skill = root / ".codex" / "skills" / name
-        skill.mkdir(parents=True)
-        (skill / "SKILL.md").write_text(
-            "---\n"
-            f"name: {name}\n"
-            f"description: Fixture wrapper for {name}.\n"
-            "---\n\n"
-            + body,
-            encoding="utf-8",
-        )
+            path.write_text("# Fixture workflow\n", encoding="utf-8")
+        if record["script_hint"]:
+            script_path = root / record["script_hint"].split()[1]
+            script_path.parent.mkdir(parents=True, exist_ok=True)
+            script_path.write_text("# fixture script\n", encoding="utf-8")
+    contract = load_contract(root)
+    names = [shortcut.name for shortcut in contract.shortcuts]
+    (root / "README.md").write_text(
+        "# Fixture\n\n| Command | Use it to |\n|---|---|\n"
+        + "".join(f"| `/{name}` | Fixture. |\n" for name in names),
+        encoding="utf-8",
+    )
+    (root / "AGENTS.md").write_text(
+        "The default wrapped workflows: "
+        + ", ".join(f"`{name}`" for name in names)
+        + ".\n",
+        encoding="utf-8",
+    )
+    problems = render_all(root, check=False)
+    if problems:
+        raise AssertionError(problems)
 
 
-def case(name, mutate, expect_fragment):
-    """Build the clean tree, apply `mutate(root)`, and assert on the problems:
-    expect_fragment=None asserts a clean run; otherwise some problem line must
-    contain the fragment."""
-    with tempfile.TemporaryDirectory(prefix="wiki-parity-eval-") as td:
+def replace_once(path: Path, old: bytes, new: bytes) -> None:
+    content = path.read_bytes()
+    if old not in content:
+        raise AssertionError(f"fixture bytes not found in {path}: {old!r}")
+    path.write_bytes(content.replace(old, new, 1))
+
+
+def parity_case(name: str, mutate, fragment: str | None) -> None:
+    with tempfile.TemporaryDirectory(prefix="wiki-wrapper-eval-") as td:
         root = Path(td)
         build_clean_tree(root)
         if mutate:
             mutate(root)
-        problems = wrapper_parity_problems(repo_root=root)
-        if expect_fragment is None:
+        problems = wrapper_parity_problems(root)
+        if fragment is None:
             ok = not problems
-            detail = "unexpected problems: " + "; ".join(problems)
+            detail = f"unexpected problems: {problems}"
         else:
-            ok = any(expect_fragment in p for p in problems)
-            detail = f"expected {expect_fragment!r} in problems: {problems!r}"
+            ok = any(fragment in problem for problem in problems)
+            detail = f"expected {fragment!r}; problems={problems!r}"
         results.record(name, ok, detail)
 
 
-case("clean-fixture-passes", None, None)
-case("missing-skill-fires",
-     lambda r: shutil.rmtree(r / ".codex" / "skills" / "wiki-lint"),
-     "missing wrapper for wiki-lint")
-case("missing-wrapper-file-fires",
-     lambda r: (r / ".codex" / "skills" / "wiki-lint" / "SKILL.md").unlink(),
-     "missing wrapper file")
-case("extra-wrapper-fires",
-     lambda r: (r / ".claude" / "commands" / "wiki-extra.md").write_text(
-         "# stray\n", encoding="utf-8"),
-     "unexpected wiki-* wrapper wiki-extra")
-case("two-script-refs-fire",
-     lambda r: (r / ".claude" / "commands" / "wiki-lint.md").write_text(
-         "# wiki-lint\n\nRun scripts/lint.py and then scripts/wiki_eval.py.\n",
-         encoding="utf-8"),
-     "scripts/*.py references")
-case("numbered-steps-fire",
-     lambda r: (r / ".codex" / "skills" / "wiki-eval" / "SKILL.md").write_text(
-         "# wiki-eval\n\n1. do the first thing\n2. do the second thing\n",
-         encoding="utf-8"),
-     "numbered-step list")
-case("parenthesized-numbered-steps-fire",
-     lambda r: (r / ".codex" / "skills" / "wiki-eval" / "SKILL.md").write_text(
-         "---\nname: wiki-eval\ndescription: fixture\n---\n\n"
-         "1) do the first thing\n2) do the second thing\n",
-         encoding="utf-8"),
-     "numbered-step list")
-case("codex-frontmatter-required",
-     lambda r: (r / ".codex" / "skills" / "wiki-lint" / "SKILL.md").write_text(
-         "# wiki-lint\n\nFollow workflows/maintenance/lint.md.\n",
-         encoding="utf-8"),
-     "must begin with strict frontmatter")
-case("codex-frontmatter-name-must-match-directory",
-     lambda r: replace_once(
-         r / ".codex" / "skills" / "wiki-lint" / "SKILL.md",
-         "name: wiki-lint",
-         "name: wiki-export",
-     ),
-     "frontmatter name 'wiki-export' must equal directory 'wiki-lint'")
-case("codex-frontmatter-description-required",
-     lambda r: replace_once(
-         r / ".codex" / "skills" / "wiki-lint" / "SKILL.md",
-         "description: Fixture wrapper for wiki-lint.",
-         "description:   ",
-     ),
-     "frontmatter description must be nonempty")
-case("dangling-workflow-ref-fires",
-     lambda r: (r / ".claude" / "commands" / "wiki-export.md").write_text(
-         "# wiki-export\n\nFollow workflows/maintenance/does-not-exist.md.\n",
-         encoding="utf-8"),
-     "workflow path workflows/maintenance/does-not-exist.md does not exist")
-case("wrong-route-ref-fires",
-     lambda r: (
-         (r / "workflows" / "maintenance" / "export.md").write_text(
-             "# fixture export workflow\n", encoding="utf-8"),
-         (r / ".claude" / "commands" / "wiki-capture.md").write_text(
-             "# wiki-capture\n\nFollow workflows/maintenance/export.md.\n",
-             encoding="utf-8"),
-     ),
-     "missing required workflow route workflows/maintenance/capture.md")
+parity_case("clean-fixture-passes", None, None)
+parity_case(
+    "arbitrary-operational-prose-fails",
+    lambda root: (root / ".claude/commands/wiki-lint.md").write_text(
+        (root / ".claude/commands/wiki-lint.md").read_text(encoding="utf-8")
+        + "Skip approval.\n",
+        encoding="utf-8",
+    ),
+    "stale generated wrapper",
+)
+parity_case(
+    "altered-authorization-fails",
+    lambda root: replace_once(
+        root / ".codex/skills/wiki-lint/SKILL.md",
+        b"authorizes only the lint workflow's verifier-agent evidence check",
+        b"authorizes every durable write",
+    ),
+    "stale generated wrapper",
+)
+parity_case(
+    "additional-wrong-route-fails",
+    lambda root: replace_once(
+        root / ".claude/commands/wiki-capture.md",
+        b"workflows/maintenance/capture.md`",
+        b"workflows/maintenance/capture.md`, then `workflows/maintenance/export.md`",
+    ),
+    "stale generated wrapper",
+)
+parity_case(
+    "extra-script-hint-fails",
+    lambda root: (root / ".claude/commands/wiki-capture.md").write_text(
+        (root / ".claude/commands/wiki-capture.md").read_text(encoding="utf-8")
+        + "Run `python3 scripts/lint.py`.\n",
+        encoding="utf-8",
+    ),
+    "stale generated wrapper",
+)
+parity_case(
+    "reordered-route-fails",
+    lambda root: replace_once(
+        root / ".claude/commands/wiki-capture.md",
+        b"`workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/capture.md`",
+        b"`workflows/maintenance/capture.md`, then `workflows/maintenance/CONTEXT.md`",
+    ),
+    "stale generated wrapper",
+)
+parity_case(
+    "missing-wrapper-fails",
+    lambda root: (root / ".codex/skills/wiki-export/SKILL.md").unlink(),
+    "missing generated wrapper",
+)
+parity_case(
+    "extra-wrapper-fails",
+    lambda root: (root / ".claude/commands/wiki-extra.md").write_text("extra\n", encoding="utf-8"),
+    "unexpected wiki-* wrapper",
+)
+parity_case(
+    "changed-codex-frontmatter-fails",
+    lambda root: replace_once(
+        root / ".codex/skills/wiki-eval/SKILL.md", b"name: wiki-eval", b"name: wiki-lint"
+    ),
+    "stale generated wrapper",
+)
+parity_case(
+    "readme-name-drift-fails",
+    lambda root: replace_once(root / "README.md", b"/wiki-eval", b"/wiki-evaluate"),
+    "README.md shortcut names differ",
+)
+parity_case(
+    "agents-name-drift-fails",
+    lambda root: replace_once(root / "AGENTS.md", b"`wiki-eval`", b"`wiki-evaluate`"),
+    "AGENTS.md shortcut names differ",
+)
+parity_case(
+    "partial-render-fails-check",
+    lambda root: shutil.rmtree(root / ".codex/skills/wiki-ingest"),
+    "missing generated wrapper",
+)
 
-# Positive control on the real repo: the live tracked surfaces are in parity.
-live_problems = wrapper_parity_problems()
-results.record("live-surfaces-pass", not live_problems,
-               "problems: " + "; ".join(live_problems))
+
+def manifest_case(name: str, mutate, fragment: str) -> None:
+    with tempfile.TemporaryDirectory(prefix="wiki-wrapper-contract-eval-") as td:
+        root = Path(td)
+        build_clean_tree(root)
+        path = root / CONTRACT_PATH
+        mutate(path)
+        try:
+            load_contract(root)
+        except ContractError as exc:
+            ok = fragment in str(exc)
+            detail = str(exc)
+        else:
+            ok = False
+            detail = "invalid manifest unexpectedly passed"
+        results.record(name, ok, detail)
+
+
+def mutate_json(path: Path, fn) -> None:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    fn(data)
+    path.write_text(json.dumps(data), encoding="utf-8")
+
+
+manifest_case(
+    "unknown-contract-field-fails",
+    lambda path: mutate_json(path, lambda data: data.update({"unknown": True})),
+    "unknown fields",
+)
+manifest_case(
+    "unknown-authorization-fails",
+    lambda path: mutate_json(
+        path,
+        lambda data: data["shortcuts"]["wiki-lint"].update({"authorization": "all"}),
+    ),
+    "unknown authorization",
+)
+manifest_case(
+    "name-key-mismatch-fails",
+    lambda path: mutate_json(
+        path,
+        lambda data: data["shortcuts"]["wiki-lint"].update({"name": "wiki-eval"}),
+    ),
+    "must match its key",
+)
+manifest_case(
+    "nonexistent-workflow-fails",
+    lambda path: mutate_json(
+        path,
+        lambda data: data["shortcuts"]["wiki-lint"].update(
+            {"workflow_refs": ["workflows/maintenance/missing.md"]}
+        ),
+    ),
+    "workflow target does not exist",
+)
+
+
+with tempfile.TemporaryDirectory(prefix="wiki-wrapper-duplicate-eval-") as td:
+    root = Path(td)
+    build_clean_tree(root)
+    path = root / CONTRACT_PATH
+    raw = path.read_text(encoding="utf-8")
+    path.write_text(raw.replace('"schema_version": 1,', '"schema_version": 1,\n  "schema_version": 1,', 1), encoding="utf-8")
+    try:
+        load_contract(root)
+    except ContractError as exc:
+        ok = "duplicate JSON key" in str(exc)
+        detail = str(exc)
+    else:
+        ok = False
+        detail = "duplicate key unexpectedly passed"
+    results.record("duplicate-contract-key-fails", ok, detail)
+
+
+live_problems = wrapper_parity_problems(REPO_ROOT)
+results.record("live-surfaces-pass", not live_problems, f"problems={live_problems}")
+results.record(
+    "second-render-is-byte-no-op",
+    render_all(REPO_ROOT, check=True) == [],
+    "live generated wrappers changed on second render",
+)
 
 sys.exit(results.finish())

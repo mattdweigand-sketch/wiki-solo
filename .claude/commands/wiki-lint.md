@@ -1,7 +1,9 @@
 ---
-description: Lint the wiki, deterministic Tier-1 checks plus Tier-2 judgment candidates and the verifier-agent evidence check
+description: Lint the wiki, including deterministic checks, judgment candidates, and the verifier evidence check
 ---
 
-Run the lint workflow. Read `workflows/maintenance/lint.md` (via `workflows/maintenance/CONTEXT.md`) and follow it exactly, including its Load / Skip list. Invoking this command authorizes the workflow's Step-3 verifier-agent evidence check. This command is just a Claude Code shortcut; the workflow file is canonical and agent-neutral.
+Run `wiki-lint` through the canonical wiki workflow. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/lint.md`, and follow the routed Load / Skip list exactly.
+Invoking this wrapper authorizes only the lint workflow's verifier-agent evidence check.
+This wrapper is generated from `scripts/wiki-wrapper-contract.json`; canonical behavior lives in `workflows/`.
 
 $ARGUMENTS

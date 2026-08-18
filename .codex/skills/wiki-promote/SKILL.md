@@ -5,4 +5,5 @@ description: Run the wiki artifact-promotion router. Use when the user says /wik
 
 # Wiki Promote
 
-Run the artifact-promotion router for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md` and `workflows/maintenance/artifact-promotion.md`, and follow it exactly: that workflow owns the route classification, the `scripts/capture_gate.py` approval gate, and the post-approval validate/rebuild/lint steps.
+Run `wiki-promote` through the canonical wiki workflow for this repo. Read `AGENTS.md`, then `CONTEXT.md`, then `workflows/maintenance/CONTEXT.md`, then `workflows/maintenance/artifact-promotion.md`, and follow the routed Load / Skip list exactly.
+This wrapper is generated from `scripts/wiki-wrapper-contract.json`; canonical behavior lives in `workflows/`.

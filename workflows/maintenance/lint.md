@@ -78,6 +78,8 @@ Invoking `/lint`, `/wiki-lint`, or `wiki-lint` is an explicit request to run thi
    python3 scripts/rebuild_referenced_by.py
    ```
 
+   The rebuild plans from one authored-page snapshot and applies one recoverable generation. Never delete `.wiki-transactions/` to clear a lint failure; inspect status and diagnose any preserved conflict or corruption.
+
 7. Re-run `python3 scripts/lint.py` and confirm Tier 1 is clean before finishing.
 8. Housekeeping: empty `tmp/` if it only contains lint scratch files. Contents of `tmp/` are disposable by rule; do not delete anything outside `tmp/`.
 9. Append to `wiki/log.md`:

@@ -99,7 +99,7 @@ After all `[[wikilinks]]` are written, refresh the auto-generated `## Referenced
 python3 scripts/rebuild_referenced_by.py
 ```
 
-Run from the repo root. The script is stdlib-only and idempotent. Never hand-edit a `## Referenced by` section; edit `## Related pages` and let the script regenerate the inbound list.
+Run from the repo root. The script is stdlib-only and idempotent. It plans from one immutable authored-page snapshot and applies all changed pages as one recoverable generation. Never hand-edit a `## Referenced by` section; edit `## Related pages` and let the script regenerate the inbound list. If recovery reports a conflict or corrupt record, preserve `.wiki-transactions/` and diagnose the named transaction instead of deleting state or retrying blindly.
 
 Then run the deterministic Tier-1 gate:
 

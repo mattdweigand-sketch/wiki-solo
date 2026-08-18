@@ -436,4 +436,186 @@ def case_archive_ignored_by_lint(root: Path) -> None:
 with_temp_root(case_archive_ignored_by_lint)
 
 
+def case_transaction_fault_recovery(root: Path) -> None:
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    write_log(root, entries)
+    original = (root / "wiki/log.md").read_bytes()
+    plan = rotate_log.build_plan(root, 30, ROTATION_DATE)
+    assert plan.archive_path is not None
+    try:
+        rotate_log.write_plan(
+            root,
+            plan,
+            fault=lambda event: (_ for _ in ()).throw(RuntimeError("stop")) if event == "after_target:0" else None,
+        )
+    except RuntimeError:
+        faulted = True
+    else:
+        faulted = False
+    split_guarded = plan.archive_path.exists() and (root / "wiki/log.md").read_bytes() == original
+    recovery = rotate_log.recover_all(root)
+    clean, reports = rotate_log.transaction_status(root)
+    record(
+        "archive-installed-fault-recovers-original-pair",
+        faulted and split_guarded and clean and not plan.archive_path.exists()
+        and (root / "wiki/log.md").read_bytes() == original
+        and any("rolled back" in message for message in recovery),
+        f"recovery={recovery} reports={reports}",
+    )
+
+
+with_temp_root(case_transaction_fault_recovery)
+
+
+def case_transaction_forward_recovery(root: Path) -> None:
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    write_log(root, entries)
+    plan = rotate_log.build_plan(root, 30, ROTATION_DATE)
+    assert plan.archive_path is not None and plan.archive_lines is not None and plan.live_lines is not None
+    try:
+        rotate_log.write_plan(
+            root,
+            plan,
+            fault=lambda event: (_ for _ in ()).throw(RuntimeError("stop")) if event == "after_target:1" else None,
+        )
+    except RuntimeError:
+        pass
+    recovery = rotate_log.recover_all(root)
+    clean, reports = rotate_log.transaction_status(root)
+    record(
+        "all-targets-installed-fault-finishes-forward",
+        clean
+        and plan.archive_path.read_text(encoding="utf-8") == "".join(plan.archive_lines)
+        and (root / "wiki/log.md").read_text(encoding="utf-8") == "".join(plan.live_lines)
+        and any("forward" in message for message in recovery),
+        f"recovery={recovery} reports={reports}",
+    )
+
+
+with_temp_root(case_transaction_forward_recovery)
+
+
+def case_concurrent_live_edit_conflicts(root: Path) -> None:
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    write_log(root, entries)
+    plan = rotate_log.build_plan(root, 30, ROTATION_DATE)
+    third_party = b"third-party live log edit\n"
+
+    def mutate(event: str) -> None:
+        if event == "after_target:0":
+            (root / "wiki/log.md").write_bytes(third_party)
+
+    try:
+        rotate_log.write_plan(root, plan, fault=mutate)
+    except rotate_log.RotationError:
+        conflicted = True
+    else:
+        conflicted = False
+    clean, reports = rotate_log.transaction_status(root)
+    record(
+        "concurrent-live-log-edit-is-preserved-as-conflict",
+        conflicted and not clean and (root / "wiki/log.md").read_bytes() == third_party
+        and any("CONFLICTED" in report for report in reports),
+        f"reports={reports}",
+    )
+
+
+with_temp_root(case_concurrent_live_edit_conflicts)
+
+
+def case_reused_archive_guard_conflicts(root: Path) -> None:
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    archive, _ = seed_base_archive(root, entries)
+    write_log(root, entries)
+    original_log = (root / "wiki/log.md").read_bytes()
+    plan = rotate_log.build_plan(root, 30, ROTATION_DATE)
+    assert plan.archive_path == archive and plan.archive_preimage is not None
+    third_party = b"third-party archive edit\n"
+
+    def mutate(event: str) -> None:
+        if event == "after_journal:COMMITTING":
+            archive.write_bytes(third_party)
+
+    try:
+        rotate_log.write_plan(root, plan, fault=mutate)
+    except rotate_log.RotationError:
+        conflicted = True
+    else:
+        conflicted = False
+    clean, reports = rotate_log.transaction_status(root)
+    record(
+        "reused-archive-concurrent-change-is-guarded-conflict",
+        conflicted
+        and not clean
+        and archive.read_bytes() == third_party
+        and (root / "wiki/log.md").read_bytes() == original_log
+        and any("CONFLICTED" in report for report in reports),
+        f"reports={reports}",
+    )
+
+
+with_temp_root(case_reused_archive_guard_conflicts)
+
+
+def case_dry_run_blocks_on_unfinished(root: Path) -> None:
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    write_log(root, entries)
+    plan = rotate_log.build_plan(root, 30, ROTATION_DATE)
+    try:
+        rotate_log.write_plan(
+            root,
+            plan,
+            fault=lambda event: (_ for _ in ()).throw(RuntimeError("stop")) if event == "after_journal:COMMITTING" else None,
+        )
+    except RuntimeError:
+        pass
+    before = {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*") if path.is_file()
+    }
+    proc = run_rotate(root, "--dry-run", "--target-lines", "30")
+    after = {
+        path.relative_to(root).as_posix(): path.read_bytes()
+        for path in root.rglob("*") if path.is_file()
+    }
+    record(
+        "dry-run-reports-recovery-required-with-zero-writes",
+        proc.returncode != 0 and "recovery required" in proc.stderr and before == after,
+        f"stdout={proc.stdout!r} stderr={proc.stderr!r}",
+    )
+
+
+with_temp_root(case_dry_run_blocks_on_unfinished)
+
+
+def case_subprocess_kill_after_archive(root: Path) -> None:
+    entries = [plain_entry(i, f"entry {i}") for i in range(1, 8)]
+    write_log(root, entries)
+    original = (root / "wiki/log.md").read_bytes()
+    child_code = """
+import os, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[2])
+import rotate_log
+root = Path(sys.argv[1])
+plan = rotate_log.build_plan(root, 30, '2026-06-27')
+rotate_log.write_plan(root, plan, fault=lambda event: os._exit(94) if event == 'after_target:0' else None)
+"""
+    proc = subprocess.run(
+        [sys.executable, "-c", child_code, str(root), str(REPO_ROOT / "scripts")],
+        cwd=root, capture_output=True, text=True,
+    )
+    recovery = rotate_log.recover_all(root)
+    clean, reports = rotate_log.transaction_status(root)
+    record(
+        "process-kill-after-archive-recovers-losslessly",
+        proc.returncode == 94 and clean and (root / "wiki/log.md").read_bytes() == original
+        and not list((root / "archive/wiki-log").glob("*.md")),
+        f"recovery={recovery} reports={reports}",
+    )
+
+
+with_temp_root(case_subprocess_kill_after_archive)
+
+
 sys.exit(results.finish())

@@ -54,15 +54,16 @@ The main control mechanisms are:
 |---|---|
 | Route-first loading | Start with `AGENTS.md`, check `wiki/domain.md`, route through `CONTEXT.md`, then open only the selected workflow and its Load / Skip list. |
 | Schema and citations | `wiki/SCHEMA.md` defines page types, frontmatter, source types, confidence values, authority metadata, and citation rules. Specific facts cite `wiki/sources/` pages. |
-| Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by`. |
+| Link graph | Authors maintain `## Related pages`; `scripts/rebuild_referenced_by.py` regenerates `## Referenced by` from one snapshot and applies the generation as a recoverable transaction. |
 | Deterministic lint | `scripts/lint.py --tier1` catches structural failures and malformed proof. Full lint also surfaces Tier-2 candidates for human or agent judgment. |
-| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for lint, backlinks, gates, ledgers, export, stale-text sweep proof, log rotation, review due, wrapper parity, and schema-doc parity. |
+| Durable writes | Stable-lock atomic ledger replacement and `.wiki-transactions/` protect interrupted, concurrent, and multi-file updates; Tier 1, pre-commit, and export fail closed while recovery state is nonclean. |
+| Live evals | `/wiki-eval` runs `scripts/wiki_eval.py`, the fixture-backed checks for durable files, transactions, lint, backlinks, gates, ledgers, export, stale-text sweep proof, log rotation, review due, generated wrapper parity, and schema-doc parity. |
 | Outcome review | `scripts/review_due.py` surfaces due `review_by` checkpoints; `workflows/maintenance/review.md` records what happened and whether confidence changes. |
 | Sourcing queue | `wiki/sourcing-queue.md` tracks missing sources and evidence gaps that research, lint, or synthesis discovers. `workflows/maintenance/refresh-sourcing-queue.md` can reprioritize it when needed. |
 | Approval gate | `scripts/capture_gate.py` guards analysis capture, artifact-promotion apply routes, and reviewed synthesis promotion (`--kind=synthesis`), then records approved boundaries in `scripts/capture-runs.jsonl`. |
 | Synthesis ledger | `wiki/synthesis.md` orients future synthesis runs; cite source pages, not the ledger, when making claims. |
 | Export | `scripts/export_wiki.py` builds a local backup that includes gitignored `raw/` sources. |
-| Thin wrappers | `.claude/commands/` and `.codex/skills/` expose shortcuts but do not own canonical behavior. |
+| Generated wrappers | `scripts/wiki-wrapper-contract.json` owns the shortcut manifest; `scripts/render_wiki_wrappers.py` deterministically renders `.claude/commands/` and `.codex/skills/`, which never own canonical behavior. |
 
 ---
 
@@ -109,8 +110,17 @@ When stating a specific fact, append `(source: [[source-filename]])`. When stati
 | `raw/README.md` | Source-artifact handling note for the ignored `raw/` corpus |
 | `scripts/raw-buckets.json` | Tracked raw bucket taxonomy read by Tier-1 lint |
 | `scripts/lint-adjudications.json` | Settled Tier-2 lint judgments with reasons and dates; lint suppresses what it lists |
+| `scripts/capture-runs.jsonl` | Append-only logical approval ledger installed through stable-lock atomic full-file replacement, never in-place append |
+| `scripts/wiki-wrapper-contract.json` | Strict machine authority for the seven generated Claude and Codex wrappers; render with `scripts/render_wiki_wrappers.py` and check with `scripts/check_wrapper_parity.py` |
 | `scripts/check_schema_doc_parity.py` | Verifies duplicated schema vocabulary docs stay in parity with `scripts/lint.py` constants |
+| `.wiki-transactions/` | Gitignored, non-disposable recovery authority for log rotation and backlink rebuild; use `scripts/wiki_transactions.py status`, `recover`, or `diagnose`, and never delete it to clear a gate |
 | `scripts/fixtures/` | Fixture data for live tooling evals |
+
+## Durable File And Transaction Boundary
+
+`scripts/_durable_files.py` owns stable advisory locks, complete writes, file and directory synchronization, same-directory replacement, and installed-byte verification. `scripts/_file_transactions.py` layers a strict journal protocol over that primitive for log rotation and backlink rebuilds. Existing byte-identical rotation archives are read-only transaction guards rather than rewritten targets.
+
+An absent or verified-clean `.wiki-transactions/` root is safe. Any unpublished preparation, unfinished cleanup, nonterminal transaction, changed guard, conflict, corruption, or unknown state blocks mutation, Tier 1, pre-commit, and export. Recovery follows only the recorded deterministic policy; third-party bytes are preserved as a conflict rather than overwritten.
 
 ## Capture Boundary
 

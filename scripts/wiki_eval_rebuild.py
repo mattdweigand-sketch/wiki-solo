@@ -20,7 +20,10 @@ import sys
 import tempfile
 from pathlib import Path
 
+import rebuild_referenced_by as rebuild
+from _file_transactions import recover_all, transaction_status
 from eval_lib import Results
+from _wiki_parse import get_entity_pages
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REBUILD_SCRIPT = REPO_ROOT / "scripts" / "rebuild_referenced_by.py"
@@ -258,6 +261,118 @@ def main() -> int:
             "duplicate-sections-collapsed",
             dup_run.returncode == 0 and collapsed.count("## Referenced by") == 1,
             f"{collapsed.count('## Referenced by')} sections remain after rebuild",
+        )
+
+        transaction_case = tmp / "transaction-fault"
+        shutil.copytree(FIXTURE_WIKI, transaction_case / "wiki")
+        pages = get_entity_pages(transaction_case / "wiki")
+        snapshot = rebuild.load_page_texts(pages)
+        changed, _counts = rebuild.build_plan(snapshot, transaction_case / "wiki")
+        before_transaction = read_tree_bytes(transaction_case / "wiki")
+        try:
+            rebuild.apply_plan(
+                changed,
+                snapshot,
+                repo_root=transaction_case,
+                fault=lambda event: (_ for _ in ()).throw(RuntimeError("stop")) if event == "after_target:1" else None,
+            )
+        except RuntimeError:
+            faulted = True
+        else:
+            faulted = False
+        recovery = recover_all(transaction_case)
+        after_recovery = read_tree_bytes(transaction_case / "wiki")
+        clean, reports = transaction_status(transaction_case)
+        check(
+            "middle-page-fault-recovers-entire-old-tree",
+            faulted and clean and before_transaction == after_recovery
+            and any("rolled back" in message for message in recovery),
+            f"recovery={recovery} reports={reports}",
+        )
+
+        forward_case = tmp / "transaction-forward"
+        shutil.copytree(FIXTURE_WIKI, forward_case / "wiki")
+        pages = get_entity_pages(forward_case / "wiki")
+        snapshot = rebuild.load_page_texts(pages)
+        changed, _counts = rebuild.build_plan(snapshot, forward_case / "wiki")
+        final_index = len(changed) - 1
+        try:
+            rebuild.apply_plan(
+                changed,
+                snapshot,
+                repo_root=forward_case,
+                fault=lambda event: (_ for _ in ()).throw(RuntimeError("stop")) if event == f"after_target:{final_index}" else None,
+            )
+        except RuntimeError:
+            pass
+        recovery = recover_all(forward_case)
+        expected_tree = {
+            page.relative_to(forward_case / "wiki").as_posix(): text.encode("utf-8")
+            for page, text in changed.items()
+        }
+        observed_tree = read_tree_bytes(forward_case / "wiki")
+        clean, reports = transaction_status(forward_case)
+        check(
+            "final-page-fault-finishes-complete-new-tree",
+            clean and all(observed_tree[path] == content for path, content in expected_tree.items())
+            and any("forward" in message for message in recovery),
+            f"recovery={recovery} reports={reports}",
+        )
+
+        conflict_case = tmp / "transaction-conflict"
+        shutil.copytree(FIXTURE_WIKI, conflict_case / "wiki")
+        pages = get_entity_pages(conflict_case / "wiki")
+        snapshot = rebuild.load_page_texts(pages)
+        changed, _counts = rebuild.build_plan(snapshot, conflict_case / "wiki")
+        late_page = sorted(changed)[-1]
+        third_party = b"third-party authored edit\n"
+
+        def concurrent_edit(event: str) -> None:
+            if event == "after_target:0":
+                late_page.write_bytes(third_party)
+
+        try:
+            rebuild.apply_plan(
+                changed,
+                snapshot,
+                repo_root=conflict_case,
+                fault=concurrent_edit,
+            )
+        except rebuild.RebuildError:
+            conflicted = True
+        else:
+            conflicted = False
+        clean, reports = transaction_status(conflict_case)
+        check(
+            "late-concurrent-page-edit-is-preserved-as-conflict",
+            conflicted and not clean and late_page.read_bytes() == third_party
+            and any("CONFLICTED" in report for report in reports),
+            f"reports={reports}",
+        )
+
+        no_op_case = tmp / "transaction-no-op"
+        shutil.copytree(FIXTURE_WIKI, no_op_case / "wiki")
+        pages = get_entity_pages(no_op_case / "wiki")
+        first_snapshot = rebuild.load_page_texts(pages)
+        first_changed, _counts = rebuild.build_plan(first_snapshot, no_op_case / "wiki")
+        rebuild.apply_plan(first_changed, first_snapshot, repo_root=no_op_case)
+        authority = no_op_case / ".wiki-transactions"
+        before_authority = {
+            path.relative_to(authority).as_posix(): (path.stat().st_mtime_ns, path.read_bytes())
+            for path in authority.iterdir() if path.is_file()
+        }
+        second_snapshot = rebuild.load_page_texts(pages)
+        second_changed, _counts = rebuild.build_plan(second_snapshot, no_op_case / "wiki")
+        second_recovery = rebuild.apply_plan(second_changed, second_snapshot, repo_root=no_op_case)
+        after_authority = {
+            path.relative_to(authority).as_posix(): (path.stat().st_mtime_ns, path.read_bytes())
+            for path in authority.iterdir() if path.is_file()
+        }
+        check(
+            "no-op-rebuild-creates-no-transaction-churn",
+            not second_changed and second_recovery == [] and before_authority == after_authority
+            and not [path for path in authority.iterdir() if path.name != ".lock"],
+            f"changed={len(second_changed)} before={before_authority} after={after_authority}",
         )
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

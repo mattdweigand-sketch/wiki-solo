@@ -160,6 +160,8 @@ Never silently overwrite verified content. Additions to an existing page go in c
    python3 scripts/lint.py --tier1
    ```
 
+   Backlink changes are applied as one recoverable generation. Preserve `.wiki-transactions/` and diagnose a named conflict or corrupt record before retrying or promoting the synthesis.
+
    All three must pass.
 
 5. Update `wiki/synthesis.md` only as part of the approved scope: refresh Current state digest lines that changed, append a run-ledger entry, and bump `updated:`.
